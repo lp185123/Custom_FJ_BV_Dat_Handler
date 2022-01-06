@@ -1,5 +1,5 @@
 ###apply "best in class" image preprocessing parameters found by ML stage
-###use after GeneticAlg_SNR file
+###if using ML optimisation stage must place the saved state OBJ in the root of the media source folder
 import copy
 import copy
 import _3DVisLabLib
