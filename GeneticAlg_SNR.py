@@ -16,8 +16,8 @@ class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=100
-        self.No_TopCandidates=15
+        self.No_of_First_gen=5
+        self.No_TopCandidates=5
         self.NewIndividualsPerGen=2
         self.TestImageBatchSize=5
         self.NewImageCycle=4
