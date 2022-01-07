@@ -1,26 +1,8 @@
 import cv2
 import numpy as np
 import os
-import sys
-import imutils
-import glob
-#print(str( sys.exec_prefix.split(os.sep)[-1] ))
-import math
-import pickle
-import math
-import _3DVisLabLib
-#from scipy.stats import norm
-from random import randint
-import time
-import copy
-import glob
-import matplotlib.pyplot as plt
-import traceback
-import random
 import pytesseract
 from pytesseract import*
-import BV_DatReader_Lib
-from pathlib import Path
 import difflib
 import enum
 
@@ -123,7 +105,6 @@ class TestSNR_Fitness():
         self.Known_Snr_Fitness=0
 
     
-
     def RunSNR_With_Parameters_multiprocess(self,MultiProcessSNR_Object):
         #multiprocess version of SNR fitness check - everything is in same namespace to avoid complications
         Name=MultiProcessSNR_Object[0]

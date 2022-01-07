@@ -1,16 +1,12 @@
-import win32clipboard
+
 import cv2
 import numpy as np
 import time
 import copy
-import binascii
 from pathlib import Path
 #sys.path.append('H:/CURRENT/PythonStuff/CUSTOM/')
 import _3DVisLabLib
-import os
-import random
 from copy import deepcopy
-import re
 from collections import namedtuple
 import enum
 import DatScraper_tool
@@ -50,6 +46,91 @@ class UserOperationStrings(enum.Enum):
             return self.MapKeyPress_to_String[keypress]
         else:
             return None
+
+class UserInputParameters():
+
+    def __init__(self):
+        self.InputFilePath=""
+        self.OutputFilePath=""
+        self.FirstImageOnly=True
+        self.AutomaticMode=True
+        self.BlockType_ImageFormat=""
+        self.BlockTypeWave=""
+
+        self.UserInput_and_test()
+        self.PrintAllUserInputs()
+
+    def PrintAllUserInputs(self):
+        #self test for developer
+        ListParams=[self.InputFilePath,
+        self.OutputFilePath,
+        self.FirstImageOnly,
+        self.AutomaticMode,
+        self.BlockType_ImageFormat,
+        self.BlockTypeWave]
+
+        print(ListParams)
+
+    def UserInput_and_test(self):
+        ##build user requests for operation
+        
+
+        #get all files in input folder
+        while True:
+            #ask what is input folder
+            Result = input("Please enter folder for analysis:")
+            InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(Result)
+            #clean files
+            InputFiles_cleaned=[]
+            for elem in InputFiles:
+                if ((".dat") in elem.lower()):
+                    InputFiles_cleaned.append(elem) 
+            print("Dat files found in folder: ", InputFiles_cleaned)
+            if (InputFiles_cleaned) is None or len(InputFiles_cleaned)<1:
+                print("Invalid folder or folder & nested folders have no .dat files")
+            else:
+                self.InputFilePath=Result
+                break
+        
+            #output folder hardcoded for now - warning we dont want the user to set same 
+            #folder for output and input as files will be deleted - but generally will put preview images
+            #alongside data
+
+        self.AutomaticMode=_3DVisLabLib.yesno("Automatic(y) or Manual (m) mode?")
+        if self.AutomaticMode==False: return False
+        self.FirstImageOnly=_3DVisLabLib.yesno("All Images (y) or First image only (n)?")
+
+        while True:
+            #ask user what block type (format of image)
+            for Elem in DatScraper_tool.ImageExtractor.BLOCK_TYPES:
+                if Elem in DatScraper_tool.ImageExtractor.IMAGE_TYPES:
+                    print(Elem, DatScraper_tool.ImageExtractor.BLOCK_TYPES[Elem])
+            Result = input("Please enter image format using ID number - non-image data available but not developed:")
+            numeric_filter = filter(str.isdigit, Result)
+            numeric_string = "".join(numeric_filter)
+            if int(numeric_string) in DatScraper_tool.ImageExtractor.IMAGE_TYPES:#TODO this will crash if user puts in non numeric chars probably
+                self.BlockType_ImageFormat=Result
+                break
+            else:
+                print("\n \n \n \n \n")
+                print(Result, "is an invalid choice - please try again")
+
+        while True:
+            #ask user what block type (format of image)
+            print("\n \n \n \n \n")
+            for Elem in DatScraper_tool.ImageExtractor.WAVE_DICTIONARY:
+                print(DatScraper_tool.ImageExtractor.WAVE_DICTIONARY[Elem])
+            Result = input("Please enter wave type:")
+            if Result in DatScraper_tool.ImageExtractor.WAVE_DICTIONARY.values():
+                self.BlockTypeWave=Result
+                break
+            else:
+                print("\n \n \n \n \n")
+                print(Result, "is an invalid choice - please try again")
+            
+
+
+
 
 class DatFileInfos():
     #do not instance class - reference only
@@ -200,8 +281,7 @@ def CreateGrayImage_from_memory(List_decimalValues, WidthImage,HeightImage):
                     DataVerify_image[Yelement,Xelement,2]=0
 
     return (gray_image,DataVerify_image)
-
-    
+   
 def GetDataFile(InputPath):
     #Load input data
     #data=Load_Hex_File(r"C:\Working\FindIMage_In_Dat\01_5_A.dat")
@@ -594,7 +674,8 @@ def RipAllImagePerDat(OutputFolder,InputFiles_cleaned,RawHex,UserManualMemorySca
     
     #clean output folder
     print ("Cleaning output folder :", OutputFolder)
-    _3DVisLabLib.DeleteFiles_RecreateFolder(OutputFolder)
+    result=_3DVisLabLib.yesno("Continue to delete all contents (including nested) of folder?")
+    if result==True: _3DVisLabLib.DeleteFiles_RecreateFolder(OutputFolder)
     
 
     for counter2, FileName in enumerate(InputFiles_cleaned): 
