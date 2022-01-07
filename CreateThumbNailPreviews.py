@@ -252,6 +252,8 @@ def main():
 
     if GetParametersFromUser.AutomaticMode==False:
         ManualMode(GetParametersFromUser)
+    else:
+        BV_DatReader_Lib.AutomaticExtraction(GetParametersFromUser)
 
 
 

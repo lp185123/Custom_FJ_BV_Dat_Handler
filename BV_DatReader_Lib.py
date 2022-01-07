@@ -56,7 +56,7 @@ class UserInputParameters():
         self.AutomaticMode=True
         self.BlockType_ImageFormat=""
         self.BlockTypeWave=""
-
+        self.GetSNR=False
         self.UserInput_and_test()
         self.PrintAllUserInputs()
 
@@ -109,7 +109,7 @@ class UserInputParameters():
             numeric_filter = filter(str.isdigit, Result)
             numeric_string = "".join(numeric_filter)
             if int(numeric_string) in DatScraper_tool.ImageExtractor.IMAGE_TYPES:#TODO this will crash if user puts in non numeric chars probably
-                self.BlockType_ImageFormat=Result
+                self.BlockType_ImageFormat=DatScraper_tool.ImageExtractor.BLOCK_TYPES[int(numeric_string)]
                 break
             else:
                 print("\n \n \n \n \n")
@@ -128,6 +128,48 @@ class UserInputParameters():
                 print("\n \n \n \n \n")
                 print(Result, "is an invalid choice - please try again")
             
+        while True:
+            GetSNR=_3DVisLabLib.yesno("Get Serial Number if available? y/n")
+
+def AutomaticExtraction(UserParameters):
+    #process according to user input parameters
+    #     self.InputFilePath=""
+    #     self.OutputFilePath=""
+    #     self.FirstImageOnly=True
+    #     self.AutomaticMode=True
+    #     self.BlockType_ImageFormat=""
+    #     self.BlockTypeWave=""
+
+    #get all files in input folder - already done but in case we change logic 
+    InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(UserParameters.InputFilePath)
+    #clean files
+    InputFiles_cleaned=[]
+    for elem in InputFiles:
+        if ((".dat") in elem.lower()):
+            InputFiles_cleaned.append(elem)
+    for DatFile in InputFiles_cleaned:
+    #get all images from first .dat file in input folder(s) (nested)
+        images = DatScraper_tool.ImageExtractor(DatFile)
+        #filter for SNR images
+        filteredImages = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.BlockTypeWave)
+        
+
+
+        if UserManualMemoryScan.SNR_extractMode==SNR_string_extract.Automatic:
+            #user has activated automatic extraction of serial number reads
+            images = DatScraper_tool.ImageExtractor(FileName)
+            for Index, Item in enumerate(images.notes):
+                Tempsnr=str(Item.snr)
+                if Tempsnr is None:
+                    SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
+                    raise Exception("Could not parse SNR")
+                elif Tempsnr =="":
+                    SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
+                    raise Exception("Could not parse SNR")
+                else:
+                    SNR_Results_per_record[Index+1]="[" + (str(Item.snr)) + "]" + str(UserManualMemoryScan.DatFileDataType)
+
+
 
 
 
