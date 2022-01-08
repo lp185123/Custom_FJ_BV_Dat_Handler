@@ -14,11 +14,11 @@ class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=5
-        self.No_TopCandidates=5
-        self.NewIndividualsPerGen=2
-        self.TestImageBatchSize=5
-        self.NewImageCycle=4
+        self.No_of_First_gen=2
+        self.No_TopCandidates=2
+        self.NewIndividualsPerGen=1
+        self.TestImageBatchSize=20
+        self.NewImageCycle=1
 
         #self checking parameters
         self.TargetParameters=dict()
@@ -38,7 +38,7 @@ class GA_Parameters():
         self.DictFilename_V_Images=dict()#load this with fitness check images
         #load fitness checking images into memory - #TODO make dynamic
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\FitnessTest"
-        self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
+        self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\Brazil"
         #save out parameter converging image
         self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"
         self.GetRandomSet_TestImages()
@@ -157,6 +157,83 @@ class GA_Parameters():
 
 class Individual():
 
+    def mapFromTo(self,x,a,b,c,d):
+    # x:input value; 
+    # a,b:input range
+    # c,d:output range
+    # y:return value
+        y=(x-a)/(b-a)*(d-c)+c
+        return y
+
+    def ApplicationSpecificMapping(self):
+        #Scale parameters from 0-1 scale to application specific scales
+        OutputParameters=dict()
+        for param in self.Parameters:
+            Upper=None
+            Lower=None
+            SetRange=[]
+            if param ==["PSM"]:
+                Upper=3
+                Lower=13
+                SetRange=[3,5,6,7,8,13]#segmentation for SNR modes
+                temp=self.mapFromTo(param,0,1,Lower,Upper)
+            if param ==["ResizeX"]:
+                Upper=250
+                Lower=80
+                temp=self.mapFromTo(param,0,1,Lower,Upper)
+                temp=int(round(temp))
+            if param ==["ResizeY"]:
+                Upper=250
+                Lower=80
+                temp=self.mapFromTo(param,0,1,Lower,Upper)
+                temp=int(round(temp))
+            if param ==["Canny"]:
+                Upper=1
+                Lower=0
+                temp=self.mapFromTo(param,0,1,Lower,Upper)
+            if param ==["AdapativeThreshold"]:
+                Upper=255
+                Lower=160
+                temp=self.mapFromTo(param,0,1,Lower,Upper)
+                temp=int(round(temp))
+            if param ==["MedianBlurDist"]:
+                Upper=11
+                Lower=0
+                temp=self.mapFromTo(param,0,1,Lower,Upper)
+                temp=int(round(temp))
+            if param ==["GausSize_Threshold"]:
+                Upper=21
+                Lower=3
+                SetRange=[3,5,7,9,11,13,15,17,19,21]#threshold gaussian values
+                temp=self.mapFromTo(param,0,1,Lower,Upper)
+            if param ==["SubtractMean"]:
+                Upper=15
+                Lower=0
+                temp=self.mapFromTo(param,0,1,Lower,Upper)
+                temp=int(round(temp))
+            if param ==["AlphaBlend"]:
+                Upper=1
+                Lower=0
+                temp=self.mapFromTo(param,0,1,Lower,Upper)
+            if param ==["CropPixels"]:
+                Upper=30
+                Lower=0
+                temp=self.mapFromTo(param,0,1,Lower,Upper)
+                temp=int(round(temp))
+
+            #if nothing populated throw up an error
+            if (Upper is None) or (Lower is None):
+                raise Exception(param, "key not found when mapping parameters to application specific range")
+
+            #if non linear list range 
+            if len(SetRange)!=0:
+                temp=self.FixRangedValue(temp,self.PSMset)
+
+            #assign mapped value from 0-1 to range of working parameter for testing fitness
+            OutputParameters[param]=temp
+
+            return OutputParameters
+        
     def GradientDescent_OneStep(self,PolarityAsInteger,InputParameter):
         #this is a poor mans "gradient descent"
         #take a "step" for parameter in question - will be application specific
@@ -202,7 +279,7 @@ class Individual():
         self.Parameters["GausSize_Threshold"]=random.choice(self.GausThresholds)
         self.Parameters["SubtractMean"]=random.randint(0,15)
         self.Parameters["AlphaBlend"]=random.random()#blend processed and raw image between 0 and 1
-        self.Parameters["CropPixels"]=random.randint(0,0)#crop from borders for X and Y 
+        self.Parameters["CropPixels"]=random.randint(0,30)#crop from borders for X and Y 
 
 
         #group parameters - as we are addressing vision tools these typically have more than one parameter per function
@@ -244,7 +321,6 @@ class Individual():
         if self.Parameters["MedianBlurDist"]%2==0:#has to be odd number
             self.Parameters["MedianBlurDist"]=self.Parameters["MedianBlurDist"]+1
         
-        
         self.Parameters["PSM"]=self.FixRangedValue(self.Parameters["PSM"],self.PSMset)
         self.Parameters["GausSize_Threshold"]=self.FixRangedValue(self.Parameters["GausSize_Threshold"],self.GausThresholds)
 
@@ -255,10 +331,11 @@ class Individual():
 
         self.Parameters["SubtractMean"]=int(_3DVisLabLib.clamp(self.Parameters["SubtractMean"],0,15))
         self.Parameters["AdapativeThreshold"]=int(_3DVisLabLib.clamp(self.Parameters["AdapativeThreshold"],160,255))
-        self.Parameters["CropPixels"]=int(_3DVisLabLib.clamp(self.Parameters["CropPixels"],0,0))
+        self.Parameters["CropPixels"]=int(_3DVisLabLib.clamp(self.Parameters["CropPixels"],0,30))
 
 
     def FixRangedValue(self,Parameter,Range):
+        #if this gets too cpu heavy then optimise with successive approximation
             #keep segmentation mode between these values
         Parameter=int(round(Parameter,0))
         LowestError=9999999#can we do inf here?
@@ -421,6 +498,7 @@ def ExternalCheckFitness_SNR(InputParameters,List_of_Fitness_images,SNR_fitnessT
 
     SNRparams=BuildSNR_Parameters(InputParameters,SNR_fitnessTest)
 
+
     #roll through images and get fitness total
     if len (List_of_Fitness_images)==0:
         raise Exception("no fitness input images!!")
@@ -451,7 +529,7 @@ def ExternalCheckFitness_SNR(InputParameters,List_of_Fitness_images,SNR_fitnessT
     
     NormalisedScore=TotalScore/PotentialScore
 
-    return NormalisedScore,TapOut,BestImg
+    return NormalisedScore,TapOut,ReturnImg#sending back last image instead so we can potentially see improvement
   
 def CheckFitness(InputGenDict,GenParams,SNR_fitnessTest):
     print("Check Fitness of ", len(InputGenDict), "genomes")
@@ -647,23 +725,81 @@ def CrossBreed(InputDict_Candidates,NameOfGen):
 def RemoveDuplicateIndividuals(InputDict_Candidates,NameOfGen):
     DictParameters=dict()#use dictionary overwrite method
     DictProgenitors=dict()
+    ListDuplicateIndvs=[]
     for Idv in InputDict_Candidates:
         if str(InputDict_Candidates[Idv].Parameters) in DictParameters.keys():
-            pass
+            #add to naughty list
+            ListDuplicateIndvs.append(Idv)
         else:
             DictParameters[str(InputDict_Candidates[Idv].Parameters)]=InputDict_Candidates[Idv]
+
     Duplicatesremoved=len(InputDict_Candidates)-len(DictParameters)
     if Duplicatesremoved >0:
-        print("Duplicates removed",Duplicatesremoved)
-
+        print("Duplicates will be removed",Duplicatesremoved)
     for Idv in DictParameters:
         DictProgenitors[DictParameters[Idv].name]=DictParameters[Idv]
-    #add randoms to fill back space
-    for looper in range (Duplicatesremoved):
+    #add randoms/mutated to fill back space
+    for Idv in ListDuplicateIndvs:
         TempIdv=Individual(NameOfGen + "_dp")
-        DictProgenitors[TempIdv.name]=copy.deepcopy(TempIdv)#TODO make this a crossbreed instead
+        Dummy,Genes=InputDict_Candidates[Idv].GetGenes()
+        TempIdv.CrossBreed([Genes,Genes],2)#mutate 2 genes - better strategy than new genome
+        DictProgenitors[TempIdv.name]=copy.deepcopy(TempIdv)
+    #for looper in range (Duplicatesremoved):
+     #   TempIdv=Individual(NameOfGen + "_dp")
+     #   DictProgenitors[TempIdv.name]=copy.deepcopy(TempIdv)#TODO make this a crossbreed instead
 
     return DictProgenitors, Duplicatesremoved
+
+def RemoveIndividualsCloseFitness(InputDict_Candidates,FitnessBuffer,NameOfGen):
+    #remove individuals that are close to duplicate fitness, and most probably will have almost same parameters
+    #sort by error
+    #TODO this might be legitimate convergence with similar 
+    Copy_InputDict_Candidates=copy.deepcopy(InputDict_Candidates)
+
+    DictOfFitness=dict()
+    for I in Copy_InputDict_Candidates:
+        if not Copy_InputDict_Candidates[I].Fitness is None:#might not have been assessed at this stage and will be None
+            DictOfFitness[Copy_InputDict_Candidates[I].Fitness]=Copy_InputDict_Candidates[I].name
+    SortedFitness=(sorted(DictOfFitness.keys()))
+
+    ListForRemoval=[]
+    if len(SortedFitness)>0:
+        BaseFitness=SortedFitness[0]
+        for Fitness in SortedFitness:
+            if BaseFitness==Fitness:#same genomes - skip - should never have same fitnesses under any circumstances as dictionary
+                #will not allow duplicate keys
+                continue
+            if abs(Fitness-BaseFitness)<FitnessBuffer:
+                ListForRemoval.append(Fitness)#add genome to list for removal
+            if abs(Fitness-BaseFitness)>FitnessBuffer:
+                BaseFitness=Fitness#cleared out buffer of fitness, onto next buffer pitch
+
+        #clean up duplicate fitnesses, instead of deleting lets mutate them
+
+        if len(ListForRemoval)>0:
+            for Idv in InputDict_Candidates:
+                if InputDict_Candidates[Idv].Fitness in ListForRemoval:
+                    TempIdv=Individual(NameOfGen + "_fcu")
+                    Dummy,Genes=InputDict_Candidates[Idv].GetGenes()
+                    TempIdv.CrossBreed([Genes,Genes],2)#mutate 2 genes - better strategy than new genome
+                    del Copy_InputDict_Candidates[Idv]
+                    Copy_InputDict_Candidates[TempIdv.name]=copy.deepcopy(TempIdv)
+
+                    if len(InputDict_Candidates)!=len(Copy_InputDict_Candidates):
+                        raise Exception("Error removing close fitness genomes - output dictionary does not match")
+
+        return Copy_InputDict_Candidates
+
+            
+            
+
+            
+
+        
+
+
+    print("SortedFitness",SortedFitness)
+    return(InputDict_Candidates)
 
 if __name__ == "__main__":
     #Global timestamp
@@ -689,24 +825,24 @@ if __name__ == "__main__":
         DictOfFirstGen[NewIndividual.name]=copy.deepcopy(NewIndividual)#ensure Python is creating instances
     
 
-    # #load into memory
-    # filepath=GenParams.OutputFolder +"\\" + "SavedState" + ".obj"
-    # file_pi2 = open(filepath, 'rb')
-    # SaveList=[]
-    # SaveList = pickle.load(file_pi2)
-    # file_pi2.close()
+    #load into memory
+    filepath=GenParams.OutputFolder +"\\" + "SavedState" + ".obj"
+    file_pi2 = open(filepath, 'rb')
+    SaveList=[]
+    SaveList = pickle.load(file_pi2)
+    file_pi2.close()
 
-    # GenParams=None
-    # DictFitCandidates=None
-    # GenParams=copy.deepcopy(SaveList[0])
-    # DictFitCandidates=copy.deepcopy(SaveList[1])
-    # GenParams.TestImageBatchSize=100
-    # GenParams.NewImageCycle=99999999
-    # GenParams.No_TopCandidates=20
+    GenParams=None
+    DictFitCandidates=None
+    GenParams=copy.deepcopy(SaveList[0])
+    DictFitCandidates=copy.deepcopy(SaveList[1])
+    GenParams.TestImageBatchSize=5
+    GenParams.NewImageCycle=1
+    GenParams.No_TopCandidates=20
 
 
     #assess first generation - here we can potentially load in a saved state
-    DictFitCandidates=CheckFitness(DictOfFirstGen,GenParams,SNR_fitnessTest)
+    #DictFitCandidates=CheckFitness(DictOfFirstGen,GenParams,SNR_fitnessTest)
 
     #start main training loop
     for i in range (0,999999):
@@ -741,10 +877,11 @@ if __name__ == "__main__":
                 DictFitCandidates=GradientDescent(DictFitCandidates,GenerationName +"_gD",StepSize)
                 DictFitCandidates,DuplicateCount=RemoveDuplicateIndividuals(DictFitCandidates,GenerationName)
                 DictFitCandidates=CheckFitness(DictFitCandidates,GenParams,SNR_fitnessTest)
+                DictFitCandidates=RemoveIndividualsCloseFitness(DictFitCandidates,0.01,GenerationName)
                 #if no response - increase step size
                 if (GenParams.CheckRepeatingFitness(2,0.01)==True) and looper>1:
                     print("$$$$$$$$$Gradient descent", "increasing step")
-                    StepSize=StepSize+1
+                    StepSize=StepSize+5
                 #if no change in fitness - break out
                 if (GenParams.CheckRepeatingFitness(3,0.01)==True) and looper>5:
                     print("$$$$$$$$$Gradient descent", "stuck in minima, breaking")
@@ -766,7 +903,7 @@ if __name__ == "__main__":
 
         #check no duplcaites
         DictFitCandidates,DuplicateCount=RemoveDuplicateIndividuals(DictFitCandidates,GenerationName)
-
+        DictFitCandidates=RemoveIndividualsCloseFitness(DictFitCandidates,0.01,GenerationName)
         #save state
         if i%3==0:
             SaveList=[GenParams,DictFitCandidates]
