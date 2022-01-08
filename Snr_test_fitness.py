@@ -42,15 +42,15 @@ class SNR_Parameters():
         self.kernel = np.ones((1,1), np.uint8)
         self.ConfidenceCutoff=80
         self.Canny=0
-        self.AdapativeThreshold=255
-        self.MedianBlurDist=5
-        self.GausSize_Threshold=11
-        self.SubtractMean=4
+        self.AdapativeThreshold=0
+        self.MedianBlurDist=0
+        self.GausSize_Threshold=0
+        self.SubtractMean=0
         self.tessedit_char_whitelist='0123456789'#use if necessary
-        self.AlphaBlend=1
+        self.AlphaBlend=1#one means no processing
         self.CropPixels=0
         self.Mirror=True
-        self.PSM=3#to throw error if not initialised
+        self.PSM=3#default is 3
         #psm is page segment modes - see pytessaract manual
         #self.config='--oem 3 --psm 6 -c load_system_dawg=0 load_freq_dawg=0 load_punc_dawg=0'
         #self.config = '--oem 3 --psm 6' #known to work

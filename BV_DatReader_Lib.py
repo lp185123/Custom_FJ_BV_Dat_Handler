@@ -267,12 +267,10 @@ def ConvertListHex_to_integers(InputListHex_str):
     return ListOfGrayScaleInt
 
 def mapFromTo(x,a,b,c,d):
-
     # x:input value; 
     # a,b:input range
     # c,d:output range
     # y:return value
-
    y=(x-a)/(b-a)*(d-c)+c
    return y
 
