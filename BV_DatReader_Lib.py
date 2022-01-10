@@ -57,6 +57,16 @@ class UserInputParameters():
         self.BlockType_ImageFormat=""
         self.BlockTypeWave=""
         self.GetSNR=False
+
+        # self.InputFilePath=r"C:\Working\FindIMage_In_Dat\Input"
+        # self.OutputFilePath=r"C:\Working\FindIMage_In_Dat\Output"
+        # self.FirstImageOnly=True
+        # self.AutomaticMode=True
+        # self.BlockType_ImageFormat="18"
+        # self.BlockTypeWave="None"
+        # self.GetSNR=True
+
+
         self.UserInput_and_test()
         self.PrintAllUserInputs()
 
@@ -128,8 +138,7 @@ class UserInputParameters():
                 print("\n \n \n \n \n")
                 print(Result, "is an invalid choice - please try again")
             
-        while True:
-            GetSNR=_3DVisLabLib.yesno("Get Serial Number if available? y/n")
+        GetSNR=_3DVisLabLib.yesno("Get Serial Number if available? y/n")
 
 def AutomaticExtraction(UserParameters):
     #process according to user input parameters
@@ -153,21 +162,19 @@ def AutomaticExtraction(UserParameters):
         #filter for SNR images
         filteredImages = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.BlockTypeWave)
         
-
-
-        if UserManualMemoryScan.SNR_extractMode==SNR_string_extract.Automatic:
-            #user has activated automatic extraction of serial number reads
-            images = DatScraper_tool.ImageExtractor(FileName)
-            for Index, Item in enumerate(images.notes):
-                Tempsnr=str(Item.snr)
-                if Tempsnr is None:
-                    SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
-                    raise Exception("Could not parse SNR")
-                elif Tempsnr =="":
-                    SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
-                    raise Exception("Could not parse SNR")
-                else:
-                    SNR_Results_per_record[Index+1]="[" + (str(Item.snr)) + "]" + str(UserManualMemoryScan.DatFileDataType)
+        #get SNR read if any exist
+        SNR_Results_per_record=dict()
+        for Index, Item in enumerate(images.notes):
+            Tempsnr=str(Item.snr)
+            if Tempsnr is None:
+                SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
+                raise Exception("Could not parse SNR")
+            elif Tempsnr =="":
+                SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
+                raise Exception("Could not parse SNR")
+            else:
+                SNR_Results_per_record[Index+1]="[" + (str(Item.snr)) + "]" + str(DatFile)
+        print(SNR_Results_per_record)
 
 
 

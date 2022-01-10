@@ -42,6 +42,8 @@ class SNR_Parameters():
         self.kernel = np.ones((1,1), np.uint8)
         self.ConfidenceCutoff=80
         self.Canny=0
+        self.CannyThresh1=100
+        self.CannyThresh2=200
         self.AdapativeThreshold=0
         self.MedianBlurDist=0
         self.GausSize_Threshold=0
@@ -51,6 +53,7 @@ class SNR_Parameters():
         self.CropPixels=0
         self.Mirror=True
         self.PSM=3#default is 3
+        
         #psm is page segment modes - see pytessaract manual
         #self.config='--oem 3 --psm 6 -c load_system_dawg=0 load_freq_dawg=0 load_punc_dawg=0'
         #self.config = '--oem 3 --psm 6' #known to work
@@ -278,7 +281,7 @@ class TestSNR_Fitness():
             ProcessedImage = cv2.adaptiveThreshold(ProcessedImage, ParameterObject.AdapativeThreshold, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,ParameterObject.GausSize_Threshold,ParameterObject.SubtractMean) #cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11,2)[1]
         
         if ParameterObject.Canny!=0:
-            ProcessedImage=cv2.Canny(ProcessedImage, 100, 200)
+            ProcessedImage=cv2.Canny(ProcessedImage, ParameterObject.CannyThresh1, ParameterObject.CannyThresh2)
 
         #blend processed and base(resized)image according to Alpha blend parameter
         beta = (1.0 - ParameterObject.AlphaBlend)
