@@ -37,8 +37,7 @@ def main():
             if ((".dat") in elem.lower()):
                 InputFiles_cleaned.append(elem)
             
-        #load as hex
-        data_hex=BV_DatReader_Lib.Load_Hex_File(InputFiles_cleaned[0])
+                       
         
         #let user select area of memory
         #create instance of helper class

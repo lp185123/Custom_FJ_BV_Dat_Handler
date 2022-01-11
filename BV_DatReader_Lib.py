@@ -57,18 +57,26 @@ class UserInputParameters():
         self.BlockType_ImageFormat=""
         self.BlockTypeWave=""
         self.GetSNR=False
+        self.GetRGBImage=False#if user selects "C" - automatically superimpose with other channels to complete an RGB image
 
-        # self.InputFilePath=r"C:\Working\FindIMage_In_Dat\Input"
-        # self.OutputFilePath=r"C:\Working\FindIMage_In_Dat\Output"
-        # self.FirstImageOnly=True
-        # self.AutomaticMode=True
-        # self.BlockType_ImageFormat="18"
-        # self.BlockTypeWave="None"
-        # self.GetSNR=True
+        self.HardCodedSnr_BlockType="SRU SNR image1"
+        self.HardCodedSnr_Wave="None"
+        #image subset waves for RGB channels
+        self.TopFeed_RGBwaves=["C","E1","F1"]
+        self.UnderFeed_RGBwaves=["D","E2","F2"]
 
+        #testing automatic fill
+        self.InputFilePath=r"E:\NCR\Currencies\lebanon\Sorted"
+        self.OutputFilePath=r"C:\Working\FindIMage_In_Dat\Output"
+        self.FirstImageOnly=True
+        self.AutomaticMode=True
+        self.BlockType_ImageFormat="GBVE MM1 image"
+        self.BlockTypeWave="C"
+        self.GetSNR=False
+        self.GetRGBImage=True
 
-        self.UserInput_and_test()
-        self.PrintAllUserInputs()
+        #self.UserInput_and_test()
+        #self.PrintAllUserInputs()
 
     def PrintAllUserInputs(self):
         #self test for developer
@@ -108,7 +116,7 @@ class UserInputParameters():
 
         self.AutomaticMode=_3DVisLabLib.yesno("Automatic(y) or Manual (m) mode?")
         if self.AutomaticMode==False: return False
-        self.FirstImageOnly=_3DVisLabLib.yesno("All Images (y) or First image only (n)?")
+        self.FirstImageOnly=_3DVisLabLib.yesno("All Images (y) or First image only (n)?\n nb [First Image Only] will write into input folder as complimentary image files")
 
         while True:
             #ask user what block type (format of image)
@@ -137,19 +145,32 @@ class UserInputParameters():
             else:
                 print("\n \n \n \n \n")
                 print(Result, "is an invalid choice - please try again")
-            
+        
+            #ask user if they want the colour image
+        print("\n \n \n \n \n")
+        self.GetRGBImage=_3DVisLabLib.yesno("Extract RGB channels into one image?")
+        
+        #does user want SNR values associated with extracted data
         GetSNR=_3DVisLabLib.yesno("Get Serial Number if available? y/n")
 
-def AutomaticExtraction(UserParameters):
-    #process according to user input parameters
-    #     self.InputFilePath=""
-    #     self.OutputFilePath=""
-    #     self.FirstImageOnly=True
-    #     self.AutomaticMode=True
-    #     self.BlockType_ImageFormat=""
-    #     self.BlockTypeWave=""
 
-    #get all files in input folder - already done but in case we change logic 
+
+def Image_from_Automatic_mode(filteredImages,Notefound,data_hex):
+    #for automatic extraction mode, input filtered data from dat scraper tool (such as MM1, C)
+    #instance memory object used by manual data skimmer for cross compatibility
+    UserManualMemoryScan=UserManualMemoryScan_helper()
+    #set skimmer position using details from automatic image scraper
+    UserManualMemoryScan.Offset=int(filteredImages[Notefound].offsetStart)
+    UserManualMemoryScan.OffsetEnd=hex(int(filteredImages[Notefound].offsetEnd))
+    UserManualMemoryScan.Width=int(filteredImages[Notefound].width)
+    UserManualMemoryScan.Height=int(filteredImages[Notefound].height)
+    #interpret hex as image - WARNING will fail with MM8 data #TODO fix this and keep it compatible with manual extraction
+    (gray_image,DataVerify_image)=GetImage_fromHex(data_hex,UserManualMemoryScan,UserManualMemoryScan.Offset)
+    return (gray_image,DataVerify_image)
+
+
+def AutomaticExtraction(UserParameters):
+    #get all files in input folder - already done but to make code modular
     InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(UserParameters.InputFilePath)
     #clean files
     InputFiles_cleaned=[]
@@ -158,23 +179,64 @@ def AutomaticExtraction(UserParameters):
             InputFiles_cleaned.append(elem)
     for DatFile in InputFiles_cleaned:
     #get all images from first .dat file in input folder(s) (nested)
+        print("Processing",DatFile)
+        #get all images found in file
         images = DatScraper_tool.ImageExtractor(DatFile)
-        #filter for SNR images
+        #filter to request specific image type and subtype (for instance mm1 image in A1 wave)
         filteredImages = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.BlockTypeWave)
-        
-        #get SNR read if any exist
-        SNR_Results_per_record=dict()
-        for Index, Item in enumerate(images.notes):
-            Tempsnr=str(Item.snr)
-            if Tempsnr is None:
-                SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
-                raise Exception("Could not parse SNR")
-            elif Tempsnr =="":
-                SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
-                raise Exception("Could not parse SNR")
-            else:
-                SNR_Results_per_record[Index+1]="[" + (str(Item.snr)) + "]" + str(DatFile)
-        print(SNR_Results_per_record)
+        #check filtered images
+        if len(filteredImages)==0 or filteredImages is None:
+            raise Exception(DatFile, "Automatic image extraction",UserParameters.BlockType_ImageFormat,UserParameters.BlockTypeWave,"not found")
+        #if user has requested colour channel combination - superimpose RGB channels
+        #first channel is assumed to be C/D channel (feed topside and feed underside)
+        if UserParameters.GetRGBImage==True:
+            filteredImagesG = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[1])
+            filteredImagesB = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[2])
+            if ((len(filteredImages) +len(filteredImagesG) +len(filteredImagesB))/3)!=len(filteredImagesB):
+                raise Exception(DatFile,"Automatic image extraction RGB channels: extracted channel sizes do not match!")
+
+        #load in dat file as hex
+        data_hex=Load_Hex_File(DatFile)
+        #roll through filtered images and extract from datamass
+        for Notefound in filteredImages:
+            (gray_image,dummy)=Image_from_Automatic_mode(filteredImages,Notefound,data_hex)
+
+            #if request for all colour channels is true - combine images
+            #this will have been checked earlier for alignment
+            if UserParameters.GetRGBImage==True:
+                (green_image,dummy)=Image_from_Automatic_mode(filteredImagesG,Notefound,data_hex)
+                (blue_image,dummy)=Image_from_Automatic_mode(filteredImagesB,Notefound,data_hex)
+                _3DVisLabLib.ImageViewer_Quickv2(green_image,1,False,False)
+                _3DVisLabLib.ImageViewer_Quickv2(blue_image,1,False,False)
+
+
+            #display image
+            _3DVisLabLib.ImageViewer_Quickv2(gray_image,1,False,False)
+            #if user only requires first image, break out of loop
+            if UserParameters.FirstImageOnly==True:
+                break
+
+
+
+
+        #if user requests Serial number read alongside images
+        if UserParameters.GetSNR==True:
+            #filter for SNR images
+            filteredImages = images.filter(UserParameters.HardCodedSnr_BlockType,UserParameters.HardCodedSnr_Wave)
+            #get SNR read if any exist
+            SNR_Results_per_record=dict()
+            for Index, Item in enumerate(images.notes):
+                Tempsnr=str(Item.snr)
+                if Tempsnr is None:
+                    SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
+                    raise Exception(DatFile, "Could not parse SNR (user request)")
+                elif Tempsnr =="":
+                    SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
+                    raise Exception(DatFile,"Could not parse SNR  (user request)")
+                else:
+                    #build serial number return string - generally they are packaged with square brackets
+                    SNR_Results_per_record[Index+1]="[" + (str(Item.snr)) + "]" + str(DatFile)
+            print("SNR_Results_per_record", SNR_Results_per_record)
 
 
 

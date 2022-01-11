@@ -15,10 +15,10 @@ class GA_Parameters():
         self.FitnessRecord=dict()
         self.SelfCheck=False
         self.No_of_First_gen=50
-        self.No_TopCandidates=25
+        self.No_TopCandidates=20
         self.NewIndividualsPerGen=0
-        self.TestImageBatchSize=10
-        self.NewImageCycle=1
+        self.TestImageBatchSize=7
+        self.NewImageCycle=10
         self.ImageTapOut=6#terminate anything that has poor performance out the box
 
         self.DictFilename_V_Images=dict()#load this with fitness check images
@@ -519,7 +519,7 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
     print("Gen lowest Error (best fitness) = ", SortedFitness[0])
     print("name", InputGenDict[DictOfFitness[SortedFitness[0]]].name)
     print("Parameters", InputGenDict[DictOfFitness[SortedFitness[0]]].ApplicationSpecificMapping())
-
+    print("All fitness:", SortedFitness[:])
     # if SortedFitness[0]<2:
     #   sss
     #   exit
