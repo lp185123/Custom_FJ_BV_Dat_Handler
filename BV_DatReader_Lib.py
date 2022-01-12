@@ -17,7 +17,6 @@ class OperationCodes(enum.Enum):
 
 
 class UserOperationStrings(enum.Enum):
-    #TODO map user key press here rather than in two places - interrogate the enum instead of dictionary
     UP="w"
     DOWN="s"
     LEFT="a"
@@ -66,7 +65,7 @@ class UserInputParameters():
         self.UnderFeed_RGBwaves=["D","E2","F2"]
 
         #testing automatic fill
-        self.InputFilePath=r"E:\NCR\Currencies\lebanon\Sorted"
+        self.InputFilePath=r"E:\NCR\Currencies\lebanon\Sorted\100000\Gen D"
         self.OutputFilePath=r"C:\Working\FindIMage_In_Dat\Output"
         self.FirstImageOnly=True
         self.AutomaticMode=True
@@ -75,8 +74,8 @@ class UserInputParameters():
         self.GetSNR=False
         self.GetRGBImage=True
 
-        #self.UserInput_and_test()
-        #self.PrintAllUserInputs()
+        self.UserInput_and_test()
+        self.PrintAllUserInputs()
 
     def PrintAllUserInputs(self):
         #self test for developer
@@ -190,34 +189,44 @@ def AutomaticExtraction(UserParameters):
         #if user has requested colour channel combination - superimpose RGB channels
         #first channel is assumed to be C/D channel (feed topside and feed underside)
         if UserParameters.GetRGBImage==True:
-            filteredImagesG = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[1])
+            filteredImagesR = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[1])
             filteredImagesB = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[2])
-            if ((len(filteredImages) +len(filteredImagesG) +len(filteredImagesB))/3)!=len(filteredImagesB):
+            if ((len(filteredImages) +len(filteredImagesR) +len(filteredImagesB))/3)!=len(filteredImagesB):
                 raise Exception(DatFile,"Automatic image extraction RGB channels: extracted channel sizes do not match!")
 
         #load in dat file as hex
         data_hex=Load_Hex_File(DatFile)
         #roll through filtered images and extract from datamass
         for Notefound in filteredImages:
-            (gray_image,dummy)=Image_from_Automatic_mode(filteredImages,Notefound,data_hex)
+            (OutputImage,dummy)=Image_from_Automatic_mode(filteredImages,Notefound,data_hex)
 
             #if request for all colour channels is true - combine images
             #this will have been checked earlier for alignment
             if UserParameters.GetRGBImage==True:
-                (green_image,dummy)=Image_from_Automatic_mode(filteredImagesG,Notefound,data_hex)
+                (red_image,dummy)=Image_from_Automatic_mode(filteredImagesR,Notefound,data_hex)
                 (blue_image,dummy)=Image_from_Automatic_mode(filteredImagesB,Notefound,data_hex)
-                _3DVisLabLib.ImageViewer_Quickv2(green_image,1,False,False)
-                _3DVisLabLib.ImageViewer_Quickv2(blue_image,1,False,False)
-
+                #create empty 3 channel (RGB) image
+                #all images should be same dimensions so arbitary which one we take dims from
+                RGB_Image = np.zeros((int(filteredImages[Notefound].height),int(filteredImages[Notefound].width),3), np.uint8)
+                #use slicing to load image
+                #WARNING these colour channels will not correspond to RGB!!! Done ad hoc 
+                #For OpenCV, 0=blue, 1=Green, 2=red
+                RGB_Image[:,:,0]=blue_image
+                RGB_Image[:,:,1]=OutputImage.copy()
+                RGB_Image[:,:,2]=red_image
+                #should have an RGB image now 
+                OutputImage=RGB_Image.copy()
 
             #display image
-            _3DVisLabLib.ImageViewer_Quickv2(gray_image,1,False,False)
+            _3DVisLabLib.ImageViewer_Quickv2(OutputImage,0,False,False)
+
+            if UserParameters.GetSNR==True:
+                SNR_ReadResult=str(filteredImages[Notefound].note.snr)
+                if SNR_ReadResult is None or SNR_ReadResult =="":raise Exception(DatFile, "Could not parse SNR (by user request)")
+
             #if user only requires first image, break out of loop
             if UserParameters.FirstImageOnly==True:
                 break
-
-
-
 
         #if user requests Serial number read alongside images
         if UserParameters.GetSNR==True:
@@ -236,7 +245,6 @@ def AutomaticExtraction(UserParameters):
                 else:
                     #build serial number return string - generally they are packaged with square brackets
                     SNR_Results_per_record[Index+1]="[" + (str(Item.snr)) + "]" + str(DatFile)
-            print("SNR_Results_per_record", SNR_Results_per_record)
 
 
 

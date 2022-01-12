@@ -14,11 +14,11 @@ class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=50
+        self.No_of_First_gen=100
         self.No_TopCandidates=20
         self.NewIndividualsPerGen=0
-        self.TestImageBatchSize=7
-        self.NewImageCycle=10
+        self.TestImageBatchSize=50
+        self.NewImageCycle=99999
         self.ImageTapOut=6#terminate anything that has poor performance out the box
 
         self.DictFilename_V_Images=dict()#load this with fitness check images
@@ -843,10 +843,11 @@ if __name__ == "__main__":
             DictFitCandidates=copy.deepcopy(SaveList[1])
             #custom modifications to saved state - warning - can cause crash if incompatible new parameters such as
             #more top candidates than generation can provide
-            GenParams.TestImageBatchSize=5
-            GenParams.NewImageCycle=1
-            #GenParams.No_TopCandidates=18
-            GenParams.GetRandomSet_TestImages()
+            print("WARNING! Modifying existing run parameters")
+            #GenParams.TestImageBatchSize=5
+            #GenParams.NewImageCycle=1
+            #GenParams.No_TopCandidates=10
+            #GenParams.GetRandomSet_TestImages()
         else:
             #default first generation
             #assess first generation - here we can potentially load in a saved state
