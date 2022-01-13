@@ -147,6 +147,7 @@ class UserInputParameters():
         
             #ask user if they want the colour image
         print("\n \n \n \n \n")
+        print("**WARNING*** extract RGB channels sometimes does not work as intended and channels get swapped - WIP")
         self.GetRGBImage=_3DVisLabLib.yesno("Extract RGB channels into one image?")
         
         #does user want SNR values associated with extracted data
@@ -189,8 +190,11 @@ def AutomaticExtraction(UserParameters):
         #if user has requested colour channel combination - superimpose RGB channels
         #first channel is assumed to be C/D channel (feed topside and feed underside)
         if UserParameters.GetRGBImage==True:
-            filteredImagesR = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[1])
-            filteredImagesB = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[2])
+            #WARNING RGB channels still not quite aligning with channel names if further work is done on
+            #extracting RGB
+            filteredImages = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[0])
+            filteredImagesR = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[2])
+            filteredImagesB = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[1])
             if ((len(filteredImages) +len(filteredImagesR) +len(filteredImagesB))/3)!=len(filteredImagesB):
                 raise Exception(DatFile,"Automatic image extraction RGB channels: extracted channel sizes do not match!")
 
@@ -226,6 +230,11 @@ def AutomaticExtraction(UserParameters):
 
             #if user only requires first image, break out of loop
             if UserParameters.FirstImageOnly==True:
+                #save out thumbnail
+                Savestring=DatFile.lower().replace(".dat",".jpg")
+                print("saving image to ", Savestring)
+                cv2.imwrite(Savestring,OutputImage)
+                
                 break
 
         #if user requests Serial number read alongside images

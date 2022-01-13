@@ -5,7 +5,8 @@ import pytesseract
 from pytesseract import*
 import difflib
 import enum
-
+import random
+import _3DVisLabLib
 #tips
 #https://nanonets.com/blog/ocr-with-tesseract/
 #tesseract ocr how to install
@@ -99,8 +100,8 @@ class CompareOCR_ReadsEnum(enum.Enum):
     Num="N"
     WildCard="*"
     Nums_Arabic="0123456789"
-    Chars_Latin="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
+    Chars_Latin_UpperCase="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    UnknownChar="?"
     ErrorLength="Length Mismatch"
     ErrorNoMatchFound="No Match Found"
     ErrorMissingData="Missing input data"
@@ -112,87 +113,219 @@ class OCR_analysisCard():
         self.ExternalSNR=None
         self.ExpectedFielding=None
         self.Error=None
-        self.InfoString=""
+        self.InfoString=None
         self.Pass=None
 
+    def DoubleSetError(self,Error):
+        raise Exception("Error - double load of SNR result card, ",Error )
+
+    def SetInput_TemplateSNR(self,Input):
+        if self.TemplateSNR is not None :self.DoubleSetError("TemplateSNR")
+        else:
+            self.TemplateSNR=Input
+
+    def SetInput_ExternalSNR(self,Input):
+        if self.ExternalSNR is not None :self.DoubleSetError("ExternalSNR")
+        else:
+            self.ExternalSNR=Input
+
+    def SetInput_ExpectedFielding(self,Input):
+        if self.ExpectedFielding is not None :self.DoubleSetError("ExpectedFielding")
+        else:
+            self.ExpectedFielding=Input
+
+    def SetInput_Error(self,Input):
+        if self.Error is not None :self.DoubleSetError("Error")
+        else:
+            self.Error=Input
+
+    def SetInput_InfoString(self,Input):
+        if self.InfoString is not None :self.DoubleSetError("InfoString")
+        else:
+            self.InfoString=Input
+
+    def SetInput_Pass(self,Input):
+        if self.Pass is not None :self.DoubleSetError("Pass")
+        else:
+            self.Pass=Input
 
 def CompareOCR_Reads(TemplateSNR,ExternalSNR,ExpectedFielding=None):
 
+    #compare OCR reads, and return info card with pass/fail and error messages
+    #issue is same chars being confused by both OCR services (such as O/0, I/1 etc) - maybe warn user if confusion chars are present
+    #should we assume at this stage that the template has pre-filtered serial number reads that dont match the expected fielding?
+    
+    #print(vars(CompareOCR_Reads("AD48F5-BB","AD48F5-BBAD48F5BBCC12s3CC 3CCc","CCNNCN*CC")))
     OCR_analysis=OCR_analysisCard()
     OCR_analysis.ExpectedFielding=ExpectedFielding
     OCR_analysis.TemplateSNR=TemplateSNR
     OCR_analysis.ExternalSNR=ExternalSNR
-    #compare OCR reads, and return:
-    #Fitness Metric
-    #Pass
-    #Pass confidence
-    #Warnings?
-    #issue is same chars being confused by both OCR services (such as O/0, I/1 etc) - maybe warn user if confusion chars are present
-    #should we assume at this stage that the template has pre-filtered serial number reads that dont match the expected fielding?
-    
+
     ConfusionPairs=[("8","B"),("S","5"),("I","1"),("3","8"),("G","6"),("0","O"),("6","9"),("I","1")]
     #roll through test cases and break out if test fails
 
 
-    while True:
+
+
+    while True:#loop through tests - should use internal function with scoped variables for this probably nicer
 
         if (TemplateSNR is None) or (TemplateSNR=="") or (ExternalSNR is None) or (ExternalSNR==""):
-            OCR_analysis.InfoString="missing input data"
-            OCR_analysis.Error=CompareOCR_ReadsEnum.ErrorMissingData.value
-            OCR_analysis.Pass=False
+            OCR_analysis.SetInput_InfoString("missing input data")
+            OCR_analysis.SetInput_Error(CompareOCR_ReadsEnum.ErrorMissingData.value)
+            OCR_analysis.SetInput_Pass(False)
         
         if OCR_analysis.Pass==False:break
 
         #expected fielding has been provided - do base checks on TemplateSNR
         if ExpectedFielding is not None:
             if len(ExpectedFielding)!=len(TemplateSNR):
-                OCR_analysis.InfoString="test snr length does not match fielding length"
-                OCR_analysis.Error=CompareOCR_ReadsEnum.ErrorLength.value
-                OCR_analysis.Pass=False
+                OCR_analysis.SetInput_InfoString("test snr length does not match fielding length")
+                OCR_analysis.SetInput_Error(CompareOCR_ReadsEnum.ErrorLength.value)
+                OCR_analysis.SetInput_Pass(False)
 
         if OCR_analysis.Pass==False:break
 
-        #check if characters match expected fielding
-        for Index, Elem in enumerate(ExpectedFielding):
-            #test that input matches expected fieldings: alphabet
-            if Elem ==CompareOCR_ReadsEnum.Charac.value:
-                if TemplateSNR[Index] not in CompareOCR_ReadsEnum.Chars_Latin.value:
-                    OCR_analysis.InfoString= TemplateSNR[Index] +" not found in " + CompareOCR_ReadsEnum.Chars_Latin.value
-                    OCR_analysis.Pass=False
-                    OCR_analysis.Error=CompareOCR_ReadsEnum.ErrorBadFielding.value
-                    
-            #test that input matches expected fieldings: numerals
-            elif Elem ==CompareOCR_ReadsEnum.Num.value:
-                if TemplateSNR[Index] not in CompareOCR_ReadsEnum.Nums_Arabic.value:
-                    OCR_analysis.InfoString=  TemplateSNR[Index] +" not found in " + CompareOCR_ReadsEnum.Nums_Arabic.value
-                    OCR_analysis.Pass=False
-                    OCR_analysis.Error=CompareOCR_ReadsEnum.ErrorBadFielding.value
-                    
-            #test that input matches expected fieldings: wildcard
-            elif Elem ==CompareOCR_ReadsEnum.WildCard.value:
-                pass
-            #input fielding does not match - error 
-            else:
-                OCR_analysis.InfoString=  ExpectedFielding + " does not conform to expected inputs"
-                OCR_analysis.Pass=False
-                OCR_analysis.Error=CompareOCR_ReadsEnum.ErrorBadFielding.value
+        if ExpectedFielding is not None:
+            #check if characters match expected fielding
+            for Index, Elem in enumerate(ExpectedFielding):
+                #test that input matches expected fieldings: alpha
+                if Elem ==CompareOCR_ReadsEnum.Charac.value:
+                    if TemplateSNR[Index] not in CompareOCR_ReadsEnum.Chars_Latin_UpperCase.value:
+                        OCR_analysis.SetInput_InfoString(TemplateSNR[Index] +" not found in " + CompareOCR_ReadsEnum.Chars_Latin_UpperCase.value)
+                        OCR_analysis.SetInput_Pass(False)
+                        OCR_analysis.SetInput_Error(CompareOCR_ReadsEnum.ErrorBadFielding.value)
+                        break
+                        
+                #test that input matches expected fieldings: numerals
+                elif Elem ==CompareOCR_ReadsEnum.Num.value:
+                    if TemplateSNR[Index] not in CompareOCR_ReadsEnum.Nums_Arabic.value:
+                        OCR_analysis.SetInput_InfoString(TemplateSNR[Index] +" not found in " + CompareOCR_ReadsEnum.Nums_Arabic.value)
+                        OCR_analysis.SetInput_Pass(False)
+                        OCR_analysis.SetInput_Error(CompareOCR_ReadsEnum.ErrorBadFielding.value)
+                        break
+                        
+                #test that input matches expected fieldings: wildcard
+                elif Elem ==CompareOCR_ReadsEnum.WildCard.value:
+                    pass
+                #input fielding does not match - error 
+                else:
+                    OCR_analysis.SetInput_InfoString(ExpectedFielding + " does not conform to expected inputs")
+                    OCR_analysis.SetInput_Pass(False)
+                    OCR_analysis.SetInput_Error(CompareOCR_ReadsEnum.ErrorBadFielding.value)
+                    break
 
         if OCR_analysis.Pass==False:break
 
         #Basic check - can we find TemplateSNR in the ExternalSNR string
         if not TemplateSNR in ExternalSNR:
-            OCR_analysis.InfoString="test snr not found in external snr"
-            OCR_analysis.Pass=False
-            OCR_analysis.Error=CompareOCR_ReadsEnum.ErrorNoMatchFound.value
+            OCR_analysis.SetInput_InfoString("test snr not found in external snr")
+            OCR_analysis.SetInput_Pass(False)
+            OCR_analysis.SetInput_Error(CompareOCR_ReadsEnum.ErrorNoMatchFound.value)
+        
+        if OCR_analysis.Pass==False:break
+
+        #explicit check of string matching
+        if TemplateSNR in ExternalSNR:
+            OCR_analysis.SetInput_InfoString("string found")
+            OCR_analysis.SetInput_Pass(True)
+            OCR_analysis.SetInput_Error(None)
+            break
 
         #default break
         break
-    print(vars(OCR_analysis))
+
+    #return analysis card
+    return(OCR_analysis)
+
+def GenerateSN_Fielding(InputListSNRReads):
+    #roll through input list of snr reads in format "xxx[....]xxx" and calculate potential character fielding (consistent format of nums/alphabet)
+    SNR_Dict=dict()
+    for Elemn in InputListSNRReads:
+
+        Known_SNR_string=None
+        #extract snr - by previous process will be bookened by "[" and "]"
+        try:
+            if not "[" in Elemn:
+                continue
+            if not "]" in Elemn:
+                continue
+            Get_SNR_string=Elemn.split("[")#delimit
+            Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
+            Get_SNR_string=Get_SNR_string.split("]")#delimit
+            Get_SNR_string=Get_SNR_string[0]
+            if (Get_SNR_string is not None):
+                if (len(Get_SNR_string))>0:
+                    Known_SNR_string=Get_SNR_string
+                    #load image file path and SNR as key and value
+                    SNR_Dict[Elemn]=Known_SNR_string
+                    print(Elemn,Known_SNR_string)
+        except Exception as e: 
+            print("error extracting known snr string from file ",Elemn )
+            print(repr(e)) 
         
+    if len(SNR_Dict.keys())==0:
+        raise Exception("GenerateSN_Fielding: No serial numbers found!")
     
+    #check general format of SNR
+    #check 1 - are all the same length? if not - can't proceed as format will be inconsistent
+    TestLength=(random.choice(list(SNR_Dict.values())))
+    for Elem in SNR_Dict.values():
+        if len(Elem)!=len(TestLength):
+            raise Exception("SNR size mismatch - cannot automatically define fielding: ", Elem, "vs",TestLength)
+
+    #all SNR reads same length - can test each element for type (num/alphabet)
+    TestLength=(random.choice(list(SNR_Dict.values())))#repeat get length
+    ListSNR_values=list(SNR_Dict.values())#convert to list for readibility
+    FieldingString=[]
+    #build fielding list
+    for BuildList in range (len(TestLength)):
+        FieldingString.append(None)
+    #take slices of each char position for list of SNR
+    for CharPosition in range (0,len(TestLength)):
+        ListAllSNR_Charposition=([x[CharPosition] for x in ListSNR_values])
+        for charac in ListAllSNR_Charposition:#
+            FieldingString[CharPosition]=SetCharType(charac,FieldingString,CharPosition)
+
+    return FieldingString
+
+def SetCharType(InputChar,FieldingString,CharPosition):
+    #if CharPosition in FieldingString has not been set - then set it
+    #if not and its a different type of character (num/alpha)- set to WildCard character
+    CompareOCR_ReadsEnum
+    ReturnValue=None
+    if InputChar in CompareOCR_ReadsEnum.UnknownChar.value:
+        ReturnValue=FieldingString[CharPosition]
+        return ReturnValue
+    if FieldingString[CharPosition] is None:
+        if InputChar in CompareOCR_ReadsEnum.Nums_Arabic.value:
+            ReturnValue=CompareOCR_ReadsEnum.Num.value
+            return ReturnValue
+        elif InputChar in CompareOCR_ReadsEnum.Chars_Latin_UpperCase.value:
+            ReturnValue=CompareOCR_ReadsEnum.Charac.value
+            return ReturnValue
+        elif InputChar in CompareOCR_ReadsEnum.UnknownChar.value:
+            ReturnValue=None
+            return ReturnValue
+    if (FieldingString[CharPosition] == CompareOCR_ReadsEnum.Num.value) and (InputChar in CompareOCR_ReadsEnum.Nums_Arabic.value):
+        ReturnValue=FieldingString[CharPosition]
+        return ReturnValue
+    if (FieldingString[CharPosition] == CompareOCR_ReadsEnum.Charac.value) and (InputChar in CompareOCR_ReadsEnum.Chars_Latin_UpperCase.value):
+        ReturnValue=FieldingString[CharPosition]
+        return ReturnValue
+
+    #default - wildcard - no match found or mismatch for character position or special character
+    return CompareOCR_ReadsEnum.WildCard.value
+    
+def GetFieldingOf_SNR_ProcessedImages():
+    #test function to automatically find fielding of snr processed files in format:
+    #B6799032875A]SRU SNR image1 None_0007 record 36 file 6.jpg
+    Result = input("Please enter folder for analysis:")
+    InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(Result)
+    ListAllImages=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
+    print(GenerateSN_Fielding(ListAllImages))
 
 
-CompareOCR_Reads("AB111AB","AB1121ABAB1211ABAB2111ABA2B1211AB","CCNNNCC")
+GetFieldingOf_SNR_ProcessedImages()
 
 class TestSNR_Fitness():
 #class which loads images into memory used to test fitness of input parameters
