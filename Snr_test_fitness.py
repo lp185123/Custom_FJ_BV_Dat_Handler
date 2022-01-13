@@ -324,8 +324,65 @@ def GetFieldingOf_SNR_ProcessedImages():
     ListAllImages=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
     print(GenerateSN_Fielding(ListAllImages))
 
+def sp_noise(image,prob):
+    '''
+    Add salt and pepper noise to image
+    prob: Probability of the noise
+    '''
+    output = np.zeros(image.shape,np.uint8)
+    thres = 1 - prob 
+    for i in range(image.shape[0]):
+        for j in range(image.shape[1]):
+            rdn = random.random()
+            if rdn < prob:
+                output[i][j] = 0
+            elif rdn > thres:
+                output[i][j] = 255
+            else:
+                output[i][j] = image[i][j]
+    return output
 
-GetFieldingOf_SNR_ProcessedImages()
+def CreateTestImages():
+    #Quick test function - to be d
+    #Do import here as we will probably move this function or delete it
+    import uuid
+    def my_random_string(string_length=10):
+        """Returns a random string of length string_length."""
+    # Convert UUID format to a Python string.
+        random = str(uuid.uuid4())
+    # Make all characters uppercase.
+        random = random.upper()
+    # Remove the UUID '-'.
+        random = random.replace("-","")
+    # Return the random string.
+        return random[0:string_length]
+
+    
+    #quick tool to create test images for OCR
+    ResultFolder = input("Please enter folder for test images:")
+    NumberOfImages=1000
+    ImageSizeX=200
+    ImageSizeY=70
+    Xbuffer=20
+
+    for Img in range (NumberOfImages):
+        RGB_Image = np.zeros((int(ImageSizeY*2),int(ImageSizeX),3), np.uint8)
+        Text=my_random_string(10)
+        TextScale=_3DVisLabLib.get_optimal_font_scale(Text,ImageSizeX-Xbuffer,ImageSizeY)#warning: this does not assume the same font
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        cv2.putText(RGB_Image, Text, (int(Xbuffer/2),ImageSizeY), font, TextScale, (255*random.random(), 255*random.random(), 255*random.random()), 2, cv2.LINE_AA)
+        #add noise
+        RGB_Image=sp_noise(RGB_Image,random.random()/10)
+        Savestring=ResultFolder + "\\TEST_IMAGE_" + "[" + Text + "].jpg" 
+        cv2.imwrite(Savestring,RGB_Image)
+        #_3DVisLabLib.ImageViewer_Quick_no_resize(RGB_Image,0,False,True)
+
+#CreateTestImages()
+
+
+
+
+
 
 class TestSNR_Fitness():
 #class which loads images into memory used to test fitness of input parameters

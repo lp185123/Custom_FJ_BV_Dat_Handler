@@ -14,17 +14,18 @@ class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=100
+        self.No_of_First_gen=50
         self.No_TopCandidates=20
         self.NewIndividualsPerGen=0
-        self.TestImageBatchSize=50
-        self.NewImageCycle=99999
+        self.TestImageBatchSize=10
+        self.NewImageCycle=5
         self.ImageTapOut=6#terminate anything that has poor performance out the box
 
         self.DictFilename_V_Images=dict()#load this with fitness check images
         #load fitness checking images into memory - #TODO make dynamic
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\FitnessTest"
-        self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
+        #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
+        self.FilePath=r"C:\Working\FindIMage_In_Dat\TestSNs"
         #save out parameter converging image
         self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"
         self.GetRandomSet_TestImages()
