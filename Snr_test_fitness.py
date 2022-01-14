@@ -361,28 +361,25 @@ def CreateTestImages():
     #quick tool to create test images for OCR
     ResultFolder = input("Please enter folder for test images:")
     NumberOfImages=1000
-    ImageSizeX=200
+    ImageSizeX=170
     ImageSizeY=70
-    Xbuffer=20
+    Xbuffer=10
 
     for Img in range (NumberOfImages):
         RGB_Image = np.zeros((int(ImageSizeY*2),int(ImageSizeX),3), np.uint8)
         Text=my_random_string(10)
         TextScale=_3DVisLabLib.get_optimal_font_scale(Text,ImageSizeX-Xbuffer,ImageSizeY)#warning: this does not assume the same font
         font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(RGB_Image, Text, (int(Xbuffer/2),ImageSizeY), font, TextScale, (255*random.random(), 255*random.random(), 255*random.random()), 2, cv2.LINE_AA)
+        cv2.putText(RGB_Image, Text, (int(Xbuffer/2),ImageSizeY), font, TextScale, (255*random.random(), 255*random.random(), 255*random.random()), 1, cv2.LINE_AA)
         #add noise
-        RGB_Image=sp_noise(RGB_Image,random.random()/10)
+        RGB_Image=sp_noise(RGB_Image,random.random()/200)
+        #resize
+        #TestImage=ResizeImage(TestImage,ParameterObject.ResizeX,ParameterObject.ResizeY)
         Savestring=ResultFolder + "\\TEST_IMAGE_" + "[" + Text + "].jpg" 
         cv2.imwrite(Savestring,RGB_Image)
         #_3DVisLabLib.ImageViewer_Quick_no_resize(RGB_Image,0,False,True)
 
 #CreateTestImages()
-
-
-
-
-
 
 class TestSNR_Fitness():
 #class which loads images into memory used to test fitness of input parameters

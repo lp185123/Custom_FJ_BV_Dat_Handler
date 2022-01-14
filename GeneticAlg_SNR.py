@@ -15,11 +15,11 @@ class GA_Parameters():
         self.FitnessRecord=dict()
         self.SelfCheck=False
         self.No_of_First_gen=50
-        self.No_TopCandidates=20
+        self.No_TopCandidates=15
         self.NewIndividualsPerGen=0
         self.TestImageBatchSize=10
-        self.NewImageCycle=5
-        self.ImageTapOut=6#terminate anything that has poor performance out the box
+        self.NewImageCycle=10
+        self.ImageTapOut=8#terminate anything that has poor performance out the box
 
         self.DictFilename_V_Images=dict()#load this with fitness check images
         #load fitness checking images into memory - #TODO make dynamic
@@ -154,8 +154,8 @@ class Individual():
         #user populate this area - each parameter has Upper, Lower, range,  test value and if integer
         self.UserInputParamsDict=dict()
         self.UserInputParamsDict["PSM"]=self.ParameterDetails(3,3,[3,5,6,7,8,13],3,True)#psm is always 3 so pretty pointless
-        self.UserInputParamsDict["ResizeX"]=self.ParameterDetails(250,80,[],200,True)
-        self.UserInputParamsDict["ResizeY"]=self.ParameterDetails(250,80,[],200,True)
+        self.UserInputParamsDict["ResizeX"]=self.ParameterDetails(150,80,[],200,True)
+        self.UserInputParamsDict["ResizeY"]=self.ParameterDetails(150,80,[],200,True)
         self.UserInputParamsDict["Canny"]=self.ParameterDetails(1,0,[],0,True)
         self.UserInputParamsDict["CannyThresh1"]=self.ParameterDetails(50,150,[],100,True)
         self.UserInputParamsDict["CannyThresh2"]=self.ParameterDetails(100,255,[],110,True)
@@ -164,7 +164,7 @@ class Individual():
         self.UserInputParamsDict["GausSize_Threshold"]=self.ParameterDetails(21,3,[3,5,7,9,11,13,15,17,19,21],15,True)
         self.UserInputParamsDict["SubtractMean"]=self.ParameterDetails(20,3,[],7,True)
         self.UserInputParamsDict["AlphaBlend"]=self.ParameterDetails(1,0,[],0.5,False)
-        self.UserInputParamsDict["CropPixels"]=self.ParameterDetails(30,0,[],2,True)
+        self.UserInputParamsDict["CropPixels"]=self.ParameterDetails(0,0,[],2,True)
 
         
 
@@ -845,10 +845,10 @@ if __name__ == "__main__":
             #custom modifications to saved state - warning - can cause crash if incompatible new parameters such as
             #more top candidates than generation can provide
             print("WARNING! Modifying existing run parameters")
-            #GenParams.TestImageBatchSize=5
-            #GenParams.NewImageCycle=1
-            #GenParams.No_TopCandidates=10
-            #GenParams.GetRandomSet_TestImages()
+            GenParams.TestImageBatchSize=10
+            GenParams.NewImageCycle=10
+            GenParams.No_TopCandidates=20
+            GenParams.GetRandomSet_TestImages()
         else:
             #default first generation
             #assess first generation - here we can potentially load in a saved state
@@ -886,8 +886,10 @@ if __name__ == "__main__":
             continue
             
         
-
-        if i%3==0 and (GenParams.CheckRepeatingFitness(3,0.01))==True:
+        #every n loops and if we arent having much movement with fitness, and fitness is >0 (hasnt converged)
+        #WARNING: if fitness is oscillating this will not meet condition, perhaps check gradient as well
+        if (i%3==0 and (GenParams.CheckRepeatingFitness(3,0.01))==True) and (GenParams.GetFitnessHistory()[-1]>0.01):
+            #here check that fitness isnt near 0 as we should get a new batch of evaluation data if so 
             StepSize=5
             for looper in range (0,15):
                 #gradient descent loop
@@ -907,8 +909,8 @@ if __name__ == "__main__":
                     break
 
     
-        #every nth cycle mix up fitness testing set
-        if i%GenParams.NewImageCycle==0 and i>0:
+        #every nth cycle mix up fitness testing set, or if fitness has converged to close to zero
+        if (i%GenParams.NewImageCycle==0 and i>0) or (GenParams.GetFitnessHistory()[-1]<0.01):
             print("New set ofimages")
             #get new testing set of images
             GenParams.GetRandomSet_TestImages()
