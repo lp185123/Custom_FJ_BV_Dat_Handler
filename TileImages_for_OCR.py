@@ -126,7 +126,7 @@ class TileImage:
                     else:
                         Get_SNR_string="NO_SNR"
                     SNRAnswersList.append(Get_SNR_string)
-
+                #TODO lets put the delimiter text in the text file as well
 
 
                 #save out delimited master image ready for OCR 
@@ -144,7 +144,7 @@ class TileImage:
 
 
 #TestTileImage=TileImage("DISPATCH",
-#r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages",
+#r"C:\Working\FindIMage_In_Dat\TestSNs",
 #r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput",7)
 
 

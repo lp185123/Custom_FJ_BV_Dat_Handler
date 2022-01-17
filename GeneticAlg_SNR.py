@@ -8,30 +8,32 @@ import cv2
 import Snr_test_fitness
 import pickle
 import os
-
+import matplotlib.pyplot as plt
 
 class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=50
-        self.No_TopCandidates=15
+        self.No_of_First_gen=100
+        self.No_TopCandidates=20
         self.NewIndividualsPerGen=0
-        self.TestImageBatchSize=10
-        self.NewImageCycle=10
+        self.TestImageBatchSize=3
+        self.NewImageCycle=2
         self.ImageTapOut=8#terminate anything that has poor performance out the box
 
         self.DictFilename_V_Images=dict()#load this with fitness check images
         #load fitness checking images into memory - #TODO make dynamic
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\FitnessTest"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
-        self.FilePath=r"C:\Working\FindIMage_In_Dat\TestSNs"
+        #self.FilePath=r"C:\Working\FindIMage_In_Dat\TestSNs"
+        self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\Brazil"
         #save out parameter converging image
         self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"
         self.GetRandomSet_TestImages()
 
         self.LastImage=None
         self.NameOfSavedState=None
+        self.Generation=0
         # #get all files in input folder
         # InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(self.FilePath)
         # #filter out non images
@@ -79,7 +81,7 @@ class GA_Parameters():
 
         print("Loaded ", len(self.DictFilename_V_Images), "images")
 
-    def FitnessRecordAdd(self,Fitness,Name,Parameters,AverageFitness,AverageAge):
+    def FitnessRecordAdd(self,Fitness,Name,Parameters,AverageFitness,AverageAge,ApplicationSpecificParams):
 
         #check not a duplicate key
         if Fitness in self.FitnessRecord.keys():
@@ -87,7 +89,7 @@ class GA_Parameters():
             del self.FitnessRecord[Fitness]
             print("Deleted duplicate fitness record ",Fitness)
         #add record to dictionary
-        self.FitnessRecord[Fitness]=(Name,Parameters,AverageFitness,AverageAge)
+        self.FitnessRecord[Fitness]=(Name,Parameters,AverageFitness,AverageAge,ApplicationSpecificParams)
 
     def GetEntireFitnessRecord(self):
         return self.FitnessRecord
@@ -153,20 +155,32 @@ class Individual():
 
         #user populate this area - each parameter has Upper, Lower, range,  test value and if integer
         self.UserInputParamsDict=dict()
-        self.UserInputParamsDict["PSM"]=self.ParameterDetails(3,3,[3,5,6,7,8,13],3,True)#psm is always 3 so pretty pointless
-        self.UserInputParamsDict["ResizeX"]=self.ParameterDetails(150,80,[],200,True)
-        self.UserInputParamsDict["ResizeY"]=self.ParameterDetails(150,80,[],200,True)
+        #self.UserInputParamsDict["PSM"]=self.ParameterDetails(3,3,[3,5,6,7,8,13],3,True)#psm is always 3 so pretty pointless
+        self.UserInputParamsDict["ResizeX"]=self.ParameterDetails(200,50,[],100,True)
+        self.UserInputParamsDict["ResizeY"]=self.ParameterDetails(200,50,[],100,True)
         self.UserInputParamsDict["Canny"]=self.ParameterDetails(1,0,[],0,True)
         self.UserInputParamsDict["CannyThresh1"]=self.ParameterDetails(50,150,[],100,True)
         self.UserInputParamsDict["CannyThresh2"]=self.ParameterDetails(100,255,[],110,True)
         self.UserInputParamsDict["AdapativeThreshold"]=self.ParameterDetails(255,160,[],200,True)
-        self.UserInputParamsDict["MedianBlurDist"]=self.ParameterDetails(21,0,[1,3,5,7,9,11,13,15,17,19,21],2,True)
+        self.UserInputParamsDict["MedianBlurDist"]=self.ParameterDetails(21,0,[1,3,5,7,9,11,13,15,17,19,21],3,True)
         self.UserInputParamsDict["GausSize_Threshold"]=self.ParameterDetails(21,3,[3,5,7,9,11,13,15,17,19,21],15,True)
         self.UserInputParamsDict["SubtractMean"]=self.ParameterDetails(20,3,[],7,True)
         self.UserInputParamsDict["AlphaBlend"]=self.ParameterDetails(1,0,[],0.5,False)
-        self.UserInputParamsDict["CropPixels"]=self.ParameterDetails(0,0,[],2,True)
+        #self.UserInputParamsDict["CropPixels"]=self.ParameterDetails(0,0,[],2,True)
+        self.UserInputParamsDict["Denoise"]=self.ParameterDetails(1,0,[0,1],1,True)
+        self.UserInputParamsDict["Negative"]=self.ParameterDetails(1,0,[0,1],1,True)
 
-        
+
+        self.ParamGroupDict=dict()
+        self.ParamGroupDict["Resizer"]=("ResizeX","ResizeY")
+        self.ParamGroupDict["Cannies"]=("Canny","CannyThresh1","CannyThresh2")
+        self.ParamGroupDict["AdapativeThresholder"]=("AdapativeThreshold","GausSize_Threshold","SubtractMean")
+        self.ParamGroupDict["g1"]=(["AlphaBlend"])
+        self.ParamGroupDict["g2"]=(["MedianBlurDist"])
+        self.ParamGroupDict["g3"]=(["Denoise"])
+        self.ParamGroupDict["g4"]=(["Negative"])
+
+
 
         #all parameters will be normalised
         for Param in self.UserInputParamsDict:
@@ -180,11 +194,12 @@ class Individual():
         #self.ParamGroupDict["Group1"]=("1","2","3")
         #self.ParamGroupDict["Group2"]=("4","5","6")
         #self.ParamGroupDict["Group3"]=("7","8","9")
+        #self.ParamGroupDict["Group5"]=(["10"])** NOTE!! have to make sure single item is in a list/iterable
 
         #default grouping - all parameters operate individually and will not be crossbreed in groups
-        self.ParamGroupDict=dict()
-        for elem in self.Parameters:
-            self.ParamGroupDict[elem + "Group"]=(elem,)#have to force this to be a single element tuple to be compatible with multiple or single items per group
+        #self.ParamGroupDict=dict()
+        #for elem in self.Parameters:
+        #   self.ParamGroupDict[elem + "Group"]=(elem,)#have to force this to be a single element tuple to be compatible with multiple or single items per group
 
         self.Fitness=None
         self.Age=0
@@ -314,24 +329,30 @@ class Individual():
         #if GenesToKeep is used - then we dont overwrite the randomly generated intialised genes
         ListParamsToKeep=[]#if genestokeep is zero then this will be ignored
         for I in range (GenesToKeep):
-            ListParamsToKeep.append(random.choice(list(self.ParamGroupDict)))
+            ListParamsToKeep.append(random.choice(list(self.Parameters)))
+
+
 
         if len(ListOfParentParameters)==2:
             #roll through groups and randomly assign child group from parent groups
             for Elem in self.ParamGroupDict:#doesnt really matter what parameter list we use as should be all the same
                 #"Elem" will match dictionary Keys from Init
                 
-                if not Elem in ListParamsToKeep:#if we want to skip groups of parameters - for instance
+                #if not Elem in ListParamsToKeep:#if we want to skip groups of parameters - for instance
                     #if this individual is initialised then cross-bred with parents - we can leave in a random genome
-                    if bool(random.getrandbits(1))==True:
-                        #take group from parent 1 
-                        for param in self.ParamGroupDict[Elem]:
-                            self.Parameters[param]=ListOfParentParameters[0][param]
-                    else:
-                        #take group from parent 2
-                        for param in self.ParamGroupDict[Elem]:
-                            self.Parameters[param]=ListOfParentParameters[1][param]
+                if bool(random.getrandbits(1))==True:
+                    #take group from parent 1 
+                    for param in self.ParamGroupDict[Elem]:
+                        self.Parameters[param]=ListOfParentParameters[0][param]
+                else:
+                    #take group from parent 2
+                    for param in self.ParamGroupDict[Elem]:
+                        self.Parameters[param]=ListOfParentParameters[1][param]
             
+            #add random genes - always between 0 and 1 as is now normalised
+            for I in ListParamsToKeep:
+                self.Parameters[I]=random.random()
+
             self.RoundParameters()
             self.HouseKeep()
 
@@ -380,29 +401,82 @@ def BuildSNR_Parameters(InputParameters,SNR_fitnessTest):
     #use input parameters to drive SNR parameters
     #build SNR input parameters object
 
-    def LoadParameter(SNRParameter,InputParametersObject, InputParameterName):
-        try:
-            SNRParameter=InputParametersObject[InputParameterName]
-        except:
-            print("**Warning Failed to load",InputParameterName,"parameter - may be valid error if parameter disabled or obj file did not include parameter")
-        return SNRParameter
+    # def LoadParameter(SNRParameter,InputParametersObject, InputParameterName):
+    #     try:
+    #         SNRParameter=InputParametersObject[InputParameterName]
+    #     except:
+    #         print("**Warning Failed to load",InputParameterName,"parameter - may be valid error if parameter disabled or obj file did not include parameter")
+    #     return SNRParameter
 
     #instance of object
     SNRparams=Snr_test_fitness.SNR_Parameters()
 
-    #TODO poor code to make sure is backwards compatible - cant pass by reference as is immutable... needs better solution
-    SNRparams.AdapativeThreshold=LoadParameter(SNRparams.AdapativeThreshold,InputParameters,"AdapativeThreshold")
-    SNRparams.Canny=LoadParameter(SNRparams.Canny,InputParameters,"Canny")
-    SNRparams.MedianBlurDist=LoadParameter(SNRparams.MedianBlurDist,InputParameters,"MedianBlurDist")
-    SNRparams.ResizeX=LoadParameter(SNRparams.ResizeX,InputParameters,"ResizeX")
-    SNRparams.ResizeY=LoadParameter(SNRparams.ResizeY,InputParameters,"ResizeY")
-    SNRparams.PSM=LoadParameter(SNRparams.PSM,InputParameters,"PSM")
-    SNRparams.GausSize_Threshold=LoadParameter(SNRparams.GausSize_Threshold,InputParameters,"GausSize_Threshold")
-    SNRparams.SubtractMean=LoadParameter(SNRparams.SubtractMean,InputParameters,"SubtractMean")
-    SNRparams.AlphaBlend=LoadParameter(SNRparams.AlphaBlend,InputParameters,"AlphaBlend")
-    SNRparams.CropPixels=LoadParameter(SNRparams.CropPixels,InputParameters,"CropPixels")
-    SNRparams.CannyThresh1=LoadParameter(SNRparams.CropPixels,InputParameters,"CannyThresh1")
-    SNRparams.CannyThresh2=LoadParameter(SNRparams.CropPixels,InputParameters,"CannyThresh2")
+    # #TODO poor code to make sure is backwards compatible - cant pass by reference as is immutable... needs better solution
+    # SNRparams.AdapativeThreshold=LoadParameter(SNRparams.AdapativeThreshold,InputParameters,"AdapativeThreshold")
+    # SNRparams.Canny=LoadParameter(SNRparams.Canny,InputParameters,"Canny")
+    # SNRparams.MedianBlurDist=LoadParameter(SNRparams.MedianBlurDist,InputParameters,"MedianBlurDist")
+    # SNRparams.ResizeX=LoadParameter(SNRparams.ResizeX,InputParameters,"ResizeX")
+    # SNRparams.ResizeY=LoadParameter(SNRparams.ResizeY,InputParameters,"ResizeY")
+    # SNRparams.PSM=LoadParameter(SNRparams.PSM,InputParameters,"PSM")
+    # SNRparams.GausSize_Threshold=LoadParameter(SNRparams.GausSize_Threshold,InputParameters,"GausSize_Threshold")
+    # SNRparams.SubtractMean=LoadParameter(SNRparams.SubtractMean,InputParameters,"SubtractMean")
+    # SNRparams.AlphaBlend=LoadParameter(SNRparams.AlphaBlend,InputParameters,"AlphaBlend")
+    # SNRparams.CropPixels=LoadParameter(SNRparams.CropPixels,InputParameters,"CropPixels")
+    # SNRparams.CannyThresh1=LoadParameter(SNRparams.CannyThresh1,InputParameters,"CannyThresh1")
+    # SNRparams.CannyThresh2=LoadParameter(SNRparams.CannyThresh2,InputParameters,"CannyThresh2")
+
+
+    for paramname in InputParameters:
+        if paramname=="AdapativeThreshold":
+            SNRparams.AdapativeThreshold=InputParameters[paramname]
+            continue
+        if paramname=="Canny":
+            SNRparams.Canny=InputParameters[paramname]
+            continue
+        if paramname=="MedianBlurDist":
+            SNRparams.MedianBlurDist=InputParameters[paramname]
+            continue
+        if paramname=="ResizeX":
+            SNRparams.ResizeX=InputParameters[paramname]
+            continue
+        if paramname=="ResizeY":
+            SNRparams.ResizeY=InputParameters[paramname]
+            continue
+        if paramname=="PSM":
+            SNRparams.PSM=InputParameters[paramname]
+            continue
+        if paramname=="GausSize_Threshold":
+            SNRparams.GausSize_Threshold=InputParameters[paramname]
+            continue
+        if paramname=="SubtractMean":
+            SNRparams.SubtractMean=InputParameters[paramname]
+            continue
+        if paramname=="AlphaBlend":
+            SNRparams.AlphaBlend=InputParameters[paramname]
+            continue
+        if paramname=="AdapativeThreshold":
+            SNRparams.AdapativeThreshold=InputParameters[paramname]
+            continue
+        if paramname=="CannyThresh1":
+            SNRparams.CannyThresh1=InputParameters[paramname]
+            continue
+        if paramname=="CannyThresh2":
+            SNRparams.CannyThresh2=InputParameters[paramname]
+            continue
+        if paramname=="CropPixels":
+            SNRparams.CropPixels=InputParameters[paramname]
+            continue
+        if paramname=="Denoise":
+            SNRparams.Denoise=InputParameters[paramname]
+            continue
+        if paramname=="Negative":
+            SNRparams.Negative=InputParameters[paramname]
+            continue
+
+        print(paramname, " parameter not found when building SNR parameters")
+
+
+
 
     # SNRparams.AdapativeThreshold=InputParameters["AdapativeThreshold"]
 
@@ -539,11 +613,13 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
         filepath=GenParams.OutputFolder + "\\" + (str(InputGenDict[DictOfFitness[SortedFitness[0]]].Fitness).replace(".","")) + ".jpg"
         cv2.imwrite(filepath,InputGenDict[DictOfFitness[SortedFitness[0]]].LastImage)
 
-
+    #save out some plots
+    PlotAndSave("TopFitnessHistory",GenParams.OutputFolder + "\\TopFitnessHistory_gen" + str(GenParams.Generation) + ".jpg",GenParams.GetFitnessHistory()[:])
+    PlotAndSave("ColonyFitness",GenParams.OutputFolder + "\\ColonyFitness_gen" + str(GenParams.Generation) +".jpg",SortedFitness[:])
 
     #need random number or will overwrite records #TODO must be another dictionary which allows duplicate keys
     randomNo=random.random()/10000
-    GenParams.FitnessRecordAdd(SortedFitness[0]+randomNo,InputGenDict[DictOfFitness[SortedFitness[0]]].name,InputGenDict[DictOfFitness[SortedFitness[0]]].Parameters,TotalFitness,TotalAge)
+    GenParams.FitnessRecordAdd(SortedFitness[0]+randomNo,InputGenDict[DictOfFitness[SortedFitness[0]]].name,InputGenDict[DictOfFitness[SortedFitness[0]]].Parameters,TotalFitness,TotalAge,InputGenDict[DictOfFitness[SortedFitness[0]]].ApplicationSpecificMapping())
     #Create dictionary of most fit individuals - copy objects 
     DictFitCandidates=dict()
     for IndvID in TopFitness:
@@ -751,6 +827,17 @@ def RemoveCloseParameterIndividuals(InputDict_Candidates,NameOfGen,Buffer):
 
     return InputDict_Candidates
 
+def PlotAndSave(Title,Filepath,Data):
+    #save out plot of 1D data
+    
+    plt.plot(Data)
+    plt.ylabel(Title)
+    plt.ylim([0, 1])
+    plt.savefig(Filepath)
+    plt.cla()
+    plt.clf()
+    plt.close()
+
 def RemoveIndividualsCloseFitness(InputDict_Candidates,FitnessBuffer,NameOfGen):
     #return InputDict_Candidates
     #remove individuals that are close to duplicate fitness, and most probably will have almost same parameters
@@ -846,9 +933,10 @@ if __name__ == "__main__":
             #more top candidates than generation can provide
             print("WARNING! Modifying existing run parameters")
             GenParams.TestImageBatchSize=10
-            GenParams.NewImageCycle=10
-            GenParams.No_TopCandidates=20
+            GenParams.NewImageCycle=5
+            #GenParams.No_TopCandidates=20
             GenParams.GetRandomSet_TestImages()
+            
         else:
             #default first generation
             #assess first generation - here we can potentially load in a saved state
@@ -863,7 +951,9 @@ if __name__ == "__main__":
     
 
     #start main training loop
-    for i in range (0,999999):
+    for i in range (GenParams.Generation, 999999):
+        
+
         GenerationName=" Gen " + str(i+1)
         print("***********" + GenerationName + "***********")
         print("generation size=", len(DictFitCandidates))
@@ -922,7 +1012,7 @@ if __name__ == "__main__":
             #start increasing image batch size every new batch of image(s)
             #if GenParams.TestImageBatchSize< 6 : GenParams.TestImageBatchSize =GenParams.TestImageBatchSize+1
 
-        #check no duplcaites
+        #check no duplicates
         #DictFitCandidates,DuplicateCount=RemoveDuplicateIndividuals(DictFitCandidates,GenerationName)
         #DictFitCandidates=RemoveIndividualsCloseFitness(DictFitCandidates,0.01,GenerationName)
         DictFitCandidates=RemoveCloseParameterIndividuals(DictFitCandidates,GenerationName,0.02)
@@ -938,19 +1028,8 @@ if __name__ == "__main__":
             pickle.dump((SaveList), file_pi)
             file_pi.close()
 
-
-
-            #load into memory
-            # file_pi2 = open(filepath, 'rb')
-            # SaveList=[]
-            # SaveList = pickle.load(file_pi2)
-            # file_pi2.close()
-
-            # GenParams=None
-            # DictFitCandidates=None
-            # GenParams=copy.deepcopy(SaveList[0])
-            # DictFitCandidates=copy.deepcopy(SaveList[1])
-
+        #keep persistant generation aligned
+        GenParams.Generation=GenParams.Generation+1
 
 
 

@@ -49,10 +49,12 @@ class SNR_Parameters():
         self.GausSize_Threshold=0
         self.SubtractMean=0
         self.tessedit_char_whitelist='0123456789'#use if necessary
-        self.AlphaBlend=1#one means no processing
+        self.AlphaBlend=1#one means raw image, 0 is processed image
         self.CropPixels=0
         self.Mirror=True
         self.PSM=3#default is 3
+        self.Denoise=0
+        self.Negative=0
         
         #psm is page segment modes - see pytessaract manual
         #self.config='--oem 3 --psm 6 -c load_system_dawg=0 load_freq_dawg=0 load_punc_dawg=0'
@@ -164,9 +166,6 @@ def CompareOCR_Reads(TemplateSNR,ExternalSNR,ExpectedFielding=None):
     ConfusionPairs=[("8","B"),("S","5"),("I","1"),("3","8"),("G","6"),("0","O"),("6","9"),("I","1")]
     #roll through test cases and break out if test fails
 
-
-
-
     while True:#loop through tests - should use internal function with scoped variables for this probably nicer
 
         if (TemplateSNR is None) or (TemplateSNR=="") or (ExternalSNR is None) or (ExternalSNR==""):
@@ -258,7 +257,7 @@ def GenerateSN_Fielding(InputListSNRReads):
                     Known_SNR_string=Get_SNR_string
                     #load image file path and SNR as key and value
                     SNR_Dict[Elemn]=Known_SNR_string
-                    print(Elemn,Known_SNR_string)
+                    #print(Elemn,Known_SNR_string)
         except Exception as e: 
             print("error extracting known snr string from file ",Elemn )
             print(repr(e)) 
@@ -360,7 +359,7 @@ def CreateTestImages():
     
     #quick tool to create test images for OCR
     ResultFolder = input("Please enter folder for test images:")
-    NumberOfImages=1000
+    NumberOfImages=100
     ImageSizeX=170
     ImageSizeY=70
     Xbuffer=10
@@ -370,16 +369,14 @@ def CreateTestImages():
         Text=my_random_string(10)
         TextScale=_3DVisLabLib.get_optimal_font_scale(Text,ImageSizeX-Xbuffer,ImageSizeY)#warning: this does not assume the same font
         font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(RGB_Image, Text, (int(Xbuffer/2),ImageSizeY), font, TextScale, (255*random.random(), 255*random.random(), 255*random.random()), 1, cv2.LINE_AA)
+        cv2.putText(RGB_Image, Text, (int(Xbuffer/2),ImageSizeY), font, TextScale, (50, 50, 20), 1, cv2.LINE_AA)
         #add noise
-        RGB_Image=sp_noise(RGB_Image,random.random()/200)
+        #RGB_Image=sp_noise(RGB_Image,random.random()/200)
+        RGB_Image=sp_noise(RGB_Image,0.01)
         #resize
-        #TestImage=ResizeImage(TestImage,ParameterObject.ResizeX,ParameterObject.ResizeY)
+        RGB_Image=ResizeImage(RGB_Image,50,150)
         Savestring=ResultFolder + "\\TEST_IMAGE_" + "[" + Text + "].jpg" 
         cv2.imwrite(Savestring,RGB_Image)
-        #_3DVisLabLib.ImageViewer_Quick_no_resize(RGB_Image,0,False,True)
-
-#CreateTestImages()
 
 class TestSNR_Fitness():
 #class which loads images into memory used to test fitness of input parameters
@@ -568,6 +565,12 @@ class TestSNR_Fitness():
         
         if ParameterObject.Canny!=0:
             ProcessedImage=cv2.Canny(ProcessedImage, ParameterObject.CannyThresh1, ParameterObject.CannyThresh2)
+
+        if ParameterObject.Denoise==1:
+            ProcessedImage=cv2.fastNlMeansDenoising(ProcessedImage)
+
+        if ParameterObject.Negative==1:
+            ProcessedImage = cv2.bitwise_not(ProcessedImage)
 
         #blend processed and base(resized)image according to Alpha blend parameter
         beta = (1.0 - ParameterObject.AlphaBlend)

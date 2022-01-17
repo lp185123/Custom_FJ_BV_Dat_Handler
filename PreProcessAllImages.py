@@ -52,7 +52,7 @@ def ProcessImages(InputPath=None,OutputPath=None,Processing=False):#dont use if 
         LastFitnessRecord=(list(FitnessRecords)[-1])
         LastRecord_Parameters=(FitnessRecords[LastFitnessRecord][1])#location of parameters in dictionary value tuple
         print("Parameters for last record:",LastRecord_Parameters)
-
+        #InputGenDict[DictOfFitness[SortedFitness[0]]].ApplicationSpecificMapping())
     #initialise OCR object
     SNR_fitnessTest=Snr_test_fitness.TestSNR_Fitness()
 
