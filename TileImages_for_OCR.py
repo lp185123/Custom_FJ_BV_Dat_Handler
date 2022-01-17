@@ -135,7 +135,7 @@ class TileImage:
                 cv2.imwrite(self.OutputFolder +"\\" + str(Counter) + "_GRAYSCALE.jpg" ,gray_img)
 
                 #write out SNR answer file
-                with open(self.OutputFolder +"\\" + str(Counter) + "_SNR_Answers" ".txt", 'w') as f:
+                with open(self.OutputFolder +"\\" + str(Counter) + "" ".txt", 'w') as f:
                     for item in SNRAnswersList:
                         f.write("%s\n" % item)
 
