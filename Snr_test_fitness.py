@@ -361,22 +361,58 @@ def CreateTestImages():
     ResultFolder = input("Please enter folder for test images:")
     NumberOfImages=100
     ImageSizeX=170
-    ImageSizeY=70
+    ImageSizeY=140
     Xbuffer=10
+    BackgroundImage_toload=r"C:\Working\FindIMage_In_Dat\Media\DirtyBackground.jpg"
+    BackGroundImage=cv2.imread(BackgroundImage_toload)
 
     for Img in range (NumberOfImages):
-        RGB_Image = np.zeros((int(ImageSizeY*2),int(ImageSizeX),3), np.uint8)
+
+        #grab a portion of the background image
+        #get range for grabbing a window from the background image that fits export image size
+        BackgroundImg_WindowRangeX=(BackGroundImage.shape[1]-ImageSizeX)
+        BackgroundImg_WindowRangeY=(BackGroundImage.shape[0]-ImageSizeY)
+        BackGroundWindowStart_X=random.randint(0,BackgroundImg_WindowRangeX)
+        BackGroundWindowStart_Y=random.randint(0,BackgroundImg_WindowRangeY)
+        
+        #create blank canvases for serial number
+        RGB_Image = np.zeros((int(ImageSizeY),int(ImageSizeX),3), np.uint8)
+        RGB_Image_Alphamatte = np.zeros((int(ImageSizeY),int(ImageSizeX),3), np.uint8)
+        RandomCroppedBackground=np.zeros((int(ImageSizeY),int(ImageSizeX),3), np.uint8)
+        #we have a starting position now - should be able to cut a section of the background out
+        RandomCroppedBackground=BackGroundImage[BackGroundWindowStart_Y:BackGroundWindowStart_Y+ImageSizeY,BackGroundWindowStart_X:BackGroundWindowStart_X+ImageSizeX,:]
+
+        
+        #generate random text string
         Text=my_random_string(10)
+        #fit text string into canvas
         TextScale=_3DVisLabLib.get_optimal_font_scale(Text,ImageSizeX-Xbuffer,ImageSizeY)#warning: this does not assume the same font
         font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(RGB_Image, Text, (int(Xbuffer/2),ImageSizeY), font, TextScale, (50, 50, 20), 1, cv2.LINE_AA)
+        #draw on text
+        cv2.putText(RGB_Image, Text, (int(Xbuffer/2),int(ImageSizeY/2)), font, TextScale, (255, 255, 20), 1, cv2.LINE_AA)
+        #to use alpha blending we need a matte image - so all black except for text
+        cv2.putText(RGB_Image_Alphamatte, Text, (int(Xbuffer/2),int(ImageSizeY/2)), font, TextScale, (255, 255, 255), 1, cv2.LINE_AA)
+        # Normalize the alpha mask to keep intensity between 0 and 1
+        RGB_Image_Alphamatte = RGB_Image_Alphamatte.astype(float)/255
+        # Convert uint8 to float
+        foreground = RGB_Image.astype(float)
+        background = RandomCroppedBackground.astype(float)
+        # Multiply the foreground with the alpha matte
+        foreground = cv2.multiply(RGB_Image_Alphamatte, foreground)
+        # Multiply the background with ( 1 - alpha )
+        #background = cv2.multiply(1.0 - RGB_Image_Alphamatte, background*random.random())
+        background = cv2.multiply(1.0 - RGB_Image_Alphamatte, background*0)
+        # Add the masked foreground and background.
+        outImage = cv2.add(foreground, background)
+
+        #inverse
+        #outImage= cv2.bitwise_not(outImage)
         #add noise
-        #RGB_Image=sp_noise(RGB_Image,random.random()/200)
-        RGB_Image=sp_noise(RGB_Image,0.01)
+        #outImage=sp_noise(outImage,random.random()/100)
         #resize
-        RGB_Image=ResizeImage(RGB_Image,50,150)
-        Savestring=ResultFolder + "\\TEST_IMAGE_" + "[" + Text + "].jpg" 
-        cv2.imwrite(Savestring,RGB_Image)
+        #RGB_Image=ResizeImage(RGB_Image,50,150)
+        Savestring=ResultFolder + "\\TEST_IMAGE_" + "[" + Text + "] "+ str(Img) + ".jpg" 
+        cv2.imwrite(Savestring,outImage)
 
 class TestSNR_Fitness():
 #class which loads images into memory used to test fitness of input parameters

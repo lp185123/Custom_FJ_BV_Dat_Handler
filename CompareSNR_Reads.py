@@ -15,7 +15,7 @@ class CheckSN_Answers():
         #self.BaseSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\ToBeRead_Single"
         #self.BaseSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
         #answers from external OCR verification
-        self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\SNR_Answers"
+        self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\SNR_Answers_Collimated"
         #self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\SNR_Answers_Single"
 
         self.Collimated=None#set boolean to single images or collimated images which handle answers differently
@@ -27,8 +27,20 @@ class CheckSN_Answers():
         self.ImageVS_ExternalSNR_dict=self.GetExternalOCR_Answers()
         #make sure dictionaries align
         if self.CheckBoth_setsAnswers_align(self.ImageVS_TemplateSNR_dict,self.ImageVS_ExternalSNR_dict)==True:
-            self.Check_TemplateAndExternal_OCR(self.ImageVS_TemplateSNR_dict,self.ImageVS_ExternalSNR_dict)
-
+            MatchResults_dict=self.Check_TemplateAndExternal_OCR(self.ImageVS_TemplateSNR_dict,self.ImageVS_ExternalSNR_dict)
+            #MatchResults_dict[filename]=[ResultsObjectList,ImageVS_TemplateSNR_dict[filename],ExternalOCR_key,InternalImage_key]       
+            #should have dictionary of results and other info such as image paths 
+            TotalPass=0
+            TotalFail=0
+            for MatchResult in MatchResults_dict:
+                
+                for SingleResult in MatchResults_dict[MatchResult][0]:
+                    if SingleResult.Pass==True:
+                        TotalPass=TotalPass+1
+                    else:
+                        TotalFail=TotalFail+1
+            print("Efficiency:",round((TotalPass/(TotalPass+TotalFail))*100),"% match")
+                
 
     def Build_SNR_Info(self):
         #fielding can come in two modes - SNR is embedded in single SNR image or can be in text files with multiple instaces
@@ -112,8 +124,10 @@ class CheckSN_Answers():
                     DelimitedLines=lines.split("DISPATCH")#TODO make this common
                     Cleanedlines=[]
                     #can get empty lines with delimiter
-                    for Singleline in DelimitedLines:
-                        if len(Singleline)>3:
+                    for Index, Singleline in enumerate(DelimitedLines):
+                        #delimiter may give us an empty final line which can throw up an error for alignment
+                        #and may also legimiately get empty lines back from external OCR
+                        if (Index< len(DelimitedLines)-1) or (len(DelimitedLines)==1):
                             CleanedLine=self.CleanUpExternalOCR(Singleline)
                             Cleanedlines.append(CleanedLine)
                             CountSingleAnswers=CountSingleAnswers+1
@@ -183,42 +197,60 @@ class CheckSN_Answers():
         #get filepath of external SNR
         #have to remove last element of filepath (filename)
         ExternalOCR_PathString=self.GetPath_WO_filename(ImageVS_ExternalOCR_dict)
+        InternalImage_PathString=self.GetPath_WO_filename(ImageVS_TemplateSNR_dict)
         #answer files will have the same filenames, potentially different extensions and will have different filepaths
-        #create dictionaries to hold matching results and mismatching results when we check both sets of SNR
-        Match_dict=dict()
-        Mismatch_dct=dict()
+        #create dictionaries to hold matching results using snr match class
+        MatchResults_dict=dict()
         for filename in ImageVS_TemplateSNR_dict:
             #get last part of filename so will be "0_SNR_Answers.txt"
             ExternalOCR_key=self.GenerateAligned_Filepath(filename,ExternalOCR_PathString,".txt")
+            InternalImage_key=self.GenerateAligned_Filepath(filename,InternalImage_PathString,".jpg")
             TemplateSNR_list=ImageVS_TemplateSNR_dict[filename]
             ExternalSNR_list=ImageVS_ExternalOCR_dict[ExternalOCR_key]
             #Should have two lists of SNR/OCR results - can now loop through and check the SNRs match
+            ResultsObjectList=[]
             for Index,Item in enumerate(TemplateSNR_list):
                 print("Checking template VS external SNR:\n",filename,"\n",ExternalOCR_key)
-                self.CheckSNR_Reads(TemplateSNR_list[Index],ExternalSNR_list[Index],self.Fielding)
+                ResultsObjectList.append(self.CheckSNR_Reads(TemplateSNR_list[Index],ExternalSNR_list[Index],self.Fielding))
+            #pack results into the dictionary alongside the image, template SNR and external SNR files for later analysis
 
+            for CheckElement in ResultsObjectList:
+                try:
+                    if CheckElement.Pass is None:
+                        raise Exception("Pass element has not been populated for OCR check card")
+                    if CheckElement.Pass==True or CheckElement.Pass==False:
+                        pass
+                except:
+                    raise Exception("Error with OCR read card - see logs")
 
-        
+            
+            MatchResults_dict[filename]=[ResultsObjectList,ImageVS_TemplateSNR_dict[filename],ExternalOCR_key,InternalImage_key]
+            
+
+        return MatchResults_dict
+
     def CheckSNR_Reads(self,TemplateSNR,ExternalSNR,Fielding):
         ###pass in internal and external SNR and check for match
         #Fielding will be NONE or generated externally
-            Known_SNR_string=None
-                #extract snr - by previous process will be bookended by "[" and "]"
-            try:
-                if (not "[" in TemplateSNR) or (not "]" in TemplateSNR):
-                    raise Exception("Template SNR not formatted correctly []")
-                Get_SNR_string=TemplateSNR.split("[")#delimit
-                Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
-                Get_SNR_string=Get_SNR_string.split("]")#delimit
-                Get_SNR_string=Get_SNR_string[0]
-                if (Get_SNR_string is not None):
-                    if (len(Get_SNR_string))>0:
-                        Known_SNR_string=Get_SNR_string
-                        print(vars(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding)))
-                        return(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding))
-            except Exception as e: 
-                print("error extracting known snr string from file " )
-                print(repr(e))
+        Known_SNR_string=None
+            #extract snr - by previous process will be bookended by "[" and "]"
+        try:
+            if (not "[" in TemplateSNR) or (not "]" in TemplateSNR):
+                raise Exception("Template SNR not formatted correctly []")
+            Get_SNR_string=TemplateSNR.split("[")#delimit
+            Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
+            Get_SNR_string=Get_SNR_string.split("]")#delimit
+            Get_SNR_string=Get_SNR_string[0]
+            if (Get_SNR_string is not None):
+                if (len(Get_SNR_string))>0:
+                    Known_SNR_string=Get_SNR_string
+                    print(vars(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding)))
+                    return(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding))
+        except Exception as e: 
+            print("error extracting known snr string from file " )
+            print(repr(e))
+
+        return None
 
 
 

@@ -60,7 +60,6 @@ class TileImage:
 
         self.DelimiterImage=blank_image
         #_3DVisLabLib.ImageViewer_Quick_no_resize(blank_image,0,True,True)
-
     def TileImages_with_delimiterImage(self):
         #create columns of images with delimiter
 
@@ -94,8 +93,6 @@ class TileImage:
         #get slice of input filepaths
         for Counter, Image in enumerate(self.ListAllImages):
            
-            
-
             if Counter%20==0 and Counter>0:
                 print("Processed image", Counter, "of",len(self.ListAllImages))
             OutputColumn=self.BlankColWithDelimiters_Img.copy()
@@ -125,7 +122,7 @@ class TileImage:
                             Get_SNR_string="NO_SNR"
                     else:
                         Get_SNR_string="NO_SNR"
-                    SNRAnswersList.append(Get_SNR_string)
+                    SNRAnswersList.append(Get_SNR_string + ImgFilePath)
                 #TODO lets put the delimiter text in the text file as well
 
 
@@ -135,7 +132,7 @@ class TileImage:
                 cv2.imwrite(self.OutputFolder +"\\" + str(Counter) + "_GRAYSCALE.jpg" ,gray_img)
 
                 #write out SNR answer file
-                with open(self.OutputFolder +"\\" + str(Counter) + "" ".txt", 'w') as f:
+                with open(self.OutputFolder +"\\" + str(Counter) + "" + ".txt", 'w') as f:
                     for item in SNRAnswersList:
                         f.write("%s\n" % item)
 

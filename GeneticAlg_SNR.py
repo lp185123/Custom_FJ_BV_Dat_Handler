@@ -14,11 +14,11 @@ class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=100
+        self.No_of_First_gen=20
         self.No_TopCandidates=20
         self.NewIndividualsPerGen=0
-        self.TestImageBatchSize=3
-        self.NewImageCycle=2
+        self.TestImageBatchSize=10
+        self.NewImageCycle=5
         self.ImageTapOut=8#terminate anything that has poor performance out the box
 
         self.DictFilename_V_Images=dict()#load this with fitness check images
@@ -34,6 +34,7 @@ class GA_Parameters():
         self.LastImage=None
         self.NameOfSavedState=None
         self.Generation=0
+        self.BestPerformerTemp=None
         # #get all files in input folder
         # InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(self.FilePath)
         # #filter out non images
@@ -281,7 +282,7 @@ class Individual():
         #TODO might make more sense normalising all parameters
 
         #decide what a discrete step would be per parameter - would this be better elsewhere? #TODO
-        DiscreteStep=1 #all parmaters normalised now so a discrete step is 1% of map range
+        DiscreteStep=0.01 #all parmaters normalised now so a discrete step is 1% of map range
         #appy discrete step with polarity from user
         self.Parameters[InputParameter]=self.Parameters[InputParameter]+(DiscreteStep*PolarityAsInteger)
         return
@@ -574,8 +575,6 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
     print("Old timers for fitness check = ",TotalOldTimers)
     TotalTapouts=0#TODO shouldnt have to do this
 
-
-
     #sort by error
     SortedFitness=(sorted(DictOfFitness.keys()))
 
@@ -595,6 +594,9 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
     print("name", InputGenDict[DictOfFitness[SortedFitness[0]]].name)
     print("Parameters", InputGenDict[DictOfFitness[SortedFitness[0]]].ApplicationSpecificMapping())
     print("All fitness:", SortedFitness[:])
+
+    #save best performer - this is pretty lazy way to do this
+    GenParams.BestPerformerTemp=copy.deepcopy(InputGenDict[DictOfFitness[SortedFitness[0]]])
     # if SortedFitness[0]<2:
     #   sss
     #   exit
@@ -638,6 +640,9 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
 
 def GradientDescent(InputDict_Candidates,NameOfGen,StepUnits):
     #basic version of gradient descent - find what dimension to move to improve fitness
+    ##return original colony plus the gradient descents - original colony should have a Fitness score
+    ##so will not need to be processed - but this may change 
+
     #dictionaries arrive here sorted, first element is the most fit descending
     DictProgenitors=dict()
     #convert to list so we can more conveniently iterate through them
@@ -656,7 +661,7 @@ def GradientDescent(InputDict_Candidates,NameOfGen,StepUnits):
         Name=DictOfFitness[key]
         Indv=InputDict_Candidates[Name]
         #just do top 2 for now - warning! Magic number!
-        if index>1:
+        if index>0:
             break
         #get genome
         Dummy, Genes1=Indv.GetGenes()
@@ -829,7 +834,6 @@ def RemoveCloseParameterIndividuals(InputDict_Candidates,NameOfGen,Buffer):
 
 def PlotAndSave(Title,Filepath,Data):
     #save out plot of 1D data
-    
     plt.plot(Data)
     plt.ylabel(Title)
     plt.ylim([0, 1])
@@ -931,11 +935,11 @@ if __name__ == "__main__":
             DictFitCandidates=copy.deepcopy(SaveList[1])
             #custom modifications to saved state - warning - can cause crash if incompatible new parameters such as
             #more top candidates than generation can provide
-            print("WARNING! Modifying existing run parameters")
-            GenParams.TestImageBatchSize=10
-            GenParams.NewImageCycle=5
+            #print("WARNING! Modifying existing run parameters")
+            #GenParams.TestImageBatchSize=10
+            #GenParams.NewImageCycle=5
             #GenParams.No_TopCandidates=20
-            GenParams.GetRandomSet_TestImages()
+            #GenParams.GetRandomSet_TestImages()
             
         else:
             #default first generation
@@ -984,10 +988,22 @@ if __name__ == "__main__":
             for looper in range (0,15):
                 #gradient descent loop
                 print("$$$$$$$$$Gradient descent", looper,"/15")
-                DictFitCandidates=GradientDescent(DictFitCandidates,GenerationName +"_gD",StepSize)
+                DictFitCandidates_gd=GradientDescent(DictFitCandidates,GenerationName +"_gD",StepSize)
                 #DictFitCandidates,DuplicateCount=RemoveDuplicateIndividuals(DictFitCandidates,GenerationName)
-                DictFitCandidates=RemoveCloseParameterIndividuals(DictFitCandidates,GenerationName,0.02)
-                DictFitCandidates=CheckFitness_Multi(DictFitCandidates,GenParams,SNR_fitnessTest)
+                DictFitCandidates_gd=RemoveCloseParameterIndividuals(DictFitCandidates_gd,GenerationName,0.02)
+                DictFitCandidates_gd=CheckFitness_Multi(DictFitCandidates_gd,GenParams,SNR_fitnessTest)
+
+                #if gradient descent has done nothing - don't keep the gradient descent prognitors
+                if (GenParams.CheckRepeatingFitness(2,0.001)==True) and looper>1:
+                    print("$$$$$$$$$Gradient descent, no improvement")
+                    pass
+                else:
+                    #get best performer held in temporary storage and add to original group
+                    DictFitCandidates[GenParams.BestPerformerTemp.name]=copy.deepcopy(GenParams.BestPerformerTemp)
+                    print("$$$$$$$$$Gradient descent, improvement - adding to progenitors")
+
+                #can end up with flat line of individuals as we scrape off the top fitness but they
+                #are all slight variations
                 #DictFitCandidates=RemoveIndividualsCloseFitness(DictFitCandidates,0.01,GenerationName)
                 #if no response - increase step size
                 if (GenParams.CheckRepeatingFitness(4,0.01)==True) and looper>1:

@@ -50,7 +50,7 @@ def ProcessImages(InputPath=None,OutputPath=None,Processing=False):#dont use if 
         FitnessRecords=GenParams.GetEntireFitnessRecord()
         #get last item by insertion - this only will work with python 3.7 onwards or will have to use ordered dictionary
         LastFitnessRecord=(list(FitnessRecords)[-1])
-        LastRecord_Parameters=(FitnessRecords[LastFitnessRecord][1])#location of parameters in dictionary value tuple
+        LastRecord_Parameters=(FitnessRecords[LastFitnessRecord][4])#location of parameters in dictionary value tuple
         print("Parameters for last record:",LastRecord_Parameters)
         #InputGenDict[DictOfFitness[SortedFitness[0]]].ApplicationSpecificMapping())
     #initialise OCR object
