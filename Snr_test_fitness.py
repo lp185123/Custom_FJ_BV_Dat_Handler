@@ -359,7 +359,7 @@ def CreateTestImages():
     
     #quick tool to create test images for OCR
     ResultFolder = input("Please enter folder for test images:")
-    NumberOfImages=100
+    NumberOfImages=300
     ImageSizeX=170
     ImageSizeY=140
     Xbuffer=10

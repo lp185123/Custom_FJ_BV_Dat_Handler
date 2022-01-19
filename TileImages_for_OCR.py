@@ -129,7 +129,7 @@ class TileImage:
                 #save out delimited master image ready for OCR 
                 cv2.imwrite(self.OutputFolder +"\\" + str(Counter) + ".jpg" ,OutputColumn)
                 gray_img = cv2.cvtColor(OutputColumn,cv2.COLOR_BGR2GRAY)
-                cv2.imwrite(self.OutputFolder +"\\" + str(Counter) + "_GRAYSCALE.jpg" ,gray_img)
+                #cv2.imwrite(self.OutputFolder +"\\" + str(Counter) + "_GRAYSCALE.jpg" ,gray_img)
 
                 #write out SNR answer file
                 with open(self.OutputFolder +"\\" + str(Counter) + "" + ".txt", 'w') as f:

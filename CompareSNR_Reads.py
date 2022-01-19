@@ -10,12 +10,13 @@ import os
 class CheckSN_Answers():
     def __init__(self):
 
-        #BaseSNR_Folder = input("Please enter folder for analysis:")
-        self.BaseSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\ToBeRead_Collimated"
+        self.BaseSNR_Folder = input("Please enter images folder:")
+        #self.BaseSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\ToBeRead_Collimated"
         #self.BaseSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\ToBeRead_Single"
         #self.BaseSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
         #answers from external OCR verification
-        self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\SNR_Answers_Collimated"
+        self.AnswersFolder = input("Please enter answers folder:")
+        #self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\SNR_Answers_Collimated"
         #self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\SNR_Answers_Single"
 
         self.Collimated=None#set boolean to single images or collimated images which handle answers differently
@@ -39,7 +40,10 @@ class CheckSN_Answers():
                         TotalPass=TotalPass+1
                     else:
                         TotalFail=TotalFail+1
+
             print("Efficiency:",round((TotalPass/(TotalPass+TotalFail))*100),"% match")
+
+
                 
 
     def Build_SNR_Info(self):
@@ -188,7 +192,7 @@ class CheckSN_Answers():
                     print("\nFilecheck: ",filename,"not found!")
                 print("\n please check input/output folders are correct")
 
-                return False
+                #return False
 
         return True
     
