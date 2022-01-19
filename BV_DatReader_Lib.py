@@ -115,7 +115,7 @@ class UserInputParameters():
 
         self.AutomaticMode=_3DVisLabLib.yesno("Automatic(y) or Manual (m) mode?")
         if self.AutomaticMode==False: return False
-        self.FirstImageOnly=_3DVisLabLib.yesno("All Images (y) or First image only (n)?\n nb [First Image Only] will write into input folder as complimentary image files")
+        self.FirstImageOnly=not _3DVisLabLib.yesno("All Images (y) or First image only (n)?\n nb [First Image Only] will write into input folder as complimentary image files")
 
         while True:
             #ask user what block type (format of image)
@@ -177,7 +177,7 @@ def AutomaticExtraction(UserParameters):
     for elem in InputFiles:
         if ((".dat") in elem.lower()):
             InputFiles_cleaned.append(elem)
-    for DatFile in InputFiles_cleaned:
+    for FileIndex, DatFile in enumerate(InputFiles_cleaned):
     #get all images from first .dat file in input folder(s) (nested)
         print("Processing",DatFile)
         #get all images found in file
@@ -201,7 +201,7 @@ def AutomaticExtraction(UserParameters):
         #load in dat file as hex
         data_hex=Load_Hex_File(DatFile)
         #roll through filtered images and extract from datamass
-        for Notefound in filteredImages:
+        for Index,Notefound in enumerate(filteredImages):
             (OutputImage,dummy)=Image_from_Automatic_mode(filteredImages,Notefound,data_hex)
 
             #if request for all colour channels is true - combine images
@@ -234,8 +234,14 @@ def AutomaticExtraction(UserParameters):
                 Savestring=DatFile.lower().replace(".dat",".jpg")
                 print("saving image to ", Savestring)
                 cv2.imwrite(Savestring,OutputImage)
-                
                 break
+            else:
+                DelimitedDat=DatFile.split("\\")
+                DelimitedDat_LastElem=DelimitedDat[-1]
+                ReplacedExtension=DelimitedDat_LastElem.lower().replace(".dat",".jpg")
+                Savestring=UserParameters.OutputFilePath +"\\File" + str(FileIndex) + "_Image_"+str(Index) +"_"+ ReplacedExtension
+                print("saving image to ", Savestring)
+                cv2.imwrite(Savestring,OutputImage)
 
         #if user requests Serial number read alongside images
         if UserParameters.GetSNR==True:

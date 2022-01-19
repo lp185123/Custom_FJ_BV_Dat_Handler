@@ -15,10 +15,10 @@ class GA_Parameters():
         self.FitnessRecord=dict()
         self.SelfCheck=False
         self.No_of_First_gen=20
-        self.No_TopCandidates=20
-        self.NewIndividualsPerGen=0
+        self.No_TopCandidates=10
+        self.NewIndividualsPerGen=1
         self.TestImageBatchSize=10
-        self.NewImageCycle=5
+        self.NewImageCycle=999999999
         self.ImageTapOut=8#terminate anything that has poor performance out the box
 
         self.DictFilename_V_Images=dict()#load this with fitness check images
@@ -708,7 +708,8 @@ def CrossBreed(InputDict_Candidates,NameOfGen):
     for index, key in enumerate(FitList):
         if index==len(FitList)-1:
             break
-        RandomIndividual=random.randint(0,len(FitList)-1)
+        #RandomIndividual=random.randint(0,len(FitList)-1)
+        RandomIndividual=index+1
         #breed in processing pairs
         #create new individual
         TempIdv=Individual(NameOfGen)
