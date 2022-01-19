@@ -17,7 +17,7 @@ OutputFolderSingleImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterCo
 #output folder tiled images
 OutputFolderTiledImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput"
 #column size of tiled images
-ColumnSize=100
+ColumnSize=20
 #Preprocessing on/off - if ML optimisation has been used
 PreProcessing=False
 

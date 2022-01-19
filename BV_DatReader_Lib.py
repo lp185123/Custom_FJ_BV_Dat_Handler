@@ -151,7 +151,7 @@ class UserInputParameters():
         self.GetRGBImage=_3DVisLabLib.yesno("Extract RGB channels into one image?")
         
         #does user want SNR values associated with extracted data
-        GetSNR=_3DVisLabLib.yesno("Get Serial Number if available? y/n")
+        self.GetSNR=_3DVisLabLib.yesno("Get Serial Number if available? y/n")
 
 
 
@@ -203,7 +203,7 @@ def AutomaticExtraction(UserParameters):
         #roll through filtered images and extract from datamass
         for Index,Notefound in enumerate(filteredImages):
             (OutputImage,dummy)=Image_from_Automatic_mode(filteredImages,Notefound,data_hex)
-
+            SNR_ReadResult=""
             #if request for all colour channels is true - combine images
             #this will have been checked earlier for alignment
             if UserParameters.GetRGBImage==True:
@@ -227,6 +227,7 @@ def AutomaticExtraction(UserParameters):
             if UserParameters.GetSNR==True:
                 SNR_ReadResult=str(filteredImages[Notefound].note.snr)
                 if SNR_ReadResult is None or SNR_ReadResult =="":raise Exception(DatFile, "Could not parse SNR (by user request)")
+                SNR_ReadResult="["+ SNR_ReadResult +"]"
 
             #if user only requires first image, break out of loop
             if UserParameters.FirstImageOnly==True:
@@ -239,7 +240,7 @@ def AutomaticExtraction(UserParameters):
                 DelimitedDat=DatFile.split("\\")
                 DelimitedDat_LastElem=DelimitedDat[-1]
                 ReplacedExtension=DelimitedDat_LastElem.lower().replace(".dat",".jpg")
-                Savestring=UserParameters.OutputFilePath +"\\File" + str(FileIndex) + "_Image_"+str(Index) +"_"+ ReplacedExtension
+                Savestring=UserParameters.OutputFilePath +"\\" + SNR_ReadResult + "File" + str(FileIndex) + "_Image_"+str(Index) +"_"+ ReplacedExtension
                 print("saving image to ", Savestring)
                 cv2.imwrite(Savestring,OutputImage)
 

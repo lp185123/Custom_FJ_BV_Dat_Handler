@@ -60,24 +60,20 @@ class TileImage:
 
         self.DelimiterImage=blank_image
         #_3DVisLabLib.ImageViewer_Quick_no_resize(blank_image,0,True,True)
-    def TileImages_with_delimiterImage(self):
-        #create columns of images with delimiter
 
-        #roll through all images
-        #Calculate Column dimensions
-        ColDim_Y=self.DelimiterImage.shape[0]#delimiter may be different height from s39 images to accomodate text
 
-        #roll through column size so we can visualise whats happening in case this gets more complicated
+    def CreateDelimited_Column(self,ColumnHeight):
+        ColDim_Y=self.DelimiterImage.shape[0]
         NewY=0
         ListY_S39=[]
         ListY_Delimiter=[]
-        for Index in range(self.ColumnSize):
+        for Index in range(ColumnHeight):
             #add height of image and height of delimiter
             ListY_S39.append(NewY)
             NewY=NewY+self.ImageY
             ListY_Delimiter.append(NewY)
             NewY=NewY+ColDim_Y
-            
+
         #now have a list of Y positions to arrange images
         #create blank white image
         blank_image = (numpy.ones((NewY,self.ImageX,3), dtype = numpy.uint8))*255
@@ -86,6 +82,38 @@ class TileImage:
         for Ypos in ListY_Delimiter:
             blank_image[Ypos:Ypos+ColDim_Y:,:]=self.DelimiterImage
         self.BlankColWithDelimiters_Img=blank_image
+        return ListY_S39
+
+
+
+    def TileImages_with_delimiterImage(self):
+        #create columns of images with delimiter
+
+        #roll through all images
+        #Calculate Column dimensions
+        ColDim_Y=self.DelimiterImage.shape[0]#delimiter may be different height from s39 images to accomodate text
+
+        
+
+        # #roll through column size so we can visualise whats happening in case this gets more complicated
+        # NewY=0
+        # ListY_S39=[]
+        # ListY_Delimiter=[]
+        # for Index in range(self.ColumnSize):
+        #     #add height of image and height of delimiter
+        #     ListY_S39.append(NewY)
+        #     NewY=NewY+self.ImageY
+        #     ListY_Delimiter.append(NewY)
+        #     NewY=NewY+ColDim_Y
+            
+        # #now have a list of Y positions to arrange images
+        # #create blank white image
+        # blank_image = (numpy.ones((NewY,self.ImageX,3), dtype = numpy.uint8))*255
+
+        # #load in delimiter image according to Y positions generated earlier
+        # for Ypos in ListY_Delimiter:
+        #     blank_image[Ypos:Ypos+ColDim_Y:,:]=self.DelimiterImage
+        # self.BlankColWithDelimiters_Img=blank_image
 
         #will have a white image with the delimited texts with pitch=height of s39 images
 
@@ -95,7 +123,16 @@ class TileImage:
            
             if Counter%20==0 and Counter>0:
                 print("Processed image", Counter, "of",len(self.ListAllImages))
+
+            #generate column image - might need variable height
+            if (len(self.ListAllImages)-Counter)< self.ColumnSize:
+                ListY_S39=self.CreateDelimited_Column(len(self.ListAllImages)-Counter)
+            else:
+                ListY_S39=self.CreateDelimited_Column(self.ColumnSize)
+
+
             OutputColumn=self.BlankColWithDelimiters_Img.copy()
+
             if Counter%self.ColumnSize==0:#take modulus
                 SNRAnswersList=[]
                 ImagesToEmbed=self.ListAllImages[Counter:Counter+self.ColumnSize]

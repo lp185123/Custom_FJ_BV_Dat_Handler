@@ -73,6 +73,16 @@ Result_Output = input("Please enter answers output folder - press enter to use d
 if len(Result_Output)<2:
     Result_Output=Default_Output
 
+#prompt user to check filepaths are OK for deletion
+print("Please check output folders can be deleted:\n",Result_Output)
+Response=_3DVisLabLib.yesno("Continue?")
+if Response==False:
+    raise Exception("User declined to delete folders - process terminated")
+
+#delete output folder
+_3DVisLabLib.DeleteFiles_RecreateFolder(Result_Output)
+
+
 #get list of files in folder
 InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(Result_Input)
 #filter for .jpg images
