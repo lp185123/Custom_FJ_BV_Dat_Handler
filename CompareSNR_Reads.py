@@ -28,8 +28,10 @@ class CheckSN_Answers():
         self.SingleImages=None#set this boolean correctly after asserting if working on single or collimated images
         self.ImageVS_TemplateSNR_dict=None#each image (whether single or collimated) will have list of SNR
         self.ImageVS_ExternalSNR_dict=None
-        #populate variables
-        self.ImageVS_TemplateSNR_dict,self.Collimated,self.Fielding=self.BuildTemplate_SNR_Info()#automatically create alpanumeric fielding for SNR
+        self.CollimatedImageVsImageLink_dict=None
+        #populate variables - CollimatedImageVsImageLink_dict is populated if using collimated images - and allows us to 
+        #trace back to find original image used to create columns. THis is NONE if using single images with embedded SNR
+        self.ImageVS_TemplateSNR_dict,self.Collimated,self.Fielding,self.CollimatedImageVsImageLink_dict=self.BuildTemplate_SNR_Info()#automatically create alpanumeric fielding for SNR
         self.ImageVS_ExternalSNR_dict=self.GetExternalOCR_Answers()
         #make sure dictionaries align
         if self.CheckBoth_setsAnswers_align(self.ImageVS_TemplateSNR_dict,self.ImageVS_ExternalSNR_dict)==True:
@@ -47,10 +49,12 @@ class CheckSN_Answers():
                         TotalFail=TotalFail+1
 
             print("Efficiency:",round((TotalPass/(TotalPass+TotalFail))*100),"% match")
-            self.BuildReport(MatchResults_dict)
+            #build report - pass in matchresults but if using collimated images wwe need self.CollimatedImageVsImageLink_dict as well
+            #so we can trace where images came from 
+            self.BuildReport(MatchResults_dict,self.CollimatedImageVsImageLink_dict)
 
 
-    def BuildReport(self,MatchResults_dict):
+    def BuildReport(self,MatchResults_dict,CollimatedImageVsImageLink_dict):
         #build html report
         buildhtml=[]
         #header of html
@@ -58,21 +62,33 @@ class CheckSN_Answers():
         buildhtml.append("<html>")
         buildhtml.append("<body>")
         buildhtml.append("<h2> Analysis Folder: " + self.BaseSNR_Folder+  "</h2>")
-
+        SingleResult_ColImgTrace=None#need this if we have collimated images 
         TotalPass=0
         TotalFail=0
         for MatchResult in MatchResults_dict:
-            
-            for SingleResult in MatchResults_dict[MatchResult][0]:
+
+            if CollimatedImageVsImageLink_dict is not None:
+                if MatchResult in CollimatedImageVsImageLink_dict.keys():
+                    SingleResult_ColImgTrace=CollimatedImageVsImageLink_dict[MatchResult]
+                else:
+                    raise Exception("BuildReport, could not find MatchResult in CollimatedImageVsImageLink_dict - logic error")
+
+            for IntIndexer, SingleResult in enumerate(MatchResults_dict[MatchResult][0]):
                 if SingleResult.Pass==True:
                     TotalPass=TotalPass+1
                 else:
                     #add to html
                     #if an image - embed it into HTML
-                    if ".jpg" in MatchResult.lower():
-                        buildhtml.append("<img src=" + '"' + MatchResult +'"' + ">")
+                    #if we have collimated images we have extra complexity to trace the image provenace
+                    if SingleResult_ColImgTrace is not None:
+                        #collimated image - get corresponding dictionary with image link
+                        buildhtml.append("<img src=" + '"' + SingleResult_ColImgTrace[IntIndexer] +'"' + ">")
                     else:
-                        buildhtml.append("<h2>" + MatchResult+  "</h2>")
+
+                        if ".jpg" in MatchResult.lower():
+                            buildhtml.append("<img src=" + '"' + MatchResult +'"' + ">")
+                        else:
+                            buildhtml.append("<h2>" + MatchResult+  "</h2>")
                     #basic info
                     buildhtml.append("""<h2 style="color:DodgerBlue;">""" + "TemplateOCR: " +SingleResult.TemplateSNR +  "</h2>")
                     buildhtml.append("""<h2 style="color:Tomato;">""" + "CloudOCR:" + SingleResult.ExternalSNR +  "</h2>")
@@ -80,8 +96,6 @@ class CheckSN_Answers():
                     buildhtml.append("<h3>" + "     Details:" + SingleResult.InfoString +  "</h2>")
                     buildhtml.append("<h3>" + "       Error:" + SingleResult.Error +  "</h2>")
                     TotalFail=TotalFail+1
-
-            
 
         #end of html
         buildhtml.append("</body>")
@@ -100,7 +114,9 @@ class CheckSN_Answers():
 
         #create dictionary of image key vs list of snr value(s) (even if single answer)
         OutputDictionary=dict()
-
+        #collimated images need some extra data to handle single image provenance - otherwise
+        #its difficult to find mismatch image for output report
+        OutputDictionary_CollimatedImageLinks=dict()
         print("automatic fielding for SNR - using folder (nested)",self.BaseSNR_Folder)
         #if no images - nothing can proceed
         if len(ListAllImageFiles)==0:
@@ -116,9 +132,12 @@ class CheckSN_Answers():
                     data = json.load(json_file)
                 #roll through deserialised json file dict
                 lines=[]
+                lines_ColImgLink=[]
                 for Indexer, Element in enumerate(data):
-                    lines.append(data[str(Indexer)][0])
+                    lines.append(data[str(Indexer)][0])#0 is the template SNR read result
+                    lines_ColImgLink.append(data[str(Indexer)][1])#1 is the SINGLE image linked to this result - not collimated image
                 OutputDictionary[TemplateCollimatedSNRs]=lines
+                OutputDictionary_CollimatedImageLinks[TemplateCollimatedSNRs]=lines_ColImgLink
                 for Snr in lines:
                     TemplateSNRs.append(Snr)
 
@@ -126,8 +145,8 @@ class CheckSN_Answers():
             if len(TemplateSNRs)==0:
                 print("No text files with template SNR found, defaulting to embedded SNR in single images")
             else:
-                #return collimated images = true with fielding found
-                return(OutputDictionary,True,SNRTools.GenerateSN_Fielding(TemplateSNRs))
+                #return collimated images = true with fielding found and OutputDictionary_CollimatedImageLinks image to snr link
+                return(OutputDictionary,True,SNRTools.GenerateSN_Fielding(TemplateSNRs),OutputDictionary_CollimatedImageLinks)
         
         #if not collimated answers - template SNR may be embedded in image filenames
         ListEmbeddedFormatSNR=[]
@@ -140,8 +159,8 @@ class CheckSN_Answers():
         print(len(ListEmbeddedFormatSNR),"possible template SNR found embedded in images")
         if len(ListEmbeddedFormatSNR)==0:
             raise Exception("no embedded SNR in images found (format = xx[SNR]xx", self.BaseSNR_Folder)
-        #return collimated images = false with fielding found 
-        return(OutputDictionary,False,SNRTools.GenerateSN_Fielding(ListEmbeddedFormatSNR))
+        #return non-collimated images = false with fielding found , and empty OutputDictionary_CollimatedImageLinks
+        return(OutputDictionary,False,SNRTools.GenerateSN_Fielding(ListEmbeddedFormatSNR),OutputDictionary_CollimatedImageLinks)
 
         #shouldnt get here 
         raise Exception("BuildTemplate_SNR_Info incomplete logic")
