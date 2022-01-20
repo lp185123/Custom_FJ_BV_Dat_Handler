@@ -62,6 +62,8 @@ class CheckSN_Answers():
         buildhtml.append("<html>")
         buildhtml.append("<body>")
         buildhtml.append("<h2> Analysis Folder: " + self.BaseSNR_Folder+  "</h2>")
+
+        
         SingleResult_ColImgTrace=None#need this if we have collimated images 
         TotalPass=0
         TotalFail=0
@@ -90,13 +92,18 @@ class CheckSN_Answers():
                         else:
                             buildhtml.append("<h2>" + MatchResult+  "</h2>")
                     #basic info
-                    buildhtml.append("""<h2 style="color:DodgerBlue;">""" + "TemplateOCR: " +SingleResult.TemplateSNR +  "</h2>")
-                    buildhtml.append("""<h2 style="color:Tomato;">""" + "CloudOCR:" + SingleResult.ExternalSNR +  "</h2>")
+                    buildhtml.append("""<h2 style="color:DodgerBlue;font-family:arial;">""" + "TemplateOCR_____: " +SingleResult.TemplateSNR +  "</h2>")
+                    buildhtml.append("""<h2 style="color:Tomato;font-family:arial">""" +      "FieldedCloudOCR__:" + SingleResult.RepairedExternalOCR +  "</h2>")
                     buildhtml.append("<h3>" + "AutoFielding:" + str(SingleResult.ExpectedFielding) +  "</h2>")
                     buildhtml.append("<h3>" + "     Details:" + SingleResult.InfoString +  "</h2>")
                     buildhtml.append("<h3>" + "       Error:" + SingleResult.Error +  "</h2>")
+                    buildhtml.append("<h3>" + "Raw CloudOCR:" + SingleResult.ExternalSNR +  "</h2>")
+                    
                     TotalFail=TotalFail+1
 
+        #put this stuff at the top
+        buildhtml.append("<h2> SNR instances: " + str(TotalPass+TotalFail)+  "</h2>")
+        buildhtml.append("<h2> Matches%: " + str(round((TotalPass/(TotalPass+TotalFail))*100))+  " </h2>")
         #end of html
         buildhtml.append("</body>")
         buildhtml.append("</html>")
@@ -354,26 +361,30 @@ class CheckSN_Answers():
 
         return MatchResults_dict
 
+
+
     def CheckSNR_Reads(self,TemplateSNR,ExternalSNR,Fielding):
         ###pass in internal and external SNR and check for match
         #Fielding will be NONE or generated externally
+
+
         Known_SNR_string=None
             #extract snr - by previous process will be bookended by "[" and "]"
-        try:
-            if (not "[" in TemplateSNR) or (not "]" in TemplateSNR):
-                raise Exception("Template SNR not formatted correctly []")
-            Get_SNR_string=TemplateSNR.split("[")#delimit
-            Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
-            Get_SNR_string=Get_SNR_string.split("]")#delimit
-            Get_SNR_string=Get_SNR_string[0]
-            if (Get_SNR_string is not None):
-                if (len(Get_SNR_string))>0:
-                    Known_SNR_string=Get_SNR_string
-                    print(vars(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding)))
-                    return(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding))
-        except Exception as e: 
-            print("error extracting known snr string from file " )
-            print(repr(e))
+    #try:
+        if (not "[" in TemplateSNR) or (not "]" in TemplateSNR):
+            raise Exception("Template SNR not formatted correctly []")
+        Get_SNR_string=TemplateSNR.split("[")#delimit
+        Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
+        Get_SNR_string=Get_SNR_string.split("]")#delimit
+        Get_SNR_string=Get_SNR_string[0]
+        if (Get_SNR_string is not None):
+            if (len(Get_SNR_string))>0:
+                Known_SNR_string=Get_SNR_string
+                #print(vars(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding)))
+                return(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding))
+    #except Exception as e: 
+        #print("error extracting known snr string from file " )
+        #print(repr(e))
 
         return None
 

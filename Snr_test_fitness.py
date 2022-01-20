@@ -117,6 +117,7 @@ class OCR_analysisCard():
         self.Error=None
         self.InfoString=None
         self.Pass=None
+        self.RepairedExternalOCR=None
 
     def DoubleSetError(self,Error):
         raise Exception("Error - double load of SNR result card, ",Error )
@@ -151,8 +152,95 @@ class OCR_analysisCard():
         else:
             self.Pass=Input
 
+
+
+def locations_of_substring(string, substring):
+    """Return a list of locations of a substring."""
+    """https://stackoverflow.com/questions/4664850/how-to-find-all-occurrences-of-a-substring"""
+    substring_length = len(substring)    
+    def recurse(locations_found, start):
+        location = string.find(substring, start)
+        if location != -1:
+            return recurse(locations_found + [location], location+substring_length)
+        else:
+            return locations_found
+
+    return recurse([], 0)
+
+
+def Repair_ExternalOCR(TemplateSNR,ExternalSNR,ExpectedFielding):
+    #print("testing for ",TemplateSNR,ExternalSNR,ExpectedFielding)
+    #use priors to fix external ocr (such as fielding)
+    #also try and align external OCR read with template ocr - as will have a lot of noise
+    Subsetsize=3
+    Substringlocs=None
+    MatchStrings_dict=dict()
+    #print("String:",TemplateSNR,ExternalSNR)
+    for OuterIndex in range (Subsetsize,len(TemplateSNR)):
+        for Index,TemplateSNRChar in enumerate(TemplateSNR):
+            #depending on substring size, don't go beyond string size
+            if Index==len(TemplateSNR)-OuterIndex+1:break
+            TestSubString=TemplateSNR[Index:Index+OuterIndex]
+            #try and match subsets of input snr
+            #we have have more than 1 instance as images could be mirrored!
+            #print(TestSubString)
+            Substringlocs_temp=(locations_of_substring(ExternalSNR,TestSubString))
+            #build potential semi-matching strings
+            #print("test substring",TestSubString)
+            for MatchLoc in Substringlocs_temp:
+                try:
+                    MatchString=ExternalSNR[MatchLoc-Index:(MatchLoc-Index)+len(TemplateSNR)]
+                    MatchStrings_dict[MatchString]=MatchString
+                    #if string is not correct length - it could have gone over string limit and truncated
+                    if len(MatchString)==len(TemplateSNR):
+                        MatchStrings_dict[MatchString]=MatchString
+                    #print("Match string found",MatchString)
+                except:
+                    raise("non critical error Repair_ExternalOCR")
+            #print("---")
+    #roll through discovered strings and align with any fielding
+    ListMatches=list(MatchStrings_dict.keys())
+    OutputString_list=[]
+    for OuterIndex, item in enumerate(ListMatches):
+        #align to fielding - if fielding exists
+        for indexer, FieldingType in enumerate(ExpectedFielding):
+            TempValue=None
+            if FieldingType==CompareOCR_ReadsEnum.Charac.value:
+                if indexer>len(item)-1:break
+                if item[indexer]=="5":TempValue="S"
+                if item[indexer]=="1":TempValue="I"
+                if item[indexer]=="6":TempValue="G"
+                if item[indexer]=="0":TempValue="O"
+            if FieldingType==CompareOCR_ReadsEnum.Num.value:
+                if indexer>len(item)-1:break
+                if item[indexer]=="S":TempValue="5"
+                if item[indexer]=="I":TempValue="1"
+                if item[indexer]=="G":TempValue="6"
+                if item[indexer]=="O":TempValue="0"
+            
+            if TempValue is None:
+                OutputString_list.append(str(ListMatches[OuterIndex][indexer]))
+            else:
+                print("repaired",TempValue)
+                OutputString_list.append(str(TempValue))
+        OutputString_list.append("     ")
+
+    #join list of chars into a string
+    OutputString = ''.join(OutputString_list)
+
+    if OutputString is None:
+        return ExternalSNR
+    if len(OutputString)==0:
+        return ExternalSNR
+
+    return OutputString
+        
+
+
+
 def CompareOCR_Reads(TemplateSNR,ExternalSNR,ExpectedFielding=None):
 
+    
     #compare OCR reads, and return info card with pass/fail and error messages
     #issue is same chars being confused by both OCR services (such as O/0, I/1 etc) - maybe warn user if confusion chars are present
     #should we assume at this stage that the template has pre-filtered serial number reads that dont match the expected fielding?
@@ -215,16 +303,21 @@ def CompareOCR_Reads(TemplateSNR,ExternalSNR,ExpectedFielding=None):
 
         if OCR_analysis.Pass==False:break
 
+
+        #repair external OCR if we have prior knowledge
+        RepairedExternalOCR=Repair_ExternalOCR(TemplateSNR,ExternalSNR,ExpectedFielding)
+        OCR_analysis.RepairedExternalOCR=RepairedExternalOCR
+
         #Basic check - can we find TemplateSNR in the ExternalSNR string
-        if not TemplateSNR in ExternalSNR:
+        if not TemplateSNR in RepairedExternalOCR:
             OCR_analysis.SetInput_InfoString("test snr not found in external snr")
             OCR_analysis.SetInput_Pass(False)
             OCR_analysis.SetInput_Error(CompareOCR_ReadsEnum.ErrorNoMatchFound.value)
-        
+
         if OCR_analysis.Pass==False:break
 
         #explicit check of string matching
-        if TemplateSNR in ExternalSNR:
+        if TemplateSNR in RepairedExternalOCR:
             OCR_analysis.SetInput_InfoString("string found")
             OCR_analysis.SetInput_Pass(True)
             OCR_analysis.SetInput_Error(None)
