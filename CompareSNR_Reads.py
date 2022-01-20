@@ -6,6 +6,7 @@ import _3DVisLabLib
 import re
 import random
 import os
+import json
 
 class CheckSN_Answers():
     def __init__(self):
@@ -56,7 +57,7 @@ class CheckSN_Answers():
         buildhtml.append("<!DOCTYPE html>")
         buildhtml.append("<html>")
         buildhtml.append("<body>")
-
+        buildhtml.append("<h2> Analysis Folder: " + self.BaseSNR_Folder+  "</h2>")
 
         TotalPass=0
         TotalFail=0
@@ -67,12 +68,17 @@ class CheckSN_Answers():
                     TotalPass=TotalPass+1
                 else:
                     #add to html
-                    buildhtml.append("<h1>" + MatchResult+  "</h1>")
+                    #if an image - embed it into HTML
+                    if ".jpg" in MatchResult.lower():
+                        buildhtml.append("<img src=" + '"' + MatchResult +'"' + ">")
+                    else:
+                        buildhtml.append("<h2>" + MatchResult+  "</h2>")
+                    #basic info
                     buildhtml.append("""<h2 style="color:DodgerBlue;">""" + "TemplateOCR: " +SingleResult.TemplateSNR +  "</h2>")
                     buildhtml.append("""<h2 style="color:Tomato;">""" + "CloudOCR:" + SingleResult.ExternalSNR +  "</h2>")
-                    buildhtml.append("<h3>" + "Details:" + str(SingleResult.ExpectedFielding) +  "</h2>")
-                    buildhtml.append("<h3>" + "Details:" + SingleResult.InfoString +  "</h2>")
-                    buildhtml.append("<h3>" + "Details:" + SingleResult.Error +  "</h2>")
+                    buildhtml.append("<h3>" + "AutoFielding:" + str(SingleResult.ExpectedFielding) +  "</h2>")
+                    buildhtml.append("<h3>" + "     Details:" + SingleResult.InfoString +  "</h2>")
+                    buildhtml.append("<h3>" + "       Error:" + SingleResult.Error +  "</h2>")
                     TotalFail=TotalFail+1
 
             
@@ -81,17 +87,15 @@ class CheckSN_Answers():
         buildhtml.append("</body>")
         buildhtml.append("</html>")
         #save out report
-        with open(r'C:\Working\FindIMage_In_Dat\test.html', 'w') as my_list_file:
+        with open(self.AnswersFolder + "\\" + "Report.html", 'w') as my_list_file:
             file_content = "\n".join(buildhtml)
             my_list_file.write(file_content)
-
-
 
     def BuildTemplate_SNR_Info(self):
         #fielding can come in two modes - SNR is embedded in single SNR image or can be in text files with multiple instaces
         #of snr for collimated images
         InputFiles_fielding=_3DVisLabLib.GetAllFilesInFolder_Recursive(self.BaseSNR_Folder)
-        ListAllTextFiles=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles_fielding,(".txt"))#name of function misnomer
+        ListAllTextFiles=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles_fielding,ImageTypes=([".json"]))#name of function misnomer
         ListAllImageFiles=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles_fielding)#get all images
 
         #create dictionary of image key vs list of snr value(s) (even if single answer)
@@ -104,15 +108,20 @@ class CheckSN_Answers():
 
         #if text files are in folders - may be collimated answers
         if len(ListAllTextFiles)>0:# text files found
-            print("text files found in target folder",self.BaseSNR_Folder)
+            print("json files found in target folder",self.BaseSNR_Folder)
             TemplateSNRs=[]
             for TemplateCollimatedSNRs in ListAllTextFiles:
                 print("Reading",TemplateCollimatedSNRs)
-                with open(TemplateCollimatedSNRs) as f:
-                    lines = f.readlines()
-                    OutputDictionary[TemplateCollimatedSNRs]=lines
-                    for Snr in lines:
-                        TemplateSNRs.append(Snr)
+                with open(TemplateCollimatedSNRs) as json_file:
+                    data = json.load(json_file)
+                #roll through deserialised json file dict
+                lines=[]
+                for Indexer, Element in enumerate(data):
+                    lines.append(data[str(Indexer)][0])
+                OutputDictionary[TemplateCollimatedSNRs]=lines
+                for Snr in lines:
+                    TemplateSNRs.append(Snr)
+
             print(len(TemplateSNRs),"template SNR found within text files")
             if len(TemplateSNRs)==0:
                 print("No text files with template SNR found, defaulting to embedded SNR in single images")
@@ -124,7 +133,7 @@ class CheckSN_Answers():
         ListEmbeddedFormatSNR=[]
         for imgfilepath in ListAllImageFiles:
             print("Reading",imgfilepath)
-            if ("[" in imgfilepath) and ("[" in imgfilepath):#bookends for embedded SNR#TODO warning magic letter!! make this a common variable or function
+            if ("[" in imgfilepath) and ("]" in imgfilepath):#bookends for embedded SNR#TODO warning magic letter!! make this a common variable or function
                 ListEmbeddedFormatSNR.append(imgfilepath)
                 OutputDictionary[imgfilepath]=[imgfilepath]
 
@@ -135,7 +144,59 @@ class CheckSN_Answers():
         return(OutputDictionary,False,SNRTools.GenerateSN_Fielding(ListEmbeddedFormatSNR))
 
         #shouldnt get here 
-        return None, None, None
+        raise Exception("BuildTemplate_SNR_Info incomplete logic")
+
+    # def BuildTemplate_SNR_Info_txt(self):
+    #     #fielding can come in two modes - SNR is embedded in single SNR image or can be in text files with multiple instaces
+    #     #of snr for collimated images
+    #     InputFiles_fielding=_3DVisLabLib.GetAllFilesInFolder_Recursive(self.BaseSNR_Folder)
+    #     ListAllTextFiles=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles_fielding,(".txt"))#name of function misnomer
+    #     ListAllImageFiles=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles_fielding)#get all images
+
+    #     #create dictionary of image key vs list of snr value(s) (even if single answer)
+    #     OutputDictionary=dict()
+
+    #     print("automatic fielding for SNR - using folder (nested)",self.BaseSNR_Folder)
+    #     #if no images - nothing can proceed
+    #     if len(ListAllImageFiles)==0:
+    #         raise Exception("no images found in folder", self.BaseSNR_Folder)
+
+    #     #if text files are in folders - may be collimated answers
+    #     if len(ListAllTextFiles)>0:# text files found
+    #         print("json files found in target folder",self.BaseSNR_Folder)
+    #         TemplateSNRs=[]
+    #         for TemplateCollimatedSNRs in ListAllTextFiles:
+    #             print("Reading",TemplateCollimatedSNRs)
+    #             #with open('json_data.json') as json_file:
+    #             #    data = json.load(json_file)
+    #             with open(TemplateCollimatedSNRs) as f:
+    #                 lines = f.readlines()
+    #                 OutputDictionary[TemplateCollimatedSNRs]=lines
+    #                 for Snr in lines:
+    #                     TemplateSNRs.append(Snr)
+    #         print(len(TemplateSNRs),"template SNR found within text files")
+    #         if len(TemplateSNRs)==0:
+    #             print("No text files with template SNR found, defaulting to embedded SNR in single images")
+    #         else:
+    #             #return collimated images = true with fielding found
+    #             return(OutputDictionary,True,SNRTools.GenerateSN_Fielding(TemplateSNRs))
+        
+    #     #if not collimated answers - template SNR may be embedded in image filenames
+    #     ListEmbeddedFormatSNR=[]
+    #     for imgfilepath in ListAllImageFiles:
+    #         print("Reading",imgfilepath)
+    #         if ("[" in imgfilepath) and ("[" in imgfilepath):#bookends for embedded SNR#TODO warning magic letter!! make this a common variable or function
+    #             ListEmbeddedFormatSNR.append(imgfilepath)
+    #             OutputDictionary[imgfilepath]=[imgfilepath]
+
+    #     print(len(ListEmbeddedFormatSNR),"possible template SNR found embedded in images")
+    #     if len(ListEmbeddedFormatSNR)==0:
+    #         raise Exception("no embedded SNR in images found (format = xx[SNR]xx", self.BaseSNR_Folder)
+    #     #return collimated images = false with fielding found 
+    #     return(OutputDictionary,False,SNRTools.GenerateSN_Fielding(ListEmbeddedFormatSNR))
+
+    #     #shouldnt get here 
+    #     return None, None, None
 
     def CleanUpExternalOCR(self,InputOCR):
         #clean up external OCR which could contain non alphanumeric characters and spaces etc
@@ -151,7 +212,7 @@ class CheckSN_Answers():
         #answers folder from external OCR service should have same filename as 
         #input text with txt prefix
         InputFiles_ExternalOCR=_3DVisLabLib.GetAllFilesInFolder_Recursive(self.AnswersFolder)
-        List_ExternalOCRTextFiles=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles_ExternalOCR,(".txt"))#name of function misnomer
+        List_ExternalOCRTextFiles=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles_ExternalOCR,([".txt"]))#name of function misnomer
         #create dictionary of image key vs list of snr value(s) (even if single answer)
         OutputDictionary=dict()
         CountSingleAnswers=0

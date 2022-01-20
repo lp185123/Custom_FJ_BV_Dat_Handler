@@ -171,9 +171,9 @@ class TileImage:
                 #cv2.imwrite(self.OutputFolder +"\\" + str(Counter) + "_GRAYSCALE.jpg" ,gray_img)
 
                 #write out SNR answer file
-                with open(self.OutputFolder +"\\" + str(Counter) + "" + ".txt", 'w') as f:
-                    for item in SNRAnswersList:
-                        f.write("%s\n" % item)
+                #with open(self.OutputFolder +"\\" + str(Counter) + "" + ".txt", 'w') as f:
+                #    for item in SNRAnswersList:
+                #        f.write("%s\n" % item)
                 #save as json file
                 with open(self.OutputFolder +"\\" + str(Counter) + "" + ".json", 'w') as outfile:
                     json.dump(SnrAnswersDict, outfile)
