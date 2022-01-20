@@ -62,7 +62,7 @@ class CloudOCR():
 
 #instancing class will initialise Cloud service and attempt to authenticate agent
 GoogleCloudOCR=CloudOCR()
-Default_Input=str( r"C:\Working\FindIMage_In_Dat\OutputTestSNR\Brazil")
+Default_Input=str( r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput")
 Default_Output=str( r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR")
 #get input folder of images from extract S39 function - can be single images with embedded template answer or
 #collimated images with answer text files with same filename but different extensions

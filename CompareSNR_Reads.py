@@ -10,12 +10,16 @@ import os
 class CheckSN_Answers():
     def __init__(self):
 
-        self.BaseSNR_Folder = input("Please enter images folder:")
+        self.BaseSNR_Folder = input("Please enter images folder: Default is C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput")
+        if len(self.BaseSNR_Folder)==0:
+            self.BaseSNR_Folder = r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput"
         #self.BaseSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\ToBeRead_Collimated"
         #self.BaseSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\ToBeRead_Single"
         #self.BaseSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
         #answers from external OCR verification
-        self.AnswersFolder = input("Please enter answers folder:")
+        self.AnswersFolder = input("Please enter answers folder: Default is C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR")
+        if len(self.AnswersFolder)==0:
+            self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR"
         #self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\SNR_Answers_Collimated"
         #self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\SNR_Answers_Single"
 
@@ -24,7 +28,7 @@ class CheckSN_Answers():
         self.ImageVS_TemplateSNR_dict=None#each image (whether single or collimated) will have list of SNR
         self.ImageVS_ExternalSNR_dict=None
         #populate variables
-        self.ImageVS_TemplateSNR_dict,self.Collimated,self.Fielding=self.Build_SNR_Info()#automatically create alpanumeric fielding for SNR
+        self.ImageVS_TemplateSNR_dict,self.Collimated,self.Fielding=self.BuildTemplate_SNR_Info()#automatically create alpanumeric fielding for SNR
         self.ImageVS_ExternalSNR_dict=self.GetExternalOCR_Answers()
         #make sure dictionaries align
         if self.CheckBoth_setsAnswers_align(self.ImageVS_TemplateSNR_dict,self.ImageVS_ExternalSNR_dict)==True:
@@ -42,11 +46,48 @@ class CheckSN_Answers():
                         TotalFail=TotalFail+1
 
             print("Efficiency:",round((TotalPass/(TotalPass+TotalFail))*100),"% match")
+            self.BuildReport(MatchResults_dict)
 
 
-                
+    def BuildReport(self,MatchResults_dict):
+        #build html report
+        buildhtml=[]
+        #header of html
+        buildhtml.append("<!DOCTYPE html>")
+        buildhtml.append("<html>")
+        buildhtml.append("<body>")
 
-    def Build_SNR_Info(self):
+
+        TotalPass=0
+        TotalFail=0
+        for MatchResult in MatchResults_dict:
+            
+            for SingleResult in MatchResults_dict[MatchResult][0]:
+                if SingleResult.Pass==True:
+                    TotalPass=TotalPass+1
+                else:
+                    #add to html
+                    buildhtml.append("<h1>" + MatchResult+  "</h1>")
+                    buildhtml.append("""<h2 style="color:DodgerBlue;">""" + "TemplateOCR: " +SingleResult.TemplateSNR +  "</h2>")
+                    buildhtml.append("""<h2 style="color:Tomato;">""" + "CloudOCR:" + SingleResult.ExternalSNR +  "</h2>")
+                    buildhtml.append("<h3>" + "Details:" + str(SingleResult.ExpectedFielding) +  "</h2>")
+                    buildhtml.append("<h3>" + "Details:" + SingleResult.InfoString +  "</h2>")
+                    buildhtml.append("<h3>" + "Details:" + SingleResult.Error +  "</h2>")
+                    TotalFail=TotalFail+1
+
+            
+
+        #end of html
+        buildhtml.append("</body>")
+        buildhtml.append("</html>")
+        #save out report
+        with open(r'C:\Working\FindIMage_In_Dat\test.html', 'w') as my_list_file:
+            file_content = "\n".join(buildhtml)
+            my_list_file.write(file_content)
+
+
+
+    def BuildTemplate_SNR_Info(self):
         #fielding can come in two modes - SNR is embedded in single SNR image or can be in text files with multiple instaces
         #of snr for collimated images
         InputFiles_fielding=_3DVisLabLib.GetAllFilesInFolder_Recursive(self.BaseSNR_Folder)
@@ -108,14 +149,14 @@ class CheckSN_Answers():
 
     def GetExternalOCR_Answers(self):
         #answers folder from external OCR service should have same filename as 
-        #input images with txt prefix
+        #input text with txt prefix
         InputFiles_ExternalOCR=_3DVisLabLib.GetAllFilesInFolder_Recursive(self.AnswersFolder)
         List_ExternalOCRTextFiles=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles_ExternalOCR,(".txt"))#name of function misnomer
         #create dictionary of image key vs list of snr value(s) (even if single answer)
         OutputDictionary=dict()
         CountSingleAnswers=0
         print("Folder of SNR Answers - using folder (nested)",self.AnswersFolder)
-        #if no images - nothing can proceed
+        #if no text - nothing can proceed
         if len(List_ExternalOCRTextFiles)==0:
             raise Exception("no images found in folder", self.BaseSNR_Folder)
 

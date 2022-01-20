@@ -3,7 +3,7 @@
 import _3DVisLabLib
 import cv2
 import numpy
-
+import json
 
 class TileImage:
     def __init__(self,DelimiterText,InputFolder,OutputFolder,ColumnSize):
@@ -133,6 +133,7 @@ class TileImage:
 
             OutputColumn=self.BlankColWithDelimiters_Img.copy()
 
+            SnrAnswersDict=dict()
             if Counter%self.ColumnSize==0:#take modulus
                 SNRAnswersList=[]
                 ImagesToEmbed=self.ListAllImages[Counter:Counter+self.ColumnSize]
@@ -160,6 +161,7 @@ class TileImage:
                     else:
                         Get_SNR_string="NO_SNR"
                     SNRAnswersList.append(Get_SNR_string + ImgFilePath)
+                    SnrAnswersDict[Index]=(Get_SNR_string,ImgFilePath)
                 #TODO lets put the delimiter text in the text file as well
 
 
@@ -172,6 +174,9 @@ class TileImage:
                 with open(self.OutputFolder +"\\" + str(Counter) + "" + ".txt", 'w') as f:
                     for item in SNRAnswersList:
                         f.write("%s\n" % item)
+                #save as json file
+                with open(self.OutputFolder +"\\" + str(Counter) + "" + ".json", 'w') as outfile:
+                    json.dump(SnrAnswersDict, outfile)
 
 
 
