@@ -21,7 +21,7 @@ class CloudOCR():
             print("WARNING CloudOCR perform OCR, filepath and Image object provided - please use exclusive option")
 
         if FilePath is not None:
-            print("Cloud OCR - loading file",FilePath)
+            #print("Cloud OCR - loading file",FilePath)
             with io.open(FilePath, 'rb') as image_file:
                 content = image_file.read()
         

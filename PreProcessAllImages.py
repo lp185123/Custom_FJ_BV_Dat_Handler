@@ -27,27 +27,36 @@ def ProcessImages(InputPath=None,OutputPath=None,Processing=False):#dont use if 
         #load saved state into memory
         #if this breaks make sure using "from" explicity importing classes into namespace EG "from GeneticAlg_SNR import Individual"
         GenParams=None
-        DictFitCandidates=None
         #probably better using "with" here so dont need to explicitly close file handler
         file_pi2 = open(ListAllObj_files[0], 'rb')
         SaveList=[]
         SaveList = pickle.load(file_pi2)
         file_pi2.close()
+        #Two types of saved obj will be found
+        #either entire genparms object from genetic alg, or fitnessOnly records due to not being able to serialise the cloud object
         GenParams=copy.deepcopy(SaveList[0])
-        DictFitCandidates=copy.deepcopy(SaveList[1])
+        
+
+
+
 
         #now saved state is rebuilt - load list of images 
         #get all files in input folder
-        print("looking in saved state", GenParams.FilePath , "for images - *WARNING* will not conform to nested folder structure")
-        InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(GenParams.FilePath)
+        print("looking in saved state", InputFolder , "for images - *WARNING* will not conform to nested folder structure")
+        InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(InputFolder)
         #Get list of images
         ListAllImg_files=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
         print(len(ListAllImg_files), " images found")
 
+        try:
+            #get fitness records
+            FitnessRecords=GenParams.GetEntireFitnessRecord()
+        except:
+            print("could not interrogate genparams object - trying to load as fitness object only")
+            FitnessRecords=copy.deepcopy(SaveList[0])
+        else:
+            pass
         
-
-        #get fitness records
-        FitnessRecords=GenParams.GetEntireFitnessRecord()
         #get last item by insertion - this only will work with python 3.7 onwards or will have to use ordered dictionary
         LastFitnessRecord=(list(FitnessRecords)[-1])
         LastRecord_Parameters=(FitnessRecords[LastFitnessRecord][4])#location of parameters in dictionary value tuple
@@ -68,7 +77,7 @@ def ProcessImages(InputPath=None,OutputPath=None,Processing=False):#dont use if 
         print(len(ListAllImg_files), " images found")
 
 
-    SNRparams=GeneticAlg_SNR.BuildSNR_Parameters(LastRecord_Parameters,SNR_fitnessTest)
+    SNRparams=GeneticAlg_SNR.BuildSNR_Parameters(LastRecord_Parameters,SNR_fitnessTest,None)
 
     
 
@@ -76,7 +85,7 @@ def ProcessImages(InputPath=None,OutputPath=None,Processing=False):#dont use if 
         if Index%50==0:
             print("Image",Index,"of",len(ListAllImg_files))
         TestImage=cv2.imread(ImageFilePath,cv2.IMREAD_GRAYSCALE)
-        ReturnImg,ReturnFitness=SNR_fitnessTest.RunSNR_With_Parameters(ImageFilePath,SNRparams,TestImage,SkipOcr=True)
+        ReturnImg,ReturnFitness=SNR_fitnessTest.RunSNR_With_Parameters(ImageFilePath,SNRparams,TestImage,SkipOcr=True,GenParams=None)
         #get delimited string
         Get_SNR_string=ImageFilePath.split("[")#delimit
         Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string

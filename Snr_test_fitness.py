@@ -96,9 +96,12 @@ class SNR_Parameters():
         self.Canny=int(self.Canny)
 
 def CheckStringSimilarity(string1,string2):
-     s = difflib.SequenceMatcher(lambda x: x == " ",string1,string2)
-     similiarity_ratio=round(s.ratio(), 3)
-     return similiarity_ratio
+    if (string1 is None) or (string2 is None):
+        return 0
+
+    s = difflib.SequenceMatcher(lambda x: x == " ",string1,string2)
+    similiarity_ratio=round(s.ratio(), 3)
+    return similiarity_ratio
 
 class CompareOCR_ReadsEnum(enum.Enum):
     Charac="C"
@@ -223,11 +226,12 @@ def Repair_ExternalOCR(TemplateSNR,ExternalSNR,ExpectedFielding):
                 if item[indexer]=="B":TempValue="8"
                 if item[indexer]=="D":TempValue="0"
                 if item[indexer]=="Q":TempValue="0"
+                
             
             if TempValue is None:
                 OutputString_list.append(str(ListMatches[OuterIndex][indexer]))
             else:
-                print("repaired",TempValue)
+                #print("repaired",TempValue)
                 OutputString_list.append(str(TempValue))
         OutputString_list.append("     ")
 
@@ -524,110 +528,110 @@ class TestSNR_Fitness():
         #self.CloudOCR=VisionAPI_Demo.CloudOCR()
 
     
-    def RunSNR_With_Parameters_DisableParameters(self,ImagePath,ParameterObject,TestImage=None,SkipOcr=False):
+    # def RunSNR_With_Parameters_DisableParameters(self,ImagePath,ParameterObject,TestImage=None,SkipOcr=False):
 
-        #make sure no invalid values
-        ParameterObject.Housekeep()
-        ParameterObject.SetConfig()
-
-        
-        if TestImage is None:
-            #load image
-            TestImage=cv2.imread(ImagePath,cv2.IMREAD_GRAYSCALE)
+    #     #make sure no invalid values
+    #     ParameterObject.Housekeep()
+    #     ParameterObject.SetConfig()
 
         
-
-        #get snr string if available (embedded in filename between "[" and "]")
-        self.Known_SNR=False
-        self.Known_SNR_string=""
-        self.Known_Snr_Fitness=0
-
-        try:
-
-            
-            Get_SNR_string=ImagePath.split("[")#delimit
-            Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
-            Get_SNR_string=Get_SNR_string.split("]")#delimit
-            Get_SNR_string=Get_SNR_string[0]
-            if Get_SNR_string is not None:
-                if len(Get_SNR_string)>5:#TODO magic number
-                    self.Known_SNR_string=Get_SNR_string
-                    self.Known_SNR=True
-
-        except Exception as e: 
-            print("error extracting known snr string from file ",ImagePath )
-            print(repr(e)) 
-
-        #resize
-        #TestImage=ResizeImage(TestImage,ParameterObject.ResizeX,ParameterObject.ResizeY)
+    #     if TestImage is None:
+    #         #load image
+    #         TestImage=cv2.imread(ImagePath,cv2.IMREAD_GRAYSCALE)
 
         
-        ParameterObject.Mirror=True
-        if ParameterObject.Mirror==True:
-            #double up image in case its flipped 
-            FlippedImage = cv2.flip(TestImage, -1)
-            #create blank image twice the height
-            #shape 0 is X shape 1 is Y
-            blank_image = (np.ones((TestImage.shape[0]*2,TestImage.shape[1]), dtype = np.uint8))*255
-            blank_image[0:TestImage.shape[0],:]=TestImage
-            blank_image[TestImage.shape[0]:TestImage.shape[0]*2,:]=FlippedImage
-            TestImage=blank_image.copy()
+
+    #     #get snr string if available (embedded in filename between "[" and "]")
+    #     self.Known_SNR=False
+    #     self.Known_SNR_string=""
+    #     self.Known_Snr_Fitness=0
+
+    #     try:
+
+            
+    #         Get_SNR_string=ImagePath.split("[")#delimit
+    #         Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
+    #         Get_SNR_string=Get_SNR_string.split("]")#delimit
+    #         Get_SNR_string=Get_SNR_string[0]
+    #         if Get_SNR_string is not None:
+    #             if len(Get_SNR_string)>5:#TODO magic number
+    #                 self.Known_SNR_string=Get_SNR_string
+    #                 self.Known_SNR=True
+
+    #     except Exception as e: 
+    #         print("error extracting known snr string from file ",ImagePath )
+    #         print(repr(e)) 
+
+    #     #resize
+    #     #TestImage=ResizeImage(TestImage,ParameterObject.ResizeX,ParameterObject.ResizeY)
+
+        
+    #     ParameterObject.Mirror=True
+    #     if ParameterObject.Mirror==True:
+    #         #double up image in case its flipped 
+    #         FlippedImage = cv2.flip(TestImage, -1)
+    #         #create blank image twice the height
+    #         #shape 0 is X shape 1 is Y
+    #         blank_image = (np.ones((TestImage.shape[0]*2,TestImage.shape[1]), dtype = np.uint8))*255
+    #         blank_image[0:TestImage.shape[0],:]=TestImage
+    #         blank_image[TestImage.shape[0]:TestImage.shape[0]*2,:]=FlippedImage
+    #         TestImage=blank_image.copy()
 
 
-        #run OCR
-        results=""
-        if SkipOcr==False:
-            results = pytesseract.image_to_data(TestImage,output_type=Output.DICT,lang='eng')
+    #     #run OCR
+    #     results=""
+    #     if SkipOcr==False:
+    #         results = pytesseract.image_to_data(TestImage,output_type=Output.DICT,lang='eng')
 
 
-            #override all image preparation
-            #TestImage=cv2.imread(ImagePath,cv2.IMREAD_GRAYSCALE)
-            #results = pytesseract.image_to_data(TestImage,output_type=Output.DICT,lang='eng')
+    #         #override all image preparation
+    #         #TestImage=cv2.imread(ImagePath,cv2.IMREAD_GRAYSCALE)
+    #         #results = pytesseract.image_to_data(TestImage,output_type=Output.DICT,lang='eng')
 
 
-            # loop over each of the individual textlocalizations
-            Collated_Snr_Text=""
-            for i in range(0, len(results["text"])):
-                # We can then extract the bounding box coordinates
-                # of the text region from  the current result
-                x = results["left"][i]
-                y = results["top"][i]
-                w = results["width"][i]
-                h = results["height"][i]
-                # We will also extract the OCR text itself along
-                # with the confidence of the text localization
-                text = results["text"][i].replace(" ","")
-                conf = int(results["conf"][i])
-                # filter out weak confidence text localizations
-                if (conf > 50) and (len(text)>1):#:args["min_conf"]:
-                    # We will display the confidence and text to
-                    # our terminal
-                    Collated_Snr_Text=Collated_Snr_Text+(str(text))
-                    # We then strip out non-ASCII text so we can
-                    # draw the text on the image We will be using
-                    # OpenCV, then draw a bounding box around the
-                    # text along with the text itself
-                    text = "".join(text).strip()
-                    cv2.rectangle(TestImage, (x, y),(x + w, y + h),(0, 0, 255), 2)
-                    cv2.putText(TestImage,text,(x, y - 10),cv2.FONT_HERSHEY_SIMPLEX,1.2, (0, 255, 255), 3)
+    #         # loop over each of the individual textlocalizations
+    #         Collated_Snr_Text=""
+    #         for i in range(0, len(results["text"])):
+    #             # We can then extract the bounding box coordinates
+    #             # of the text region from  the current result
+    #             x = results["left"][i]
+    #             y = results["top"][i]
+    #             w = results["width"][i]
+    #             h = results["height"][i]
+    #             # We will also extract the OCR text itself along
+    #             # with the confidence of the text localization
+    #             text = results["text"][i].replace(" ","")
+    #             conf = int(results["conf"][i])
+    #             # filter out weak confidence text localizations
+    #             if (conf > 50) and (len(text)>1):#:args["min_conf"]:
+    #                 # We will display the confidence and text to
+    #                 # our terminal
+    #                 Collated_Snr_Text=Collated_Snr_Text+(str(text))
+    #                 # We then strip out non-ASCII text so we can
+    #                 # draw the text on the image We will be using
+    #                 # OpenCV, then draw a bounding box around the
+    #                 # text along with the text itself
+    #                 text = "".join(text).strip()
+    #                 cv2.rectangle(TestImage, (x, y),(x + w, y + h),(0, 0, 255), 2)
+    #                 cv2.putText(TestImage,text,(x, y - 10),cv2.FONT_HERSHEY_SIMPLEX,1.2, (0, 255, 255), 3)
 
             
             
-            #if found something - set fitness to above zero- as reading anything is a good start
-            if len( Collated_Snr_Text)>4:
-                self.Known_Snr_Fitness=round(0.1,3)
-            if len( Collated_Snr_Text)>8:
-                self.Known_Snr_Fitness=round(0.2,3)
+    #         #if found something - set fitness to above zero- as reading anything is a good start
+    #         if len( Collated_Snr_Text)>4:
+    #             self.Known_Snr_Fitness=round(0.1,3)
+    #         if len( Collated_Snr_Text)>8:
+    #             self.Known_Snr_Fitness=round(0.2,3)
             
-            if self.Known_SNR==True:
-                #extracted snr string from image filepath - either generated by user or automatically
-                self.Known_Snr_Fitness= round(CheckStringSimilarity(self.Known_SNR_string,Collated_Snr_Text),3)
+    #         if self.Known_SNR==True:
+    #             #extracted snr string from image filepath - either generated by user or automatically
+    #             self.Known_Snr_Fitness= round(CheckStringSimilarity(self.Known_SNR_string,Collated_Snr_Text),3)
             
-            if self.Known_Snr_Fitness>0.5:
-                pass
-                #print(self.Known_Snr_Fitness,self.Known_SNR_string,Collated_Snr_Text)
+    #         if self.Known_Snr_Fitness>0.5:
+    #             pass
+    #             #print(self.Known_Snr_Fitness,self.Known_SNR_string,Collated_Snr_Text)
             
-        return TestImage,self.Known_Snr_Fitness
+    #     return TestImage,self.Known_Snr_Fitness
 
     def RunSNR_With_Parameters(self,ImagePath,ParameterObject,TestImage=None,SkipOcr=False,GenParams=None):
         
@@ -718,24 +722,23 @@ class TestSNR_Fitness():
 
         #run OCR
         #use google OCR if enabled
-        if GenParams.CloudOCRObject is not None and GenParams.UseCloudOCR==True:
-            #get OCR from Google VIsion API
-            #filtered response - only alphanumeric chars
-            OCR_Result=GenParams.CloudOCRObject.PerformOCR(ImagePath,None)
-            #have to add square brackets to make it compatible with this function
-            CompareResult=CompareSNR_Reads.CheckSNR_Reads("[" +self.Known_SNR_string +"]",OCR_Result,GenParams.Fielding)
-            self.Known_Snr_Fitness= round(CheckStringSimilarity(self.Known_SNR_string,CompareResult.RepairedExternalOCR),3)
-            print("Cloud OCR score",self.Known_Snr_Fitness,"raw cloud OCR",OCR_Result,"Repaired cloud OCR",CompareResult.RepairedExternalOCR, "test ocr",self.Known_SNR_string)
-            return TestImage,self.Known_Snr_Fitness
-            
+        if SkipOcr==False:
+            if GenParams.CloudOCRObject is not None and GenParams.UseCloudOCR==True:
+                #need to save image to give to google
+                #save to RAM DRIVE for now
 
+                Savestring="X://tempimg.jpg"
+                cv2.imwrite(Savestring,TestImage)
+                #get OCR from Google VIsion API
+                #filtered response - only alphanumeric chars
+                OCR_Result=GenParams.CloudOCRObject.PerformOCR(Savestring,None)
+                #have to add square brackets to make it compatible with this function
+                CompareResult=CompareSNR_Reads.CheckSNR_Reads("[" +self.Known_SNR_string +"]",OCR_Result,GenParams.Fielding)
+                self.Known_Snr_Fitness= round(CheckStringSimilarity(self.Known_SNR_string,CompareResult.RepairedExternalOCR),3)
+                #print("Cloud OCR score",self.Known_Snr_Fitness,"raw cloud OCR",OCR_Result,"Repaired cloud OCR",CompareResult.RepairedExternalOCR, "test ocr",self.Known_SNR_string)
+                return TestImage,self.Known_Snr_Fitness
+                
 
-
-
-
-        #should not get here!
-        if GenParams.UseCloudOCR==True:
-            raise Exception("RunSNR_With_Parameters  logic error - Cloud OCR option active but code has not returned")
 
         #default to pytesseract ocr
         results=""
