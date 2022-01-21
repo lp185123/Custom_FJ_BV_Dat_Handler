@@ -7,6 +7,9 @@ import difflib
 import enum
 import random
 import _3DVisLabLib
+import VisionAPI_Demo
+from GeneticAlg_SNR import GA_Parameters
+import CompareSNR_Reads
 #tips
 #https://nanonets.com/blog/ocr-with-tesseract/
 #tesseract ocr how to install
@@ -152,8 +155,6 @@ class OCR_analysisCard():
         else:
             self.Pass=Input
 
-
-
 def locations_of_substring(string, substring):
     """Return a list of locations of a substring."""
     """https://stackoverflow.com/questions/4664850/how-to-find-all-occurrences-of-a-substring"""
@@ -166,7 +167,6 @@ def locations_of_substring(string, substring):
             return locations_found
 
     return recurse([], 0)
-
 
 def Repair_ExternalOCR(TemplateSNR,ExternalSNR,ExpectedFielding):
     #print("testing for ",TemplateSNR,ExternalSNR,ExpectedFielding)
@@ -211,12 +211,18 @@ def Repair_ExternalOCR(TemplateSNR,ExternalSNR,ExpectedFielding):
                 if item[indexer]=="1":TempValue="I"
                 if item[indexer]=="6":TempValue="G"
                 if item[indexer]=="0":TempValue="O"
+                if item[indexer]=="8":TempValue="B"
             if FieldingType==CompareOCR_ReadsEnum.Num.value:
                 if indexer>len(item)-1:break
                 if item[indexer]=="S":TempValue="5"
                 if item[indexer]=="I":TempValue="1"
+                if item[indexer]=="i":TempValue="1"
                 if item[indexer]=="G":TempValue="6"
                 if item[indexer]=="O":TempValue="0"
+                if item[indexer]=="o":TempValue="0"
+                if item[indexer]=="B":TempValue="8"
+                if item[indexer]=="D":TempValue="0"
+                if item[indexer]=="Q":TempValue="0"
             
             if TempValue is None:
                 OutputString_list.append(str(ListMatches[OuterIndex][indexer]))
@@ -234,9 +240,6 @@ def Repair_ExternalOCR(TemplateSNR,ExternalSNR,ExpectedFielding):
         return ExternalSNR
 
     return OutputString
-        
-
-
 
 def CompareOCR_Reads(TemplateSNR,ExternalSNR,ExpectedFielding=None):
 
@@ -309,7 +312,7 @@ def CompareOCR_Reads(TemplateSNR,ExternalSNR,ExpectedFielding=None):
         OCR_analysis.RepairedExternalOCR=RepairedExternalOCR
 
         #Basic check - can we find TemplateSNR in the ExternalSNR string
-        if not TemplateSNR in RepairedExternalOCR:
+        if (not TemplateSNR in RepairedExternalOCR) or (not TemplateSNR in ExternalSNR):
             OCR_analysis.SetInput_InfoString("test snr not found in external snr")
             OCR_analysis.SetInput_Pass(False)
             OCR_analysis.SetInput_Error(CompareOCR_ReadsEnum.ErrorNoMatchFound.value)
@@ -518,9 +521,9 @@ class TestSNR_Fitness():
         self.Known_SNR=False
         self.Known_SNR_string=""
         self.Known_Snr_Fitness=0
+        #self.CloudOCR=VisionAPI_Demo.CloudOCR()
 
     
-
     def RunSNR_With_Parameters_DisableParameters(self,ImagePath,ParameterObject,TestImage=None,SkipOcr=False):
 
         #make sure no invalid values
@@ -626,8 +629,10 @@ class TestSNR_Fitness():
             
         return TestImage,self.Known_Snr_Fitness
 
-    def RunSNR_With_Parameters(self,ImagePath,ParameterObject,TestImage=None,SkipOcr=False):
+    def RunSNR_With_Parameters(self,ImagePath,ParameterObject,TestImage=None,SkipOcr=False,GenParams=None):
+        
 
+        
         #make sure no invalid values
         ParameterObject.Housekeep()
         ParameterObject.SetConfig()
@@ -712,6 +717,27 @@ class TestSNR_Fitness():
 
 
         #run OCR
+        #use google OCR if enabled
+        if GenParams.CloudOCRObject is not None and GenParams.UseCloudOCR==True:
+            #get OCR from Google VIsion API
+            #filtered response - only alphanumeric chars
+            OCR_Result=GenParams.CloudOCRObject.PerformOCR(ImagePath,None)
+            #have to add square brackets to make it compatible with this function
+            CompareResult=CompareSNR_Reads.CheckSNR_Reads("[" +self.Known_SNR_string +"]",OCR_Result,GenParams.Fielding)
+            self.Known_Snr_Fitness= round(CheckStringSimilarity(self.Known_SNR_string,CompareResult.RepairedExternalOCR),3)
+            print("Cloud OCR score",self.Known_Snr_Fitness,"raw cloud OCR",OCR_Result,"Repaired cloud OCR",CompareResult.RepairedExternalOCR, "test ocr",self.Known_SNR_string)
+            return TestImage,self.Known_Snr_Fitness
+            
+
+
+
+
+
+        #should not get here!
+        if GenParams.UseCloudOCR==True:
+            raise Exception("RunSNR_With_Parameters  logic error - Cloud OCR option active but code has not returned")
+
+        #default to pytesseract ocr
         results=""
         if SkipOcr==False:
             results = pytesseract.image_to_data(TestImage, config=ParameterObject.config,output_type=Output.DICT,lang='eng')

@@ -9,43 +9,39 @@ import Snr_test_fitness
 import pickle
 import os
 import matplotlib.pyplot as plt
+import VisionAPI_Demo
+
+
 
 class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=20
-        self.No_TopCandidates=10
+        self.No_of_First_gen=5
+        self.No_TopCandidates=5
         self.NewIndividualsPerGen=1
-        self.TestImageBatchSize=10
+        self.TestImageBatchSize=5
         self.NewImageCycle=999999999
         self.ImageTapOut=8#terminate anything that has poor performance out the box
-
+        self.UseCloudOCR=True
+        self.MirrorImage=True
         self.DictFilename_V_Images=dict()#load this with fitness check images
         #load fitness checking images into memory - #TODO make dynamic
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\FitnessTest"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\TestSNs"
-        self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\Brazil"
+        self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR"
         #save out parameter converging image
         self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"
-        self.GetRandomSet_TestImages()
+        
 
         self.LastImage=None
         self.NameOfSavedState=None
         self.Generation=0
         self.BestPerformerTemp=None
-        # #get all files in input folder
-        # InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(self.FilePath)
-        # #filter out non images
-        # ListAllImages=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
-        # print("Fitness images at ", self.FilePath)
-        # print("Fitness Images to be loaded into memory: ", len(ListAllImages))
-        # #roll through images and load into dictionary, with filepath as key (we need filepath to extract potential snr read)
-        # for ImageInstance in ListAllImages:
-        #     TestImage=cv2.imread(ImageInstance,cv2.IMREAD_GRAYSCALE)
-        #     self.DictFilename_V_Images[ImageInstance]=TestImage
-        # print("Fitness images loaded")
+        self.Fielding=None
+        self.CloudOCRObject=None
+        self.GetRandomSet_TestImages_AndFielding()
 
     def CheckRepeatingFitness(self,Range,Error):
         LastFitness= self.GetFitnessHistory()
@@ -54,7 +50,7 @@ class GA_Parameters():
                 return True
         return False
 
-    def GetRandomSet_TestImages(self):
+    def GetRandomSet_TestImages_AndFielding(self):
         #pick N random test images from set of images
         self.DictFilename_V_Images=dict()
         #get all files in input folder
@@ -79,8 +75,11 @@ class GA_Parameters():
              TestImage=cv2.imread(ImageInstance,cv2.IMREAD_GRAYSCALE)
              self.DictFilename_V_Images[ImageInstance]=TestImage
             
+        #attempt to get fielding of input images:
+        self.Fielding=Snr_test_fitness.GenerateSN_Fielding(ListAllImages)
 
         print("Loaded ", len(self.DictFilename_V_Images), "images")
+        print("Fielding is: ",self.Fielding)
 
     def FitnessRecordAdd(self,Fitness,Name,Parameters,AverageFitness,AverageAge,ApplicationSpecificParams):
 
@@ -114,7 +113,7 @@ class GA_Parameters():
         return fitnessrecords
 
 
-    def CheckFitness_single(self,InputParameters,SNR_fitnessTest,SelfTestTargetParameters):
+    def CheckFitness_single(self,GenParams,InputParameters,SNR_fitnessTest,SelfTestTargetParameters):
         
         
         #tally up error/fitness
@@ -129,7 +128,7 @@ class GA_Parameters():
         else:
             try:
                 #application specific fitness check
-                fitness, Tapout,ReturnImg=ExternalCheckFitness_SNR(InputParameters,self.DictFilename_V_Images,SNR_fitnessTest,self.ImageTapOut)
+                fitness, Tapout,ReturnImg=ExternalCheckFitness_SNR(InputParameters,self.DictFilename_V_Images,SNR_fitnessTest,self.ImageTapOut,GenParams)
                 Error=1-fitness
             except Exception as e:
                 print("error with checking fitness using parameters")
@@ -398,7 +397,7 @@ class Individual():
         self.RoundParameters()
         self.HouseKeep()
 
-def BuildSNR_Parameters(InputParameters,SNR_fitnessTest):
+def BuildSNR_Parameters(InputParameters,SNR_fitnessTest,GenParams):
     #use input parameters to drive SNR parameters
     #build SNR input parameters object
 
@@ -425,7 +424,7 @@ def BuildSNR_Parameters(InputParameters,SNR_fitnessTest):
     # SNRparams.CropPixels=LoadParameter(SNRparams.CropPixels,InputParameters,"CropPixels")
     # SNRparams.CannyThresh1=LoadParameter(SNRparams.CannyThresh1,InputParameters,"CannyThresh1")
     # SNRparams.CannyThresh2=LoadParameter(SNRparams.CannyThresh2,InputParameters,"CannyThresh2")
-
+    SNRparams.Mirror= GenParams.MirrorImage
 
     for paramname in InputParameters:
         if paramname=="AdapativeThreshold":
@@ -501,7 +500,7 @@ def BuildSNR_Parameters(InputParameters,SNR_fitnessTest):
 
     return SNRparams
 
-def ExternalCheckFitness_SNR(InputParameters,List_of_Fitness_images,SNR_fitnessTest,ImageTapOut):
+def ExternalCheckFitness_SNR(InputParameters,List_of_Fitness_images,SNR_fitnessTest,ImageTapOut,GenParams):
     #use input parameters to drive SNR parameters and quantifiy success in range 0: 1
 
     # #build SNR input parameters object
@@ -516,7 +515,7 @@ def ExternalCheckFitness_SNR(InputParameters,List_of_Fitness_images,SNR_fitnessT
     # SNRparams.SubtractMean=InputParameters["SubtractMean"]
     # SNRparams.NoProcessing=InputParameters["NoProcessing"]
 
-    SNRparams=BuildSNR_Parameters(InputParameters,SNR_fitnessTest)
+    SNRparams=BuildSNR_Parameters(InputParameters,SNR_fitnessTest,GenParams)
 
 
     #roll through images and get fitness total
@@ -533,7 +532,7 @@ def ExternalCheckFitness_SNR(InputParameters,List_of_Fitness_images,SNR_fitnessT
     for Index, ImagePathInstance in enumerate(List_of_Fitness_images):
         PotentialScore=PotentialScore+1
         #pass the image filepath & name (may have snr read result found between [] brackets), genome parameters for SNR, and image preloaded by ga_params object
-        ReturnImg,ReturnFitness=SNR_fitnessTest.RunSNR_With_Parameters(ImagePathInstance,SNRparams,List_of_Fitness_images[ImagePathInstance])
+        ReturnImg,ReturnFitness=SNR_fitnessTest.RunSNR_With_Parameters(ImagePathInstance,SNRparams,List_of_Fitness_images[ImagePathInstance],SkipOcr=False,GenParams=GenParams)
         TotalScore=TotalScore+ReturnFitness
         _3DVisLabLib.ImageViewer_Quick_no_resize(ReturnImg,0,False,False)
 
@@ -564,7 +563,7 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
 
             #map parameters from normalised range to application specific range
             ApplicationParams=InputGenDict[I].ApplicationSpecificMapping()
-            InputGenDict[I].Fitness, TapOut,InputGenDict[I].LastImage=(GenParams.CheckFitness_single(ApplicationParams,SNR_fitnessTest,InputGenDict[I].SelfTestTargetParameters))
+            InputGenDict[I].Fitness, TapOut,InputGenDict[I].LastImage=(GenParams.CheckFitness_single(GenParams,ApplicationParams,SNR_fitnessTest,InputGenDict[I].SelfTestTargetParameters))
         else:
             TotalOldTimers=TotalOldTimers+1
         DictOfFitness[InputGenDict[I].Fitness]=InputGenDict[I].name
@@ -906,6 +905,12 @@ if __name__ == "__main__":
 
     #initialise working details and fitness testing details
     GenParams=GA_Parameters()
+    
+    #create cloud OCR if we are using it
+    if GenParams.UseCloudOCR==True:
+        #instancing class will initialise Cloud service and attempt to authenticate agent
+        GenParams.CloudOCRObject=VisionAPI_Demo.CloudOCR()
+
     #create first generation
     DictOfFirstGen=dict()
     
@@ -940,7 +945,7 @@ if __name__ == "__main__":
             #GenParams.TestImageBatchSize=10
             #GenParams.NewImageCycle=5
             #GenParams.No_TopCandidates=20
-            #GenParams.GetRandomSet_TestImages()
+            #GenParams.GetRandomSet_TestImages_AndFielding()
             
         else:
             #default first generation
@@ -974,7 +979,7 @@ if __name__ == "__main__":
         #if modulus 20 then do huge image batch
         if i%9999999==0 and i>0:
             GenParams.TestImageBatchSize=20
-            GenParams.GetRandomSet_TestImages()
+            GenParams.GetRandomSet_TestImages_AndFielding()
             for individual in DictFitCandidates:
                 DictFitCandidates[individual].SetFitness(None)
             GenParams.TestImageBatchSize=4
@@ -1020,7 +1025,7 @@ if __name__ == "__main__":
         if (i%GenParams.NewImageCycle==0 and i>0) or (GenParams.GetFitnessHistory()[-1]<0.01):
             print("New set ofimages")
             #get new testing set of images
-            GenParams.GetRandomSet_TestImages()
+            GenParams.GetRandomSet_TestImages_AndFielding()
             #will have to retest all old timers fitnesses, setting fitness to None will allow the fitness
             #value to be reasessed
             for individual in DictFitCandidates:

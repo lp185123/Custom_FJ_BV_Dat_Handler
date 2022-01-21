@@ -7,6 +7,7 @@ import re
 import random
 import os
 import json
+import shutil
 
 class CheckSN_Answers():
     def __init__(self):
@@ -79,12 +80,17 @@ class CheckSN_Answers():
                 if SingleResult.Pass==True:
                     TotalPass=TotalPass+1
                 else:
+                    
                     #add to html
                     #if an image - embed it into HTML
                     #if we have collimated images we have extra complexity to trace the image provenace
                     if SingleResult_ColImgTrace is not None:
                         #collimated image - get corresponding dictionary with image link
                         buildhtml.append("<img src=" + '"' + SingleResult_ColImgTrace[IntIndexer] +'"' + ">")
+                        #copy failed image?
+                        ImageDelimiter=SingleResult_ColImgTrace[IntIndexer].split("\\")
+                        ImageFileNameOnly=ImageDelimiter[-1]
+                        shutil.copyfile(SingleResult_ColImgTrace[IntIndexer], self.AnswersFolder + "\\" + ImageFileNameOnly)
                     else:
 
                         if ".jpg" in MatchResult.lower():
@@ -343,7 +349,7 @@ class CheckSN_Answers():
             ResultsObjectList=[]
             for Index,Item in enumerate(TemplateSNR_list):
                 print("Checking template VS external SNR:\n",filename,"\n",ExternalOCR_key)
-                ResultsObjectList.append(self.CheckSNR_Reads(TemplateSNR_list[Index],ExternalSNR_list[Index],self.Fielding))
+                ResultsObjectList.append(CheckSNR_Reads(TemplateSNR_list[Index],ExternalSNR_list[Index],self.Fielding))
             #pack results into the dictionary alongside the image, template SNR and external SNR files for later analysis
 
             for CheckElement in ResultsObjectList:
@@ -363,37 +369,34 @@ class CheckSN_Answers():
 
 
 
-    def CheckSNR_Reads(self,TemplateSNR,ExternalSNR,Fielding):
-        ###pass in internal and external SNR and check for match
-        #Fielding will be NONE or generated externally
+def CheckSNR_Reads(TemplateSNR,ExternalSNR,Fielding):
+    ###pass in internal and external SNR and check for match
+    #Fielding will be NONE or generated externally
 
 
-        Known_SNR_string=None
-            #extract snr - by previous process will be bookended by "[" and "]"
-    #try:
-        if (not "[" in TemplateSNR) or (not "]" in TemplateSNR):
-            raise Exception("Template SNR not formatted correctly []")
-        Get_SNR_string=TemplateSNR.split("[")#delimit
-        Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
-        Get_SNR_string=Get_SNR_string.split("]")#delimit
-        Get_SNR_string=Get_SNR_string[0]
-        if (Get_SNR_string is not None):
-            if (len(Get_SNR_string))>0:
-                Known_SNR_string=Get_SNR_string
-                #print(vars(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding)))
-                return(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding))
-    #except Exception as e: 
-        #print("error extracting known snr string from file " )
-        #print(repr(e))
+    Known_SNR_string=None
+        #extract snr - by previous process will be bookended by "[" and "]"
+#try:
+    if (not "[" in TemplateSNR) or (not "]" in TemplateSNR):
+        raise Exception("Template SNR not formatted correctly []")
+    Get_SNR_string=TemplateSNR.split("[")#delimit
+    Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
+    Get_SNR_string=Get_SNR_string.split("]")#delimit
+    Get_SNR_string=Get_SNR_string[0]
+    if (Get_SNR_string is not None):
+        if (len(Get_SNR_string))>0:
+            Known_SNR_string=Get_SNR_string
+            #print(vars(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding)))
+            return(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding))
+#except Exception as e: 
+    #print("error extracting known snr string from file " )
+    #print(repr(e))
 
-        return None
-
-
+    return None
 
 
-testSnr=CheckSN_Answers()
 
-print("fin")
+
 # #may want to get fielding from another source if using collimated answers
 # Fielding=SNRTools.GenerateSN_Fielding(InputFiles_fielding)
 # print("Fielding found:",Fielding)
