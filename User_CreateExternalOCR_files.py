@@ -11,15 +11,15 @@ from GeneticAlg_SNR import Individual
 
 #at time of writing point this to folder of S39 images with savedstate obj file (preprocessing)
 #can disable preprocessing but need this file until fixed
-Input_S39_ExtractionImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\Brazil"
+Input_S39_ExtractionImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
 #output folder for single processed files with snr answer as filename
-OutputFolderSingleImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"
+OutputFolderSingleImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ProcessSingles"
 #output folder tiled images
 OutputFolderTiledImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput"
 #column size of tiled images
-ColumnSize=25
+ColumnSize=30
 #Preprocessing on/off - if ML optimisation has been used
-PreProcessing=False
+PreProcessing=True
 
 
 

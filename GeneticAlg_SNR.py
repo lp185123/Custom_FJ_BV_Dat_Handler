@@ -8,6 +8,8 @@ import cv2
 import Snr_test_fitness
 import pickle
 import os
+import matplotlib
+matplotlib.use('Agg')#can get "Tcl_AsyncDelete: async handler deleted by the wrong thread" crashes otherwise
 import matplotlib.pyplot as plt
 import VisionAPI_Demo
 
@@ -15,21 +17,21 @@ class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=20
-        self.No_TopCandidates=10
+        self.No_of_First_gen=50
+        self.No_TopCandidates=5
         self.NewIndividualsPerGen=1
-        self.TestImageBatchSize=5
-        self.NewImageCycle=5
-        self.ImageTapOut=2#terminate anything that has poor performance out the box
+        self.TestImageBatchSize=10
+        self.NewImageCycle=1
+        self.ImageTapOut=3#terminate anything that has poor performance out the box
         self.UseCloudOCR=True
-        self.MirrorImage=False
+        self.MirrorImage=True
         self.DictFilename_V_Images=dict()#load this with fitness check images
         #load fitness checking images into memory - #TODO make dynamic
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\FitnessTest"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\TestSNs"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR"
-        self.FilePath=r"X:\CloudOCR"
+        self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\Brazil"
         #save out parameter converging image
         self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"
         
@@ -154,20 +156,26 @@ class Individual():
 
         #user populate this area - each parameter has Upper, Lower, range,  test value and if integer
         self.UserInputParamsDict=dict()
-        #self.UserInputParamsDict["PSM"]=self.ParameterDetails(3,3,[3,5,6,7,8,13],3,True)#psm is always 3 so pretty pointless
-        self.UserInputParamsDict["ResizeX"]=self.ParameterDetails(200,50,[],100,True)
-        self.UserInputParamsDict["ResizeY"]=self.ParameterDetails(200,50,[],100,True)
-        self.UserInputParamsDict["Canny"]=self.ParameterDetails(1,0,[],0,True)
-        self.UserInputParamsDict["CannyThresh1"]=self.ParameterDetails(50,150,[],100,True)
-        self.UserInputParamsDict["CannyThresh2"]=self.ParameterDetails(100,255,[],110,True)
-        self.UserInputParamsDict["AdapativeThreshold"]=self.ParameterDetails(255,160,[],200,True)
-        self.UserInputParamsDict["MedianBlurDist"]=self.ParameterDetails(21,0,[1,3,5,7,9,11,13,15,17,19,21],3,True)
+        #self.UserInputParamsDict["PSM"]=self.ParameterDetails(3,3,[3,5,6,7,8,13],3,True)#tesseract psm is always 3 so can disable 
+        self.UserInputParamsDict["ResizeX"]=self.ParameterDetails(150,50,[],100,True)
+        self.UserInputParamsDict["ResizeY"]=self.ParameterDetails(150,50,[],100,True)#india x50 y156
+        
+        self.UserInputParamsDict["AdapativeThreshold"]=self.ParameterDetails(1,0,[1,0],1,True)
+        self.UserInputParamsDict["MedianBlurDist"]=self.ParameterDetails(23,1,[1,3,5,7,9,11,13,15,17,19,21,23],3,True)
         self.UserInputParamsDict["GausSize_Threshold"]=self.ParameterDetails(21,3,[3,5,7,9,11,13,15,17,19,21],15,True)
         self.UserInputParamsDict["SubtractMean"]=self.ParameterDetails(20,3,[],7,True)
-        self.UserInputParamsDict["AlphaBlend"]=self.ParameterDetails(1,0,[],0.5,False)
-        #self.UserInputParamsDict["CropPixels"]=self.ParameterDetails(0,0,[],2,True)
-        self.UserInputParamsDict["Denoise"]=self.ParameterDetails(1,0,[0,1],1,True)
+        self.UserInputParamsDict["AlphaBlend"]=self.ParameterDetails(0,1,[],0.5,False)
+        #self.UserInputParamsDict["Denoise"]=self.ParameterDetails(1,0,[0,1],1,True)
         self.UserInputParamsDict["Negative"]=self.ParameterDetails(1,0,[0,1],1,True)
+        self.UserInputParamsDict["Equalise"]=self.ParameterDetails(1,0,[0,1],1,True)
+
+
+
+        #self.UserInputParamsDict["Canny"]=self.ParameterDetails(1,0,[],0,True)
+        #self.UserInputParamsDict["CannyThresh1"]=self.ParameterDetails(50,150,[],100,True)
+        #self.UserInputParamsDict["CannyThresh2"]=self.ParameterDetails(100,255,[],110,True)
+        #self.UserInputParamsDict["CropPixels"]=self.ParameterDetails(0,0,[],2,True)
+
 
 
         # self.ParamGroupDict=dict()
@@ -279,8 +287,12 @@ class Individual():
 
         #TODO might make more sense normalising all parameters
 
-        #decide what a discrete step would be per parameter - would this be better elsewhere? #TODO
         DiscreteStep=0.01 #all parmaters normalised now so a discrete step is 1% of map range
+        #special case for discrete parameters
+        if len(self.UserInputParamsDict[InputParameter].SetDiscreteRange)>0:#if a discrete range - handle it differently than continuous paramter
+            DiscreteStep=1/len(self.UserInputParamsDict[InputParameter].SetDiscreteRange)
+        #decide what a discrete step would be per parameter - would this be better elsewhere? #TODO
+        
         #appy discrete step with polarity from user
         self.Parameters[InputParameter]=self.Parameters[InputParameter]+(DiscreteStep*PolarityAsInteger)
         return
@@ -300,7 +312,7 @@ class Individual():
             #keep segmentation mode between these values
         Parameter=int(round(Parameter,0))
         LowestError=9999999#can we do inf here?
-        ClosestValue=3
+        ClosestValue=None
         for PSMvalue in Range:
             Error=(abs(Parameter-PSMvalue))
             if Error<LowestError:
@@ -308,7 +320,7 @@ class Individual():
                 ClosestValue=PSMvalue
         ReturnValue=ClosestValue
         if not ClosestValue in Range:
-            raise Exception("error trying to correct to closest value in set, " , self.Parameters["PSM"])
+            raise Exception("error trying to correct to closest value in set, " , self.Parameters[Parameter])
         return ReturnValue
 
     def RoundParameters(self):
@@ -470,6 +482,9 @@ def BuildSNR_Parameters(InputParameters,SNR_fitnessTest,GenParams):
             continue
         if paramname=="Negative":
             SNRparams.Negative=InputParameters[paramname]
+            continue
+        if paramname=="Equalise":
+            SNRparams.Equalise=InputParameters[paramname]
             continue
 
         print(paramname, " parameter not found when building SNR parameters")
@@ -832,6 +847,8 @@ def RemoveCloseParameterIndividuals(InputDict_Candidates,NameOfGen,Buffer):
     return InputDict_Candidates
 
 def PlotAndSave(Title,Filepath,Data):
+    return
+    #this causes crashes
     #save out plot of 1D data
     plt.plot(Data)
     plt.ylabel(Title)
@@ -959,10 +976,22 @@ if __name__ == "__main__":
                 DictFitCandidates=copy.deepcopy(SaveList[1])
             
         else:
+            #prompt user to check filepaths are OK for deletion
+            print("Please check output folder can be deleted:\n",GenParams.OutputFolder)
+            Response=_3DVisLabLib.yesno("Delete contents (y) - continue writing (n) ?")
+            if Response==True:
+                _3DVisLabLib.DeleteFiles_RecreateFolder(GenParams.OutputFolder)
+
             #default first generation
             #assess first generation - here we can potentially load in a saved state
             DictFitCandidates=CheckFitness_Multi(DictOfFirstGen,GenParams,SNR_fitnessTest)
     else:
+        #prompt user to check filepaths are OK for deletion
+        print("Please check output folder can be deleted:\n",GenParams.OutputFolder)
+        Response=_3DVisLabLib.yesno("Delete contents (y) - continue writing (n) ?")
+        if Response==True:
+            _3DVisLabLib.DeleteFiles_RecreateFolder(GenParams.OutputFolder)
+            
         #default first generation
         #assess first generation - here we can potentially load in a saved state
         DictFitCandidates=CheckFitness_Multi(DictOfFirstGen,GenParams,SNR_fitnessTest)

@@ -58,6 +58,7 @@ class SNR_Parameters():
         self.PSM=3#default is 3
         self.Denoise=0
         self.Negative=0
+        self.Equalise=0
         
         #psm is page segment modes - see pytessaract manual
         #self.config='--oem 3 --psm 6 -c load_system_dawg=0 load_freq_dawg=0 load_punc_dawg=0'
@@ -91,7 +92,7 @@ class SNR_Parameters():
         self.ResizeX=int(self.ResizeX)
         self.ResizeY=int(self.ResizeY)
         self.ConfidenceCutoff=int(self.ConfidenceCutoff)
-        self.AdapativeThreshold=int(self.AdapativeThreshold)
+        self.AdapativeThreshold=(self.AdapativeThreshold)
         self.MedianBlurDist=int(self.MedianBlurDist)
         self.Canny=int(self.Canny)
 
@@ -310,13 +311,12 @@ def CompareOCR_Reads(TemplateSNR,ExternalSNR,ExpectedFielding=None):
 
         if OCR_analysis.Pass==False:break
 
-
         #repair external OCR if we have prior knowledge
         RepairedExternalOCR=Repair_ExternalOCR(TemplateSNR,ExternalSNR,ExpectedFielding)
         OCR_analysis.RepairedExternalOCR=RepairedExternalOCR
 
         #Basic check - can we find TemplateSNR in the ExternalSNR string
-        if (not TemplateSNR in RepairedExternalOCR) or (not TemplateSNR in ExternalSNR):
+        if (( TemplateSNR in RepairedExternalOCR)==False) and (( TemplateSNR in ExternalSNR)==False):
             OCR_analysis.SetInput_InfoString("test snr not found in external snr")
             OCR_analysis.SetInput_Pass(False)
             OCR_analysis.SetInput_Error(CompareOCR_ReadsEnum.ErrorNoMatchFound.value)
@@ -699,7 +699,9 @@ class TestSNR_Fitness():
             ProcessedImage = cv2.medianBlur(ProcessedImage,ParameterObject.MedianBlurDist)
 
         if ParameterObject.AdapativeThreshold!=0:
-            ProcessedImage = cv2.adaptiveThreshold(ProcessedImage, ParameterObject.AdapativeThreshold, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,ParameterObject.GausSize_Threshold,ParameterObject.SubtractMean) #cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11,2)[1]
+            ProcessedImage = cv2.GaussianBlur(ProcessedImage, (7, 7), 0)
+            ProcessedImage=cv2.adaptiveThreshold(ProcessedImage, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV,ParameterObject.GausSize_Threshold,ParameterObject.SubtractMean)
+            #ProcessedImage = cv2.adaptiveThreshold(ProcessedImage, ParameterObject.AdapativeThreshold, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,ParameterObject.GausSize_Threshold,ParameterObject.SubtractMean) #cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11,2)[1]
         
         if ParameterObject.Canny!=0:
             ProcessedImage=cv2.Canny(ProcessedImage, ParameterObject.CannyThresh1, ParameterObject.CannyThresh2)
@@ -707,12 +709,16 @@ class TestSNR_Fitness():
         if ParameterObject.Denoise==1:
             ProcessedImage=cv2.fastNlMeansDenoising(ProcessedImage)
 
-        if ParameterObject.Negative==1:
-            ProcessedImage = cv2.bitwise_not(ProcessedImage)
+        if ParameterObject.Equalise==1:
+            ProcessedImage = cv2.equalizeHist(ProcessedImage)
 
         #blend processed and base(resized)image according to Alpha blend parameter
         beta = (1.0 - ParameterObject.AlphaBlend)
         TestImage = cv2.addWeighted(TestImage, ParameterObject.AlphaBlend, ProcessedImage, beta, 0.0)
+
+        if ParameterObject.Negative==1:
+            #TestImage = cv2.bitwise_not(TestImage)
+            TestImage = 1 - TestImage
 
         #TestImage = cv2.morphologyEx(TestImage, cv2.MORPH_OPEN, ParameterObject.kernel)
         #TestImage = cv2.morphologyEx(TestImage, cv2.MORPH_CLOSE, ParameterObject.kernel)

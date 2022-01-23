@@ -111,7 +111,7 @@ class CheckSN_Answers():
         buildhtml.append("<h2> SNR instances: " + str(TotalPass+TotalFail)+  "</h2>")
         buildhtml.append("<h2> Matches : " + str(round((TotalPass/(TotalPass+TotalFail))*100))+  "% </h2>")
         buildhtml.append("<h2> Total pass: " + str(TotalPass)+  "</h2>")
-        buildhtml.append("<h2> Total pass: " + str(TotalFail)+  "</h2>")
+        buildhtml.append("<h2> Total Fail: " + str(TotalFail)+  "</h2>")
         #end of html
         buildhtml.append("</body>")
         buildhtml.append("</html>")
