@@ -9,6 +9,16 @@ import os
 import json
 import shutil
 
+def CleanUpExternalOCR(InputOCR):
+    #clean up external OCR which could contain non alphanumeric characters and spaces etc
+    CleanedUpSnr=""
+    #remove non alphanumeric chars
+    CleanedUpSnr = re.sub(r'[^a-zA-Z0-9]', '', InputOCR)
+    #remove spaces
+    CleanedUpSnr=CleanedUpSnr.replace(" ","")
+    #should be left with continous string of alphanumeric characters
+    return CleanedUpSnr
+
 class CheckSN_Answers():
     def __init__(self):
 
@@ -232,15 +242,7 @@ class CheckSN_Answers():
     #     #shouldnt get here 
     #     return None, None, None
 
-    def CleanUpExternalOCR(self,InputOCR):
-        #clean up external OCR which could contain non alphanumeric characters and spaces etc
-        CleanedUpSnr=""
-        #remove non alphanumeric chars
-        CleanedUpSnr = re.sub(r'[^a-zA-Z0-9]', '', InputOCR)
-        #remove spaces
-        CleanedUpSnr=CleanedUpSnr.replace(" ","")
-        #should be left with continous string of alphanumeric characters
-        return CleanedUpSnr
+
 
     def GetExternalOCR_Answers(self):
         #answers folder from external OCR service should have same filename as 
@@ -268,7 +270,7 @@ class CheckSN_Answers():
                         #delimiter may give us an empty final line which can throw up an error for alignment
                         #and may also legimiately get empty lines back from external OCR
                         if (Index< len(DelimitedLines)-1) or (len(DelimitedLines)==1):
-                            CleanedLine=self.CleanUpExternalOCR(Singleline)
+                            CleanedLine=CleanUpExternalOCR(Singleline)
                             Cleanedlines.append(CleanedLine)
                             CountSingleAnswers=CountSingleAnswers+1
                     OutputDictionary[OCRtext]=Cleanedlines

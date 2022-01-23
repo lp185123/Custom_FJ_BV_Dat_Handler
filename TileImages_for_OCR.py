@@ -5,15 +5,16 @@ import cv2
 import numpy
 import json
 import random
-
+import copy
+import Snr_test_fitness
 def CreateDelimiterImage(ListAllImages,DelimiterText,Xbuffer):
     #get first image - we can assume all images have been checked and loaded at this point
-    CheckImg = cv2.imread(ListAllImages[0])
+    CheckImg = list(ListAllImages.values())[0]
     ImageX=int(CheckImg.shape[1])
     ImageY=int(CheckImg.shape[0])
     #create colour image, convert to grayscale if we need to
     #make image twice the height to avoid cramming text against border
-    blank_image = numpy.ones((ImageY*2,ImageX,3), dtype = numpy.uint8)#
+    blank_image = numpy.ones((ImageY*2,ImageX), dtype = numpy.uint8)#
     blank_image=blank_image*255#make all channels white
 
     #print delimiter text onto blank image- make sure it fits incase we get weird combinations of image size and string length
@@ -39,7 +40,7 @@ def CreateDelimited_Column(ColumnHeight,DelimiterImage,ImageY,ImageX):
 
     #now have a list of Y positions to arrange images
     #create blank white image
-    blank_image = (numpy.ones((NewY,ImageX,3), dtype = numpy.uint8))*255
+    blank_image = (numpy.ones((NewY,ImageX), dtype = numpy.uint8))*255
 
     #load in delimiter image according to Y positions generated earlier
     for Ypos in ListY_Delimiter:
@@ -47,9 +48,10 @@ def CreateDelimited_Column(ColumnHeight,DelimiterImage,ImageY,ImageX):
     BlankColWithDelimiters_Img=blank_image
     return ListY_S39, BlankColWithDelimiters_Img
 
-def TileImages_with_delimiterImage(DelimiterImage,ListAllImages,ImageY,ImageX,ColumnSize,OutputFolder):
+def TileImages_with_delimiterImage(DelimiterImage,ImgVsPath,ImageY,ImageX,ColumnSize,OutputFolder):
     #create columns of images with delimiter
 
+    ListAllImages=list(ImgVsPath.keys())
     #roll through all images
     #Calculate Column dimensions
     ColDim_Y=DelimiterImage.shape[0]#delimiter may be different height from s39 images to accomodate text
@@ -91,28 +93,26 @@ def TileImages_with_delimiterImage(DelimiterImage,ListAllImages,ImageY,ImageX,Co
             print("Processed image", Counter, "of",len(ListAllImages))
 
         #generate column image - might need variable height
-        if (len(ListAllImages)-Counter)< ColumnSize:
-            ListY_S39,BlankColWithDelimiters_Img=CreateDelimited_Column(len(ListAllImages)-Counter,DelimiterImage,ImageY,ImageX)
-        else:
-            ListY_S39,BlankColWithDelimiters_Img=CreateDelimited_Column(ColumnSize,DelimiterImage,ImageY,ImageX)
+        if Counter%ColumnSize==0:
+            if (len(ListAllImages)-Counter)< ColumnSize:
+                ListY_S39,BlankColWithDelimiters_Img=CreateDelimited_Column(len(ListAllImages)-Counter,DelimiterImage,ImageY,ImageX)
+            else:
+                ListY_S39,BlankColWithDelimiters_Img=CreateDelimited_Column(ColumnSize,DelimiterImage,ImageY,ImageX)
 
+            OutputColumn=BlankColWithDelimiters_Img.copy()
+            SnrAnswersDict=dict()
 
-        OutputColumn=BlankColWithDelimiters_Img.copy()
-
-        
-        
-        SnrAnswersDict=dict()
         if Counter%ColumnSize==0:#take modulus
             SNRAnswersList=[]
             ImagesToEmbed=ListAllImages[Counter:Counter+ColumnSize]
             #roll through and space out into blank image with delimiter images
             for Index, ImgFilePath in enumerate(ImagesToEmbed):
                 #load image
-                LoadImage = cv2.imread(ImgFilePath)
+                LoadImage = ImgVsPath[ImgFilePath]#cv2.imread(ImgFilePath,cv2.IMREAD_GRAYSCALE)
                 #use Y positions generated to position images into master image
                 Yposition=ListY_S39[Index]
                 #place into master image
-                OutputColumn[Yposition:Yposition+ImageY,:,:]=LoadImage
+                OutputColumn[Yposition:Yposition+ImageY,:]=LoadImage
 
                 #extract SNR from filename if it exists
                 #get delimited string
@@ -130,9 +130,6 @@ def TileImages_with_delimiterImage(DelimiterImage,ListAllImages,ImageY,ImageX,Co
                     Get_SNR_string="NO_SNR"
                 SNRAnswersList.append(Get_SNR_string + ImgFilePath)
                 SnrAnswersDict[Index]=(Get_SNR_string,ImgFilePath)
-            #TODO lets put the delimiter text in the text file as well
-
-                
             #save out delimited master image ready for OCR 
             # cv2.imwrite(OutputFolder +"\\" + str(Counter) + ".jpg" ,OutputColumn)
             # gray_img = cv2.cvtColor(OutputColumn,cv2.COLOR_BGR2GRAY)
@@ -140,11 +137,10 @@ def TileImages_with_delimiterImage(DelimiterImage,ListAllImages,ImageY,ImageX,Co
             # with open(OutputFolder +"\\" + str(Counter) + "" + ".json", 'w') as outfile:
             #     json.dump(SnrAnswersDict, outfile)
             
-            ImgPath_VS_ImageAndAnswer[OutputFolder +"\\" + str(Counter) + ".jpg"]=(OutputFolder +"\\" + str(Counter) + "" + ".json",SnrAnswersDict,OutputColumn)
+            ImgPath_VS_ImageAndAnswer[OutputFolder +"\\" + str(Counter) + ".jpg"]=(OutputFolder +"\\" + str(Counter) + "" + ".json",copy.deepcopy(SnrAnswersDict),OutputColumn.copy())
 
 
     return ImgPath_VS_ImageAndAnswer
-
 
 class TileImage:
     def __init__(self,DelimiterText,InputFolder,OutputFolder,ColumnSize):

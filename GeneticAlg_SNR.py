@@ -12,6 +12,7 @@ import matplotlib
 matplotlib.use('Agg')#can get "Tcl_AsyncDelete: async handler deleted by the wrong thread" crashes otherwise
 import matplotlib.pyplot as plt
 import VisionAPI_Demo
+import TileImages_for_OCR
 
 class GA_Parameters():
     def __init__(self):
@@ -20,7 +21,8 @@ class GA_Parameters():
         self.No_of_First_gen=50
         self.No_TopCandidates=5
         self.NewIndividualsPerGen=1
-        self.TestImageBatchSize=10
+        self.TestImageBatchSize=50
+        self.ImageColumnSize=30
         self.NewImageCycle=1
         self.ImageTapOut=3#terminate anything that has poor performance out the box
         self.UseCloudOCR=True
@@ -42,7 +44,8 @@ class GA_Parameters():
         self.Fielding=None
         self.CloudOCRObject=None
 
-        self.GetRandomSet_TestImages_AndFielding()
+        self.GetCollimatedTestSet_AndFielding(self.ImageColumnSize,self.TestImageBatchSize)
+        #self.GetRandomSet_TestImages_AndFielding()
 
     def CheckRepeatingFitness(self,Range,Error):
         LastFitness= self.GetFitnessHistory()
@@ -51,6 +54,47 @@ class GA_Parameters():
                 return True
         return False
 
+    def GetCollimatedTestSet_AndFielding(self,ColSize,TotalNoImages):
+        #pick N random test images from set of images and collimate with SNR answers
+        self.DictFilename_V_Images=dict()
+        #get all files in input folder
+        InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(self.FilePath)
+        #filter out non images
+        ListAllImages=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
+
+        if len(ListAllImages)<TotalNoImages:
+            raise Exception("ERROR: GetCollimatedTestSet_AndFielding length: User requested illegal",TotalNoImages,"image batch size from dataset of",len(ListAllImages) )
+        if (ColSize)>TotalNoImages:
+            raise Exception("ERROR: GetCollimatedTestSet_AndFielding length: User requested",ColSize,"col size from",TotalNoImages, " total images" )
+
+        #convert to dictionary so we can remove items easier
+        ListAllImages_dict=dict()
+        for image in ListAllImages:
+            ListAllImages_dict[image]=image
+        
+        #pick random imagepath from list and then delete key so no duplicates
+        ImagesToLoad=[]
+        for ImageBatchSize in range (0,TotalNoImages):
+            RandomImage=random.choice(list(ListAllImages_dict.keys()))
+            ImagesToLoad.append(RandomImage)
+            del ListAllImages_dict[RandomImage]
+
+        #attempt to get fielding of input images:
+        self.Fielding=Snr_test_fitness.GenerateSN_Fielding(ListAllImages)
+
+        
+
+        #load images into memory
+        for ImageInstance in ImagesToLoad:
+            #block out images as we will handle them elsewhere - but keep this format 
+            #TODO will need refactoring if deployed
+             TestImage=None#cv2.imread(ImageInstance,cv2.IMREAD_GRAYSCALE)
+             self.DictFilename_V_Images[ImageInstance]=TestImage
+
+        print("Selected ", len(self.DictFilename_V_Images), "random images from dataset, to be sorted into columns of size",ColSize )
+        print("Fielding is: ",self.Fielding)
+        
+    
     def GetRandomSet_TestImages_AndFielding(self):
         #pick N random test images from set of images
         self.DictFilename_V_Images=dict()
@@ -127,15 +171,15 @@ class GA_Parameters():
                 TempError=(InputParameters[I]-SelfTestTargetParameters[I])*(InputParameters[I]-SelfTestTargetParameters[I])
                 Error=Error+TempError
         else:
-            try:
-                #application specific fitness check
-                fitness, Tapout,ReturnImg=ExternalCheckFitness_SNR(InputParameters,self.DictFilename_V_Images,SNR_fitnessTest,self.ImageTapOut,GenParams)
-                Error=1-fitness
-            except Exception as e:
-                print("error with checking fitness using parameters")
-                print(InputParameters)
-                print(e)
-                Error=99999999#try and push bad set of parameters to extinction #TODO remove this instead of pushing it down
+        #try:
+            #application specific fitness check
+            fitness, Tapout,ReturnImg=ExternalCheckFitness_SNR(InputParameters,self.DictFilename_V_Images,SNR_fitnessTest,self.ImageTapOut,GenParams)
+            Error=1-fitness
+        # except Exception as e:
+        #     print("error with checking fitness using parameters")
+        #     print(InputParameters)
+        #     print(e)
+        #     Error=99999999#try and push bad set of parameters to extinction #TODO remove this instead of pushing it down
 
        
         
@@ -543,10 +587,17 @@ def ExternalCheckFitness_SNR(InputParameters,List_of_Fitness_images,SNR_fitnessT
     ReturnImg=None
     BestImg=None
     BestImageFitness=0
+
+    #test code to convert from handling 1 image at a time to handling a list to be collimated and processed
+    ReturnImg,ReturnFitness=SNR_fitnessTest.RunSNR_With_Parameters(List_of_Fitness_images,SNRparams,None,SkipOcr=False,GenParams=GenParams,ColSize=GenParams.ImageColumnSize)
+    rfjjfirfjr
+
+
+
     for Index, ImagePathInstance in enumerate(List_of_Fitness_images):
         PotentialScore=PotentialScore+1
         #pass the image filepath & name (may have snr read result found between [] brackets), genome parameters for SNR, and image preloaded by ga_params object
-        ReturnImg,ReturnFitness=SNR_fitnessTest.RunSNR_With_Parameters(ImagePathInstance,SNRparams,List_of_Fitness_images[ImagePathInstance],SkipOcr=False,GenParams=GenParams)
+        ReturnImg,ReturnFitness=SNR_fitnessTest.RunSNR_With_Parameters([ImagePathInstance],SNRparams,[List_of_Fitness_images[ImagePathInstance]],SkipOcr=False,GenParams=GenParams,ColSize=GenParams.ImageColumnSize)
         TotalScore=TotalScore+ReturnFitness
         _3DVisLabLib.ImageViewer_Quick_no_resize(ReturnImg,0,False,False)
 

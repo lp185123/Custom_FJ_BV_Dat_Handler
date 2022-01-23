@@ -19,7 +19,7 @@ OutputFolderTiledImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOu
 #column size of tiled images
 ColumnSize=12
 #Preprocessing on/off - if ML optimisation has been used
-PreProcessing=True
+PreProcessing=False
 
 
 

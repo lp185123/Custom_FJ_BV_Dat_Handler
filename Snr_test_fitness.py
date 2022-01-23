@@ -8,8 +8,10 @@ import enum
 import random
 import _3DVisLabLib
 import VisionAPI_Demo
-from GeneticAlg_SNR import GA_Parameters
+from GeneticAlg_SNR import GA_Parameters#, SNR_fitnessTest
 import CompareSNR_Reads
+import copy
+import TileImages_for_OCR
 #tips
 #https://nanonets.com/blog/ocr-with-tesseract/
 #tesseract ocr how to install
@@ -514,6 +516,96 @@ def CreateTestImages():
         Savestring=ResultFolder + "\\TEST_IMAGE_" + "[" + Text + "] "+ str(Img) + ".jpg" 
         cv2.imwrite(Savestring,outImage)
 
+def GetCollimatedImages_and_Answers(ImagePaths_Dict,ColSize,DelimitText,Xbuffer):
+# #collimate images and load images into memory alongside SN answers
+    DelimiterImage,ImageX,ImageY=TileImages_for_OCR.CreateDelimiterImage(ImagePaths_Dict,DelimitText,Xbuffer)#use valid image file from set to create delimiter image
+    
+    ImgPath_VS_ImageAndAnswer=TileImages_for_OCR.TileImages_with_delimiterImage(DelimiterImage,ImagePaths_Dict,ImageY,ImageX,ColSize,"Dummy parameter not needed")
+        #display out images and answer files
+    #for Index, CollumnItem in enumerate(ImgPath_VS_ImageAndAnswer):
+     #   _3DVisLabLib.ImageViewer_Quickv2(ImgPath_VS_ImageAndAnswer[CollumnItem][2],0,True,True)
+    
+    return ImgPath_VS_ImageAndAnswer
+
+def MirrorImage(InputImage):
+    #double up image 
+    FlippedImage = cv2.flip(InputImage, -1)
+    #create blank image twice the height
+    #shape 0 is X shape 1 is Y
+    blank_image = (np.ones((InputImage.shape[0]*2,InputImage.shape[1]), dtype = np.uint8))*255
+    blank_image[0:InputImage.shape[0],:]=InputImage
+    blank_image[InputImage.shape[0]:InputImage.shape[0]*2,:]=FlippedImage
+    TestImage=blank_image.copy()
+    return TestImage
+
+
+
+def ProcessImage(TestImage,ParameterObject):
+    #resize
+    TestImage=ResizeImage(TestImage,ParameterObject.ResizeX,ParameterObject.ResizeY)
+
+    #perform crop here
+    Height,Width=TestImage.shape
+    y=ParameterObject.CropPixels
+    x=ParameterObject.CropPixels
+    h=Height-ParameterObject.CropPixels
+    w=Width-ParameterObject.CropPixels
+    TestImage = TestImage[y:y+h, x:x+w]
+
+    if ParameterObject.Mirror==True:
+        #double up image in case its flipped 
+        FlippedImage = cv2.flip(TestImage, -1)
+        #create blank image twice the height
+        #shape 0 is X shape 1 is Y
+        blank_image = (np.ones((TestImage.shape[0]*2,TestImage.shape[1]), dtype = np.uint8))*255
+        blank_image[0:TestImage.shape[0],:]=TestImage
+        blank_image[TestImage.shape[0]:TestImage.shape[0]*2,:]=FlippedImage
+        TestImage=blank_image.copy()
+
+    ProcessedImage=TestImage.copy()
+#if ParameterObject.NoProcessing<0.5:#skip all modification of pixel values except for resizing and mirror
+    if ParameterObject.MedianBlurDist!=0:
+        ProcessedImage = cv2.medianBlur(ProcessedImage,ParameterObject.MedianBlurDist)
+
+    if ParameterObject.AdapativeThreshold!=0:
+        ProcessedImage = cv2.GaussianBlur(ProcessedImage, (7, 7), 0)
+        ProcessedImage=cv2.adaptiveThreshold(ProcessedImage, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV,ParameterObject.GausSize_Threshold,ParameterObject.SubtractMean)
+        #ProcessedImage = cv2.adaptiveThreshold(ProcessedImage, ParameterObject.AdapativeThreshold, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,ParameterObject.GausSize_Threshold,ParameterObject.SubtractMean) #cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11,2)[1]
+    
+    if ParameterObject.Canny!=0:
+        ProcessedImage=cv2.Canny(ProcessedImage, ParameterObject.CannyThresh1, ParameterObject.CannyThresh2)
+
+    if ParameterObject.Denoise==1:
+        ProcessedImage=cv2.fastNlMeansDenoising(ProcessedImage)
+
+    if ParameterObject.Equalise==1:
+        ProcessedImage = cv2.equalizeHist(ProcessedImage)
+
+    #blend processed and base(resized)image according to Alpha blend parameter
+    beta = (1.0 - ParameterObject.AlphaBlend)
+    TestImage = cv2.addWeighted(TestImage, ParameterObject.AlphaBlend, ProcessedImage, beta, 0.0)
+
+    if ParameterObject.Negative==1:
+        #TestImage = cv2.bitwise_not(TestImage)
+        TestImage = 1 - TestImage
+
+    #TestImage = cv2.morphologyEx(TestImage, cv2.MORPH_OPEN, ParameterObject.kernel)
+    #TestImage = cv2.morphologyEx(TestImage, cv2.MORPH_CLOSE, ParameterObject.kernel)
+    #img = image_smoothening(img)
+    #TestImage = cv2.bitwise_or(TestImage, closing)
+
+    return TestImage
+
+
+def GoogleOCR(TestImage,GenParams):
+    if GenParams.CloudOCRObject is not None and GenParams.UseCloudOCR==True:
+        Savestring="X://tempimg.jpg"
+        cv2.imwrite(Savestring,TestImage)
+        #get OCR from Google VIsion API
+        #filtered response - only alphanumeric chars
+        OCR_Result=GenParams.CloudOCRObject.PerformOCR(Savestring,None)
+        return OCR_Result
+
 class TestSNR_Fitness():
 #class which loads images into memory used to test fitness of input parameters
     def __init__(self):
@@ -525,205 +617,122 @@ class TestSNR_Fitness():
         self.Known_SNR=False
         self.Known_SNR_string=""
         self.Known_Snr_Fitness=0
+
+        self.LastRequestImages=None#remember last set of image paths to be requested
+        self.ColImagesVAnswers=None#
+        self.ImgVsPath_dict=None
         #self.CloudOCR=VisionAPI_Demo.CloudOCR()
 
-    
-    # def RunSNR_With_Parameters_DisableParameters(self,ImagePath,ParameterObject,TestImage=None,SkipOcr=False):
-
-    #     #make sure no invalid values
-    #     ParameterObject.Housekeep()
-    #     ParameterObject.SetConfig()
-
-        
-    #     if TestImage is None:
-    #         #load image
-    #         TestImage=cv2.imread(ImagePath,cv2.IMREAD_GRAYSCALE)
-
-        
-
-    #     #get snr string if available (embedded in filename between "[" and "]")
-    #     self.Known_SNR=False
-    #     self.Known_SNR_string=""
-    #     self.Known_Snr_Fitness=0
-
-    #     try:
-
-            
-    #         Get_SNR_string=ImagePath.split("[")#delimit
-    #         Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
-    #         Get_SNR_string=Get_SNR_string.split("]")#delimit
-    #         Get_SNR_string=Get_SNR_string[0]
-    #         if Get_SNR_string is not None:
-    #             if len(Get_SNR_string)>5:#TODO magic number
-    #                 self.Known_SNR_string=Get_SNR_string
-    #                 self.Known_SNR=True
-
-    #     except Exception as e: 
-    #         print("error extracting known snr string from file ",ImagePath )
-    #         print(repr(e)) 
-
-    #     #resize
-    #     #TestImage=ResizeImage(TestImage,ParameterObject.ResizeX,ParameterObject.ResizeY)
-
-        
-    #     ParameterObject.Mirror=True
-    #     if ParameterObject.Mirror==True:
-    #         #double up image in case its flipped 
-    #         FlippedImage = cv2.flip(TestImage, -1)
-    #         #create blank image twice the height
-    #         #shape 0 is X shape 1 is Y
-    #         blank_image = (np.ones((TestImage.shape[0]*2,TestImage.shape[1]), dtype = np.uint8))*255
-    #         blank_image[0:TestImage.shape[0],:]=TestImage
-    #         blank_image[TestImage.shape[0]:TestImage.shape[0]*2,:]=FlippedImage
-    #         TestImage=blank_image.copy()
 
 
-    #     #run OCR
-    #     results=""
-    #     if SkipOcr==False:
-    #         results = pytesseract.image_to_data(TestImage,output_type=Output.DICT,lang='eng')
-
-
-    #         #override all image preparation
-    #         #TestImage=cv2.imread(ImagePath,cv2.IMREAD_GRAYSCALE)
-    #         #results = pytesseract.image_to_data(TestImage,output_type=Output.DICT,lang='eng')
-
-
-    #         # loop over each of the individual textlocalizations
-    #         Collated_Snr_Text=""
-    #         for i in range(0, len(results["text"])):
-    #             # We can then extract the bounding box coordinates
-    #             # of the text region from  the current result
-    #             x = results["left"][i]
-    #             y = results["top"][i]
-    #             w = results["width"][i]
-    #             h = results["height"][i]
-    #             # We will also extract the OCR text itself along
-    #             # with the confidence of the text localization
-    #             text = results["text"][i].replace(" ","")
-    #             conf = int(results["conf"][i])
-    #             # filter out weak confidence text localizations
-    #             if (conf > 50) and (len(text)>1):#:args["min_conf"]:
-    #                 # We will display the confidence and text to
-    #                 # our terminal
-    #                 Collated_Snr_Text=Collated_Snr_Text+(str(text))
-    #                 # We then strip out non-ASCII text so we can
-    #                 # draw the text on the image We will be using
-    #                 # OpenCV, then draw a bounding box around the
-    #                 # text along with the text itself
-    #                 text = "".join(text).strip()
-    #                 cv2.rectangle(TestImage, (x, y),(x + w, y + h),(0, 0, 255), 2)
-    #                 cv2.putText(TestImage,text,(x, y - 10),cv2.FONT_HERSHEY_SIMPLEX,1.2, (0, 255, 255), 3)
-
-            
-            
-    #         #if found something - set fitness to above zero- as reading anything is a good start
-    #         if len( Collated_Snr_Text)>4:
-    #             self.Known_Snr_Fitness=round(0.1,3)
-    #         if len( Collated_Snr_Text)>8:
-    #             self.Known_Snr_Fitness=round(0.2,3)
-            
-    #         if self.Known_SNR==True:
-    #             #extracted snr string from image filepath - either generated by user or automatically
-    #             self.Known_Snr_Fitness= round(CheckStringSimilarity(self.Known_SNR_string,Collated_Snr_Text),3)
-            
-    #         if self.Known_Snr_Fitness>0.5:
-    #             pass
-    #             #print(self.Known_Snr_Fitness,self.Known_SNR_string,Collated_Snr_Text)
-            
-    #     return TestImage,self.Known_Snr_Fitness
-
-    def RunSNR_With_Parameters(self,ImagePath,ParameterObject,TestImage=None,SkipOcr=False,GenParams=None):
-        
-
+    def RunSNR_With_Parameters(self,ImagePaths,ParameterObject,TestImages=None,SkipOcr=False,GenParams=None,ColSize=None):
         
         #make sure no invalid values
         ParameterObject.Housekeep()
         ParameterObject.SetConfig()
 
         
-        if TestImage is None:
-            #load image
-            TestImage=cv2.imread(ImagePath,cv2.IMREAD_GRAYSCALE)
+        if TestImages is None:
+            #load image#
+            #TODO dont think we need this at this point
+            TestImages=[]
+            for ImagePath in ImagePaths:
+                TestImages.append(cv2.imread(ImagePath,cv2.IMREAD_GRAYSCALE))
 
+        #convert keys of dictionary to list
+        ImagePaths_list=list(ImagePaths.keys())
+        #check we havent processed these images alread
+        if self.LastRequestImages==ImagePaths_list:
+            pass
+        else:
+            print("Loading images into memory")
+            #load all iamges and process them
+            self.ImgVsPath_dict=None
+            self.ImgVsPath_dict=dict()
+            for Img in ImagePaths_list:
+                self.ImgVsPath_dict[Img]=cv2.imread(Img,cv2.IMREAD_GRAYSCALE)
+            #update last set of images to avoid reloading 
+            self.LastRequestImages=ImagePaths_list
+
+        #hold the processed image and answers
+        ProcessedImgVsPath_dict=dict()
+        #process pre-loaded raw images and create collimated image
+        for ImagetoProcess in self.ImgVsPath_dict.keys():
+            ProcessedImage=ProcessImage(self.ImgVsPath_dict[ImagetoProcess],ParameterObject)
+            ProcessedImgVsPath_dict[ImagetoProcess]=ProcessedImage.copy()
+
+        #nw collimate processed images
+        ProcessedColImagesVAnswers=GetCollimatedImages_and_Answers(ProcessedImgVsPath_dict,ColSize,"DISPATCH",20)
+
+
+        #Perform OCR
+        if SkipOcr==False:
+            if GenParams.CloudOCRObject is not None and GenParams.UseCloudOCR==True:
+                ProcessedIMg_VS_CloudOCR=dict()
+                for Img in ProcessedColImagesVAnswers:
+                    _3DVisLabLib.ImageViewer_Quickv2(ProcessedColImagesVAnswers[Img][2],0,False,False)
+                    RawOCRResult=GoogleOCR(ProcessedColImagesVAnswers[Img][2],GenParams)
+                    DelimitedLines=RawOCRResult.split("DISPATCH")#TODO make this common
+                    Cleanedlines=[]
+                    CountSingleAnswers=0
+                    #can get empty lines with delimiter
+                    for Index, Singleline in enumerate(DelimitedLines):
+                        #delimiter may give us an empty final line which can throw up an error for alignment
+                        #and may also legimiately get empty lines back from external OCR
+                        if (Index< len(DelimitedLines)-1) or (len(DelimitedLines)==1):
+                            CleanedLine=CompareSNR_Reads.CleanUpExternalOCR(Singleline)
+                            Cleanedlines.append(CleanedLine)
+                            CountSingleAnswers=CountSingleAnswers+1
+                    ProcessedIMg_VS_CloudOCR[Img]=(Cleanedlines,CountSingleAnswers)
+                    if (len(ProcessedColImagesVAnswers[Img][1])!=len(ProcessedIMg_VS_CloudOCR[Img][0])):
+                        raise Exception("RunSNR_With_Parameters, answers different lengths",len(ProcessedColImagesVAnswers[Img][1]),len(ProcessedIMg_VS_CloudOCR[Img][0]))
         
+                #now align answers with traceback to original image file
+                TemplateSNR_list=[]
+                ExternalSNR_list=[]
+                for Img in ProcessedIMg_VS_CloudOCR:
+                    for OCRread in ProcessedIMg_VS_CloudOCR[Img][0]:
+                        ExternalSNR_list.append(OCRread)
+                    for OCRread in ProcessedColImagesVAnswers[Img][1].values():
+                        TemplateSNR_list.append(OCRread[0])
+                if len(ExternalSNR_list)!=len(TemplateSNR_list):
+                    raise Exception("RunSNR_With_Parameters, list of snr and ocr do not match",len(ExternalSNR_list),len(TemplateSNR_list))
+                #now have two lists which align, one with template SNR and one with external OCR
 
-        #get snr string if available (embedded in filename between "[" and "]")
-        self.Known_SNR=False
-        self.Known_SNR_string=""
-        self.Known_Snr_Fitness=0
+                #roll through results and get report card - will handle fielding and other issues
+                ResultsObjectList=[]
+                for Index in range (len(ExternalSNR_list)):
+                    ResultsObjectList.append(CompareSNR_Reads.CheckSNR_Reads(TemplateSNR_list[Index],ExternalSNR_list[Index],GenParams.Fielding))
 
-        try:
-
-            
-            Get_SNR_string=ImagePath.split("[")#delimit
-            Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
-            Get_SNR_string=Get_SNR_string.split("]")#delimit
-            Get_SNR_string=Get_SNR_string[0]
-            if Get_SNR_string is not None:
-                if len(Get_SNR_string)>5:#TODO magic number
-                    self.Known_SNR_string=Get_SNR_string
-                    self.Known_SNR=True
-
-        except Exception as e: 
-            print("error extracting known snr string from file ",ImagePath )
-            print(repr(e)) 
-
-        #resize
-        TestImage=ResizeImage(TestImage,ParameterObject.ResizeX,ParameterObject.ResizeY)
-
+                #tally up results
+                FitnessTally=[]
+                FitnessScore=0
+                for ResultCard in ResultsObjectList:
+                    if ResultCard.Pass==True:
+                        FitnessTally.append(1)
+                        FitnessScore=FitnessScore+1.0
+                    else:
+                        #get comparison ratio
+                        CompareStringScore=round(CheckStringSimilarity(ResultCard.TemplateSNR,ResultCard.RepairedExternalOCR),3)
+                        FitnessTally.append(CompareStringScore)
+                        FitnessScore=FitnessScore+CompareStringScore
+                print(FitnessTally)
         
-        #perform crop here
-        Height,Width=TestImage.shape
-        y=ParameterObject.CropPixels
-        x=ParameterObject.CropPixels
-        h=Height-ParameterObject.CropPixels
-        w=Width-ParameterObject.CropPixels
-        TestImage = TestImage[y:y+h, x:x+w]
+        if GenParams.CloudOCRObject is not None and GenParams.UseCloudOCR==True:
+                #need to save image to give to google
+                #save to RAM DRIVE for now
 
+                Savestring="X://tempimg.jpg"
+                cv2.imwrite(Savestring,TestImage)
+                #get OCR from Google VIsion API
+                #filtered response - only alphanumeric chars
+                OCR_Result=GenParams.CloudOCRObject.PerformOCR(Savestring,None)
+                #have to add square brackets to make it compatible with this function
+                CompareResult=CompareSNR_Reads.CheckSNR_Reads("[" +self.Known_SNR_string +"]",OCR_Result,GenParams.Fielding)
+                self.Known_Snr_Fitness= round(CheckStringSimilarity(self.Known_SNR_string,CompareResult.RepairedExternalOCR),3)
+                #print("Cloud OCR score",self.Known_Snr_Fitness,"raw cloud OCR",OCR_Result,"Repaired cloud OCR",CompareResult.RepairedExternalOCR, "test ocr",self.Known_SNR_string)
+                return TestImage,self.Known_Snr_Fitness
 
-
-        if ParameterObject.Mirror==True:
-            #double up image in case its flipped 
-            FlippedImage = cv2.flip(TestImage, -1)
-            #create blank image twice the height
-            #shape 0 is X shape 1 is Y
-            blank_image = (np.ones((TestImage.shape[0]*2,TestImage.shape[1]), dtype = np.uint8))*255
-            blank_image[0:TestImage.shape[0],:]=TestImage
-            blank_image[TestImage.shape[0]:TestImage.shape[0]*2,:]=FlippedImage
-            TestImage=blank_image.copy()
-
-        ProcessedImage=TestImage.copy()
-        #if ParameterObject.NoProcessing<0.5:#skip all modification of pixel values except for resizing and mirror
-        if ParameterObject.MedianBlurDist!=0:
-            ProcessedImage = cv2.medianBlur(ProcessedImage,ParameterObject.MedianBlurDist)
-
-        if ParameterObject.AdapativeThreshold!=0:
-            ProcessedImage = cv2.GaussianBlur(ProcessedImage, (7, 7), 0)
-            ProcessedImage=cv2.adaptiveThreshold(ProcessedImage, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV,ParameterObject.GausSize_Threshold,ParameterObject.SubtractMean)
-            #ProcessedImage = cv2.adaptiveThreshold(ProcessedImage, ParameterObject.AdapativeThreshold, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,ParameterObject.GausSize_Threshold,ParameterObject.SubtractMean) #cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11,2)[1]
-        
-        if ParameterObject.Canny!=0:
-            ProcessedImage=cv2.Canny(ProcessedImage, ParameterObject.CannyThresh1, ParameterObject.CannyThresh2)
-
-        if ParameterObject.Denoise==1:
-            ProcessedImage=cv2.fastNlMeansDenoising(ProcessedImage)
-
-        if ParameterObject.Equalise==1:
-            ProcessedImage = cv2.equalizeHist(ProcessedImage)
-
-        #blend processed and base(resized)image according to Alpha blend parameter
-        beta = (1.0 - ParameterObject.AlphaBlend)
-        TestImage = cv2.addWeighted(TestImage, ParameterObject.AlphaBlend, ProcessedImage, beta, 0.0)
-
-        if ParameterObject.Negative==1:
-            #TestImage = cv2.bitwise_not(TestImage)
-            TestImage = 1 - TestImage
-
-        #TestImage = cv2.morphologyEx(TestImage, cv2.MORPH_OPEN, ParameterObject.kernel)
-        #TestImage = cv2.morphologyEx(TestImage, cv2.MORPH_CLOSE, ParameterObject.kernel)
-        #img = image_smoothening(img)
-        #TestImage = cv2.bitwise_or(TestImage, closing)
 
 
         #run OCR
