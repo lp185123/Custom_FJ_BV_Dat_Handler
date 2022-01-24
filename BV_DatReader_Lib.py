@@ -226,7 +226,10 @@ def AutomaticExtraction(UserParameters):
 
             if UserParameters.GetSNR==True:
                 SNR_ReadResult=str(filteredImages[Notefound].note.snr)
-                if SNR_ReadResult is None or SNR_ReadResult =="":raise Exception(DatFile, "Could not parse SNR (by user request)")
+                if SNR_ReadResult is None or SNR_ReadResult =="":
+                    print("Error reading SNR - skipping file ")
+                    continue
+                    raise Exception(DatFile, "Could not parse SNR (by user request)")
                 SNR_ReadResult="["+ SNR_ReadResult +"]"
 
             #if user only requires first image, break out of loop
@@ -245,22 +248,24 @@ def AutomaticExtraction(UserParameters):
                 cv2.imwrite(Savestring,OutputImage)
 
         #if user requests Serial number read alongside images
-        if UserParameters.GetSNR==True:
-            #filter for SNR images
-            filteredImages = images.filter(UserParameters.HardCodedSnr_BlockType,UserParameters.HardCodedSnr_Wave)
-            #get SNR read if any exist
-            SNR_Results_per_record=dict()
-            for Index, Item in enumerate(images.notes):
-                Tempsnr=str(Item.snr)
-                if Tempsnr is None:
-                    SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
-                    raise Exception(DatFile, "Could not parse SNR (user request)")
-                elif Tempsnr =="":
-                    SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
-                    raise Exception(DatFile,"Could not parse SNR  (user request)")
-                else:
-                    #build serial number return string - generally they are packaged with square brackets
-                    SNR_Results_per_record[Index+1]="[" + (str(Item.snr)) + "]" + str(DatFile)
+        #TODO are we even using this?
+        # #return
+        # if UserParameters.GetSNR==True:
+        #     #filter for SNR images
+        #     filteredImages = images.filter(UserParameters.HardCodedSnr_BlockType,UserParameters.HardCodedSnr_Wave)
+        #     #get SNR read if any exist
+        #     SNR_Results_per_record=dict()
+        #     for Index, Item in enumerate(images.notes):
+        #         Tempsnr=str(Item.snr)
+        #         if Tempsnr is None:
+        #             SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
+        #             raise Exception(DatFile, "Could not parse SNR (user request)")
+        #         elif Tempsnr =="":
+        #             SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
+        #             raise Exception(DatFile,"Could not parse SNR  (user request)")
+        #         else:
+        #             #build serial number return string - generally they are packaged with square brackets
+        #             SNR_Results_per_record[Index+1]="[" + (str(Item.snr)) + "]" + str(DatFile)
 
 
 
@@ -843,9 +848,13 @@ def RipAllImagePerDat(OutputFolder,InputFiles_cleaned,RawHex,UserManualMemorySca
                 Tempsnr=str(Item.snr)
                 if Tempsnr is None:
                     SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
+                    print("Error extracting SNR")
+                    continue
                     raise Exception("Could not parse SNR")
                 elif Tempsnr =="":
                     SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
+                    print("Error extracting SNR")
+                    continue
                     raise Exception("Could not parse SNR")
                 else:
                     SNR_Results_per_record[Index+1]="[" + (str(Item.snr)) + "]" + str(UserManualMemoryScan.DatFileDataType)

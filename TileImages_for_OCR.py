@@ -190,99 +190,52 @@ class TileImage:
     
     def CheckImageFiles(self):
         #check all images are same size
+        Error=0
+        List_to_Delete=[]
+        CheckImg=None
+        CheckImg_path=None
+        dict_imageshapes=dict()
         for img in self.ListAllImages:
+            CheckImg_path=img
             CheckImg=self.ListAllImages[img]
+            #print("first image set shape check,",CheckImg,"shape",CheckImg.shape)
             break
 
         for img in self.ListAllImages:
-            if self.ListAllImages[img].shape != CheckImg.shape:
-                raise Exception("Image size mismatch in folder, cannot proceed ", str(img) )
+            if not(self.ListAllImages[img].shape in dict_imageshapes):
+                dict_imageshapes[self.ListAllImages[img].shape]=[]
+            dict_imageshapes[self.ListAllImages[img].shape].append(img)
 
-
-
-    # def TileImages_with_delimiterImage(self):
-    #     #create columns of images with delimiter
-
-    #     #roll through all images
-    #     #Calculate Column dimensions
-    #     ColDim_Y=self.DelimiterImage.shape[0]#delimiter may be different height from s39 images to accomodate text
-
-    #     # #roll through column size so we can visualise whats happening in case this gets more complicated
-    #     # NewY=0
-    #     # ListY_S39=[]
-    #     # ListY_Delimiter=[]
-    #     # for Index in range(self.ColumnSize):
-    #     #     #add height of image and height of delimiter
-    #     #     ListY_S39.append(NewY)
-    #     #     NewY=NewY+self.ImageY
-    #     #     ListY_Delimiter.append(NewY)
-    #     #     NewY=NewY+ColDim_Y
-            
-    #     # #now have a list of Y positions to arrange images
-    #     # #create blank white image
-    #     # blank_image = (numpy.ones((NewY,self.ImageX,3), dtype = numpy.uint8))*255
-
-    #     # #load in delimiter image according to Y positions generated earlier
-    #     # for Ypos in ListY_Delimiter:
-    #     #     blank_image[Ypos:Ypos+ColDim_Y:,:]=self.DelimiterImage
-    #     # self.BlankColWithDelimiters_Img=blank_image
-
-    #     #will have a white image with the delimited texts with pitch=height of s39 images
-
-    #     #write in S39 images in sets of column size parmeter
-    #     #get slice of input filepaths
-    #     for Counter, Image in enumerate(self.ListAllImages):
-           
-    #         if Counter%20==0 and Counter>0:
-    #             print("Processed image", Counter, "of",len(self.ListAllImages))
-
-    #         #generate column image - might need variable height
-    #         if (len(self.ListAllImages)-Counter)< self.ColumnSize:
-    #             ListY_S39,self.BlankColWithDelimiters_Img=CreateDelimited_Column(len(self.ListAllImages)-Counter,self.DelimiterImage,self.ImageY,self.ImageX)
-    #         else:
-    #             ListY_S39,self.BlankColWithDelimiters_Img=CreateDelimited_Column(self.ColumnSize,self.DelimiterImage,self.ImageY,self.ImageX)
-
-
-    #         OutputColumn=self.BlankColWithDelimiters_Img.copy()
-
-    #         SnrAnswersDict=dict()
-    #         if Counter%self.ColumnSize==0:#take modulus
-    #             SNRAnswersList=[]
-    #             ImagesToEmbed=self.ListAllImages[Counter:Counter+self.ColumnSize]
-    #             #roll through and space out into blank image with delimiter images
-    #             for Index, ImgFilePath in enumerate(ImagesToEmbed):
-    #                 #load image
-    #                 LoadImage = cv2.imread(ImgFilePath)
-    #                 #use Y positions generated to position images into master image
-    #                 Yposition=ListY_S39[Index]
-    #                 #place into master image
-    #                 OutputColumn[Yposition:Yposition+self.ImageY,:,:]=LoadImage
-
-    #                 #extract SNR from filename if it exists
-    #                 #get delimited string
-    #                 Get_SNR_string=ImgFilePath.split("[")#delimit
-    #                 Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
-    #                 Get_SNR_string=Get_SNR_string.split("]")#delimit
-    #                 Get_SNR_string=Get_SNR_string[0]
-    #                 if Get_SNR_string is not None:
-    #                     if len(Get_SNR_string)>5:#TODO magic number
-    #                         #keep consistent format of SNR read string
-    #                         Get_SNR_string="[" + Get_SNR_string +"]"
-    #                     else:
-    #                         Get_SNR_string="NO_SNR"
-    #                 else:
-    #                     Get_SNR_string="NO_SNR"
-    #                 SNRAnswersList.append(Get_SNR_string + ImgFilePath)
-    #                 SnrAnswersDict[Index]=(Get_SNR_string,ImgFilePath)
-    #             #TODO lets put the delimiter text in the text file as well
-
-
-    #             #save out delimited master image ready for OCR 
-    #             cv2.imwrite(self.OutputFolder +"\\" + str(Counter) + ".jpg" ,OutputColumn)
-    #             gray_img = cv2.cvtColor(OutputColumn,cv2.COLOR_BGR2GRAY)
-
-    #             with open(self.OutputFolder +"\\" + str(Counter) + "" + ".json", 'w') as outfile:
-    #                 json.dump(SnrAnswersDict, outfile)
-
+        #have a dictionary of imgae shapes (dimensions)
+        #if more than 1 we have a problem
+        if len(dict_imageshapes)==1:
+            print("All images in same format - can proceed")
+            return
+        
+        #print image sizes found
+        print("WARNING: Multiple image sizes found - not compatible with current development")
+        ImgCount=0
+        ShapeKey=None
+        for Shapeformat in dict_imageshapes.keys():
+            print("Image dimensions:",str(Shapeformat),len(dict_imageshapes[Shapeformat]),"images found")
+            if len(dict_imageshapes[Shapeformat])>ImgCount:
+                ImgCount=len(dict_imageshapes[Shapeformat])
+                ShapeKey=Shapeformat
+        print("Image format with largest image instance:",ShapeKey)
+        
+        Check=_3DVisLabLib.yesno("Proceed with largest image set and ignore others?")
+        if Check==False:
+            raise Exception("Image size mismatch in folder, do not proceed ", str(img) )
+        else:
+            print("Reloading subset of images")
+            #remove images that dont match size/dims
+            self.ListAllImages=dict()#clear list of images
+            #rebuild list of images
+            for ImgItem in dict_imageshapes[ShapeKey]:
+                TestImage=cv2.imread(ImgItem,cv2.IMREAD_GRAYSCALE)
+                self.ListAllImages[ImgItem]=TestImage.copy()
+            print("Recursive image check")
+            self.CheckImageFiles()
+        return
 
     
