@@ -45,30 +45,22 @@ def GetML_SavedState(InputPath=None,Processing=False):
 
 def ProcessImages(InputPath=None,OutputPath=None,Processing=False,MirrorImage=True,GenParams=None):#dont use if __name__ == "__main__" yet 
     InputFolder=InputPath#r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
-    #get all files in input folder
-    InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(InputFolder)
-    #Get pickle file - warning will just take first one
-    ListAllObj_files=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles,ImageTypes=[".obj"])
-    #create dummy object if we dont use preprocessing
-    GenParams=None
-    #if more than one obj file - warn user
-    if (len(ListAllObj_files)!=1) and (Processing==True):
-        raise Exception("1 OBJ file expected in , ", InputFolder, " - cannot proceed to process images. Please rectify",len(ListAllObj_files) ," obj files found" )
-    
-    if (len(ListAllObj_files)==1) and (Processing==True):
-        print("Loading saved state, ", ListAllObj_files[0])
-        #Unpickle files
-        #load saved state into memory
-        #if this breaks make sure using "from" explicity importing classes into namespace EG "from GeneticAlg_SNR import Individual"
-        GenParams=None
-        #probably better using "with" here so dont need to explicitly close file handler
-        file_pi2 = open(ListAllObj_files[0], 'rb')
-        SaveList=[]
-        SaveList = pickle.load(file_pi2)
-        file_pi2.close()
-        #GenParams is the governing object for ML stage such as fitness history and other details
-        GenParams=copy.deepcopy(SaveList[0])
-        
+
+
+
+    # #get all files in input folder
+    # InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(InputFolder)
+    # #Get pickle file - warning will just take first one
+    # ListAllObj_files=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles,ImageTypes=[".obj"])
+    # #create dummy object if we dont use preprocessing
+    # GenParams=None
+    # #if more than one obj file - warn user
+    # if (len(ListAllObj_files)!=1) and (Processing==True):
+    #     raise Exception("1 OBJ file expected in , ", InputFolder, " - cannot proceed to process images. Please rectify",len(ListAllObj_files) ," obj files found" )
+    if (GenParams is None) and (Processing==True):
+        raise Exception("ProcessImages, user option use saved state=True but GenParams object is NONE, cannot proceed")
+
+    if (GenParams is not None) and (Processing==True):
         #now saved state is rebuilt - load list of images 
         #get all files in input folder
         print("looking in saved state", GenParams.FilePath , "for images - *WARNING* will not conform to nested folder structure")

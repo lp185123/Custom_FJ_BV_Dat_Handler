@@ -11,7 +11,7 @@ from GeneticAlg_SNR import Individual
 
 #at time of writing point this to folder of S39 images with savedstate obj file (preprocessing)
 #can disable preprocessing but need this file until fixed
-Input_S39_ExtractionImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
+Input_S39_ExtractionImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\Brazil"
 #output folder for single processed files with snr answer as filename
 OutputFolderSingleImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ProcessSingles"
 #output folder tiled images
@@ -41,11 +41,11 @@ SavedState_GenParams=PreProcessAllImages.GetML_SavedState(Input_S39_ExtractionIm
 #create single images
 PreProcessAllImages.ProcessImages(InputPath=Input_S39_ExtractionImages,
 OutputPath=OutputFolderSingleImages,
-Processing=PreProcessing,MirrorImage=MirrorImage,SavedState_GenParams)
+Processing=PreProcessing,MirrorImage=MirrorImage,GenParams=SavedState_GenParams)
 
 
 TileImages_for_OCR.TileImage("DISPATCH",
-OutputFolderSingleImages,OutputFolderTiledImages,ColumnSize,20)
+OutputFolderSingleImages,OutputFolderTiledImages,ColumnSize,20,SavedState_GenParams)
 
 
 

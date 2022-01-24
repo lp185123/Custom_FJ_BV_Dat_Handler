@@ -144,15 +144,18 @@ def TileImages_with_delimiterImage(DelimiterImage,ImgVsPath,ImageY,ImageX,Column
     return ImgPath_VS_ImageAndAnswer
 
 class TileImage:
-    def __init__(self,DelimiterText,InputFolder,OutputFolder,ColumnSize,Xbuffer):
+    def __init__(self,DelimiterText,InputFolder,OutputFolder,ColumnSize,Xbuffer,GenParams):
         #delimiter image is the same size as s39 image, but blank
         #with composited delimiter text to allow automatic segmentation of OCR results if 
         #tiling is used
         self.DelimiterText=DelimiterText
         self.InputFolder=InputFolder
         self.OutputFolder=OutputFolder
-        self.ColumnSize=ColumnSize#how long we want column of stacked images (not including delimiters)
-
+        if GenParams is not None:
+            print("saved state found - using col size of",GenParams.ImageColumnSize)
+            self.ColumnSize=GenParams.ImageColumnSize#how long we want column of stacked images (not including delimiters)
+        else:
+            self.ColumnSize=ColumnSize
         self.ImageX=None
         self.ImageY=None
         self.Xbuffer=Xbuffer
