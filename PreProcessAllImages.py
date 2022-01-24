@@ -11,7 +11,39 @@ import GeneticAlg_SNR
 from GeneticAlg_SNR import GA_Parameters
 from GeneticAlg_SNR import Individual
 
-def ProcessImages(InputPath=None,OutputPath=None,Processing=False,MirrorImage=True):#dont use if __name__ == "__main__" yet 
+def GetML_SavedState(InputPath=None,Processing=False):
+    if Processing==False: return None
+    #if a saved state is available, find it
+    #get all files in input folder
+    InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(InputPath)
+    #Get pickle file - warning will just take first one
+    ListAllObj_files=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles,ImageTypes=[".obj"])
+    #create dummy object if we dont use preprocessing
+    GenParams=None
+    #if more than one obj file - warn user
+    if (len(ListAllObj_files)!=1) and (Processing==True):
+        raise Exception("1 OBJ file expected in , ", InputPath, " - cannot proceed to process images. Please rectify",len(ListAllObj_files) ," obj files found" )
+    if (len(ListAllObj_files)==1) and (Processing==True):
+        print("Loading saved state, ", ListAllObj_files[0])
+        #Unpickle files
+        #load saved state into memory
+        #if this breaks make sure using "from" explicity importing classes into namespace EG "from GeneticAlg_SNR import Individual"
+        GenParams=None
+        #probably better using "with" here so dont need to explicitly close file handler
+        file_pi2 = open(ListAllObj_files[0], 'rb')
+        SaveList=[]
+        SaveList = pickle.load(file_pi2)
+        file_pi2.close()
+        #GenParams is the governing object for ML stage such as fitness history and other details
+        GenParams=copy.deepcopy(SaveList[0])
+        return GenParams
+
+    raise Exception("GetML_SavedState: bad logic chain")
+    return None
+
+
+
+def ProcessImages(InputPath=None,OutputPath=None,Processing=False,MirrorImage=True,GenParams=None):#dont use if __name__ == "__main__" yet 
     InputFolder=InputPath#r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
     #get all files in input folder
     InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(InputFolder)

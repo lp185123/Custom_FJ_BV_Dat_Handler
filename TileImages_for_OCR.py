@@ -144,7 +144,7 @@ def TileImages_with_delimiterImage(DelimiterImage,ImgVsPath,ImageY,ImageX,Column
     return ImgPath_VS_ImageAndAnswer
 
 class TileImage:
-    def __init__(self,DelimiterText,InputFolder,OutputFolder,ColumnSize):
+    def __init__(self,DelimiterText,InputFolder,OutputFolder,ColumnSize,Xbuffer):
         #delimiter image is the same size as s39 image, but blank
         #with composited delimiter text to allow automatic segmentation of OCR results if 
         #tiling is used
@@ -155,11 +155,11 @@ class TileImage:
 
         self.ImageX=None
         self.ImageY=None
-        self.Xbuffer=20
+        self.Xbuffer=Xbuffer
         self.DelimiterImage=None
         self.BlankColWithDelimiters_Img=None
         #organise files
-        self.ListAllImages=None#populated by GetAllImages
+        self.ListAllImages=dict()#populated by GetAllImages
         self.GetAllImages()#populate ListAllImages
         self.CheckImageFiles()#ensure no mixing up of images - or at least all same dimension
         self.DelimiterImage,self.ImageX,self.ImageY=CreateDelimiterImage(self.ListAllImages,self.DelimiterText,self.Xbuffer)#use valid image file from set to create delimiter image
@@ -175,16 +175,25 @@ class TileImage:
         print("getting all images from,",str(self.InputFolder))
         InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(self.InputFolder)
         #filter out non images
-        self.ListAllImages=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
+        ListAllImages=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
+        #package up in format expected by collimating function
+        self.ListAllImages=dict()
+        #format expected is dictionary with filepath as key and loaded image as value
+        for imgpath in ListAllImages:
+            TestImage=cv2.imread(imgpath,cv2.IMREAD_GRAYSCALE)
+            self.ListAllImages[imgpath]=TestImage.copy()
+
         print(len(self.ListAllImages), "images found")
     
     def CheckImageFiles(self):
         #check all images are same size
-        CheckImg = cv2.imread(self.ListAllImages[0])
         for img in self.ListAllImages:
-            Img = cv2.imread(img)
-            if Img.shape != CheckImg.shape:
-                raise Exception("Image size mismatch ", str(self.ListAllImages[0]), str(img) )
+            CheckImg=self.ListAllImages[img]
+            break
+
+        for img in self.ListAllImages:
+            if self.ListAllImages[img].shape != CheckImg.shape:
+                raise Exception("Image size mismatch in folder, cannot proceed ", str(img) )
 
 
 
