@@ -11,7 +11,7 @@ import GeneticAlg_SNR
 from GeneticAlg_SNR import GA_Parameters
 from GeneticAlg_SNR import Individual
 
-def ProcessImages(InputPath=None,OutputPath=None,Processing=False):#dont use if __name__ == "__main__" yet 
+def ProcessImages(InputPath=None,OutputPath=None,Processing=False,ColumnSize=12):#dont use if __name__ == "__main__" yet 
     InputFolder=InputPath#r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
     #get all files in input folder
     InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(InputFolder)
@@ -79,7 +79,13 @@ def ProcessImages(InputPath=None,OutputPath=None,Processing=False):#dont use if 
 
     SNRparams=GeneticAlg_SNR.BuildSNR_Parameters(LastRecord_Parameters,SNR_fitnessTest,None)
 
-    
+    #convert to dictionary object
+    DictAllImg_files=dict()
+    for img in ListAllImg_files:
+        DictAllImg_files[img]=None
+
+    ReturnImg,ReturnFitness=SNR_fitnessTest.RunSNR_With_Parameters(DictAllImg_files,SNRparams,None,SkipOcr=True,GenParams=None,ColSize=ColumnSize)
+        
 
     for Index,ImageFilePath in enumerate(ListAllImg_files):
         if Index%50==0:

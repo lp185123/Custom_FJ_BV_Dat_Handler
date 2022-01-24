@@ -90,7 +90,8 @@ def TileImages_with_delimiterImage(DelimiterImage,ImgVsPath,ImageY,ImageX,Column
     for Counter, Image in enumerate(ListAllImages):
         
         if Counter%20==0 and Counter>0:
-            print("Processed image", Counter, "of",len(ListAllImages))
+            pass
+            #print("Processed image", Counter, "of",len(ListAllImages))
 
         #generate column image - might need variable height
         if Counter%ColumnSize==0:

@@ -18,12 +18,12 @@ class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=50
+        self.No_of_First_gen=100
         self.No_TopCandidates=5
         self.NewIndividualsPerGen=1
-        self.TestImageBatchSize=50
+        self.TestImageBatchSize=396
         self.ImageColumnSize=30
-        self.NewImageCycle=1
+        self.NewImageCycle=134567
         self.ImageTapOut=3#terminate anything that has poor performance out the box
         self.UseCloudOCR=True
         self.MirrorImage=True
@@ -560,21 +560,7 @@ def BuildSNR_Parameters(InputParameters,SNR_fitnessTest,GenParams):
 
 def ExternalCheckFitness_SNR(InputParameters,List_of_Fitness_images,SNR_fitnessTest,ImageTapOut,GenParams):
     #use input parameters to drive SNR parameters and quantifiy success in range 0: 1
-
-    # #build SNR input parameters object
-    # SNRparams=Snr_test_fitness.SNR_Parameters()
-    # SNRparams.AdapativeThreshold=InputParameters["AdapativeThreshold"]
-    # SNRparams.Canny=InputParameters["Canny"]
-    # SNRparams.MedianBlurDist=InputParameters["MedianBlurDist"]
-    # SNRparams.ResizeX=InputParameters["ResizeX"]
-    # SNRparams.ResizeY=InputParameters["ResizeY"]
-    # SNRparams.PSM=str(InputParameters["PSM"])
-    # SNRparams.GausSize_Threshold=InputParameters["GausSize_Threshold"]
-    # SNRparams.SubtractMean=InputParameters["SubtractMean"]
-    # SNRparams.NoProcessing=InputParameters["NoProcessing"]
-
     SNRparams=BuildSNR_Parameters(InputParameters,SNR_fitnessTest,GenParams)
-
 
     #roll through images and get fitness total
     if len (List_of_Fitness_images)==0:
@@ -590,7 +576,7 @@ def ExternalCheckFitness_SNR(InputParameters,List_of_Fitness_images,SNR_fitnessT
 
     #test code to convert from handling 1 image at a time to handling a list to be collimated and processed
     ReturnImg,ReturnFitness=SNR_fitnessTest.RunSNR_With_Parameters(List_of_Fitness_images,SNRparams,None,SkipOcr=False,GenParams=GenParams,ColSize=GenParams.ImageColumnSize)
-    rfjjfirfjr
+    return ReturnFitness,TapOut,ReturnImg#sending back last image instead so we can potentially see improvement
 
 
 
@@ -657,7 +643,7 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
     print("Gen lowest Error (best fitness) = ", SortedFitness[0])
     print("name", InputGenDict[DictOfFitness[SortedFitness[0]]].name)
     print("Parameters", InputGenDict[DictOfFitness[SortedFitness[0]]].ApplicationSpecificMapping())
-    print("All fitness:", SortedFitness[:])
+    #print("All fitness:", SortedFitness[:])
 
     #save best performer - this is pretty lazy way to do this
     GenParams.BestPerformerTemp=copy.deepcopy(InputGenDict[DictOfFitness[SortedFitness[0]]])
@@ -898,16 +884,19 @@ def RemoveCloseParameterIndividuals(InputDict_Candidates,NameOfGen,Buffer):
     return InputDict_Candidates
 
 def PlotAndSave(Title,Filepath,Data):
-    return
+    
     #this causes crashes
     #save out plot of 1D data
-    plt.plot(Data)
-    plt.ylabel(Title)
-    plt.ylim([0, 1])
-    plt.savefig(Filepath)
-    plt.cla()
-    plt.clf()
-    plt.close()
+    try:
+        plt.plot(Data)
+        plt.ylabel(Title)
+        plt.ylim([0, 1])
+        plt.savefig(Filepath)
+        plt.cla()
+        plt.clf()
+        plt.close()
+    except Exception as e:
+        print("Error with matpyplot",e)
 
 def RemoveIndividualsCloseFitness(InputDict_Candidates,FitnessBuffer,NameOfGen):
     #return InputDict_Candidates

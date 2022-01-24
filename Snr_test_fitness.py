@@ -660,17 +660,18 @@ class TestSNR_Fitness():
         for ImagetoProcess in self.ImgVsPath_dict.keys():
             ProcessedImage=ProcessImage(self.ImgVsPath_dict[ImagetoProcess],ParameterObject)
             ProcessedImgVsPath_dict[ImagetoProcess]=ProcessedImage.copy()
+        #image to user
+        TempImage=ProcessedImgVsPath_dict[list(ProcessedImgVsPath_dict.keys())[0]]
+        _3DVisLabLib.ImageViewer_Quick_no_resize(TempImage,0,False,False)
 
-        #nw collimate processed images
+        #now collimate processed images
         ProcessedColImagesVAnswers=GetCollimatedImages_and_Answers(ProcessedImgVsPath_dict,ColSize,"DISPATCH",20)
-
-
+        
         #Perform OCR
         if SkipOcr==False:
             if GenParams.CloudOCRObject is not None and GenParams.UseCloudOCR==True:
                 ProcessedIMg_VS_CloudOCR=dict()
                 for Img in ProcessedColImagesVAnswers:
-                    _3DVisLabLib.ImageViewer_Quickv2(ProcessedColImagesVAnswers[Img][2],0,False,False)
                     RawOCRResult=GoogleOCR(ProcessedColImagesVAnswers[Img][2],GenParams)
                     DelimitedLines=RawOCRResult.split("DISPATCH")#TODO make this common
                     Cleanedlines=[]
@@ -713,11 +714,20 @@ class TestSNR_Fitness():
                         FitnessScore=FitnessScore+1.0
                     else:
                         #get comparison ratio
-                        CompareStringScore=round(CheckStringSimilarity(ResultCard.TemplateSNR,ResultCard.RepairedExternalOCR),3)
-                        FitnessTally.append(CompareStringScore)
-                        FitnessScore=FitnessScore+CompareStringScore
-                print(FitnessTally)
-        
+                        CompareStringScore=round(CheckStringSimilarity(ResultCard.TemplateSNR,ResultCard.RepairedExternalOCR),5)
+                        FitnessTally.append(0.0)
+                        #try having a score of zero instead of a continuum
+                        #FitnessScore=FitnessScore+CompareStringScore
+
+                FinalScore=FitnessScore/len(ResultsObjectList)
+                return TempImage,FinalScore
+
+
+
+        if SkipOcr==True:
+            return TempImage,0.0#return dummy final score
+
+
         if GenParams.CloudOCRObject is not None and GenParams.UseCloudOCR==True:
                 #need to save image to give to google
                 #save to RAM DRIVE for now

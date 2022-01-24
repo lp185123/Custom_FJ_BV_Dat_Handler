@@ -37,7 +37,7 @@ _3DVisLabLib.DeleteFiles_RecreateFolder(OutputFolderTiledImages)
 #create single images
 PreProcessAllImages.ProcessImages(InputPath=Input_S39_ExtractionImages,
 OutputPath=OutputFolderSingleImages,
-Processing=PreProcessing)
+Processing=PreProcessing,ColumnSize=ColumnSize)
 
 
 TileImages_for_OCR.TileImage("DISPATCH",
