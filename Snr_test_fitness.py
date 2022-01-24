@@ -12,6 +12,7 @@ from GeneticAlg_SNR import GA_Parameters#, SNR_fitnessTest
 import CompareSNR_Reads
 import copy
 import TileImages_for_OCR
+import pickle
 #tips
 #https://nanonets.com/blog/ocr-with-tesseract/
 #tesseract ocr how to install
@@ -597,13 +598,13 @@ def ProcessImage(TestImage,ParameterObject):
     return TestImage
 
 
-def GoogleOCR(TestImage,GenParams):
-    if GenParams.CloudOCRObject is not None and GenParams.UseCloudOCR==True:
+def GoogleOCR(TestImage,GenParams,GoogleOCR_Object):
+    if GoogleOCR_Object is not None and GenParams.UseCloudOCR==True:
         Savestring="X://tempimg.jpg"
         cv2.imwrite(Savestring,TestImage)
         #get OCR from Google VIsion API
         #filtered response - only alphanumeric chars
-        OCR_Result=GenParams.CloudOCRObject.PerformOCR(Savestring,None)
+        OCR_Result=GoogleOCR_Object.PerformOCR(Savestring,None)
         return OCR_Result
 
 class TestSNR_Fitness():
@@ -623,9 +624,63 @@ class TestSNR_Fitness():
         self.ImgVsPath_dict=None
         #self.CloudOCR=VisionAPI_Demo.CloudOCR()
 
+    def GenerateSingleImages_and_linkFile(self,ImagePaths,OutputFolder,ParameterObject,GenParams,ProcessImg,Mirror):
+        #after a successful ML stage will have a folder of input s39 images and an OBJ file which is the saved state
+        #run this to generate all the single images processed or unprocessed - then a file which will link the
+        #images back to the original images incase we need to trace them back to source
 
+        #make sure no invalid values
+        ParameterObject.Housekeep()#this could be empty
+        #hold the processed image and origin image incase we have to link back
+        ProcessedImgVsOriginalPath_dict=dict()
+        #check not wrong folder
+        if len(ImagePaths)==1:
+            raise Exception("No images found in",ImagePaths,"please check folder is extracted S39 images folder")
+        #roll through each extracted image, process image according to ML stage (or not)
+        #save out to output folder with SNR intact and an object linking back to the files
 
-    def RunSNR_With_Parameters(self,ImagePaths,ParameterObject,TestImages=None,SkipOcr=False,GenParams=None,ColSize=None):
+        for Index, ImgFile in enumerate(ImagePaths):
+            #read in image
+            TestImage=cv2.imread(ImgFile,cv2.IMREAD_GRAYSCALE)
+            #conduct processing (or not) - will still need to mirror image if not processing generally
+            if (Mirror==True) and (ProcessImg==False): TestImage=MirrorImage(TestImage)
+            #process image
+            if ProcessImg==True: TestImage= ProcessImage(TestImage,ParameterObject)
+            #ReturnImg,ReturnFitness=SNR_fitnessTest.RunSNR_With_Parameters(ImageFilePath,SNRparams,TestImage,SkipOcr=True,GenParams=None)
+            #get delimited string
+            Get_SNR_string=ImgFile.split("[")#delimit
+            Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
+            Get_SNR_string=Get_SNR_string.split("]")#delimit
+            Get_SNR_string=Get_SNR_string[0]
+            if Get_SNR_string is not None:
+                if len(Get_SNR_string)>0:#TODO magic number
+                    #keep consistent format of SNR read string
+                    Get_SNR_string="[" + Get_SNR_string +"]"
+                else:
+                    Get_SNR_string="NO_SNR"
+            else:
+                    Get_SNR_string="NO_SNR"
+
+            #write image into output folder
+            SavePath=OutputFolder +"\\" +Get_SNR_string + "I" + str(Index) + ".jpg"
+            print("saving image to",SavePath)
+            cv2.imwrite(SavePath ,TestImage)
+            #add to dictionary
+            ProcessedImgVsOriginalPath_dict[ImgFile]=SavePath
+            _3DVisLabLib.ImageViewer_Quick_no_resize(TestImage,0,False,False)
+
+        #save out list of image tracing info
+        SaveList=[ProcessedImgVsOriginalPath_dict]
+        #make sure we can save and load state
+        filepath=OutputFolder +"\\" + "SingleImg_to_ExtractionLinker" + ".lnk"
+        file_pi = open(filepath, 'wb') 
+        pickle.dump((SaveList), file_pi)
+        file_pi.close()
+
+        return
+        
+
+    def RunSNR_With_Parameters(self,ImagePaths,ParameterObject,TestImages=None,SkipOcr=False,GenParams=None,ColSize=None,ListCloudOCR=[]):
         
         #make sure no invalid values
         ParameterObject.Housekeep()
@@ -669,10 +724,10 @@ class TestSNR_Fitness():
         
         #Perform OCR
         if SkipOcr==False:
-            if GenParams.CloudOCRObject is not None and GenParams.UseCloudOCR==True:
+            if (len(ListCloudOCR)>0) and (GenParams.UseCloudOCR==True):
                 ProcessedIMg_VS_CloudOCR=dict()
                 for Img in ProcessedColImagesVAnswers:
-                    RawOCRResult=GoogleOCR(ProcessedColImagesVAnswers[Img][2],GenParams)
+                    RawOCRResult=GoogleOCR(ProcessedColImagesVAnswers[Img][2],GenParams,ListCloudOCR[0])
                     DelimitedLines=RawOCRResult.split("DISPATCH")#TODO make this common
                     Cleanedlines=[]
                     CountSingleAnswers=0
@@ -720,6 +775,7 @@ class TestSNR_Fitness():
                         #FitnessScore=FitnessScore+CompareStringScore
 
                 FinalScore=FitnessScore/len(ResultsObjectList)
+                #print(FinalScore)
                 return TempImage,FinalScore
 
 
@@ -727,6 +783,13 @@ class TestSNR_Fitness():
         if SkipOcr==True:
             return TempImage,0.0#return dummy final score
 
+
+        
+        ###########################################################
+        #put in pytesseract stuff here? all broken below this line#
+        ###########################################################TODO
+        #should get here
+        raise Exception("SNR_Test_Fitness hinterland code! Should not have got here")
 
         if GenParams.CloudOCRObject is not None and GenParams.UseCloudOCR==True:
                 #need to save image to give to google

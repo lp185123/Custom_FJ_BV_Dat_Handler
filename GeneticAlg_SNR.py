@@ -18,11 +18,11 @@ class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=100
+        self.No_of_First_gen=5
         self.No_TopCandidates=5
         self.NewIndividualsPerGen=1
-        self.TestImageBatchSize=396
-        self.ImageColumnSize=30
+        self.TestImageBatchSize=60
+        self.ImageColumnSize=31
         self.NewImageCycle=134567
         self.ImageTapOut=3#terminate anything that has poor performance out the box
         self.UseCloudOCR=True
@@ -42,7 +42,7 @@ class GA_Parameters():
         self.Generation=0
         self.BestPerformerTemp=None
         self.Fielding=None
-        self.CloudOCRObject=None
+        #self.CloudOCRObject=None
 
         self.GetCollimatedTestSet_AndFielding(self.ImageColumnSize,self.TestImageBatchSize)
         #self.GetRandomSet_TestImages_AndFielding()
@@ -575,7 +575,7 @@ def ExternalCheckFitness_SNR(InputParameters,List_of_Fitness_images,SNR_fitnessT
     BestImageFitness=0
 
     #test code to convert from handling 1 image at a time to handling a list to be collimated and processed
-    ReturnImg,ReturnFitness=SNR_fitnessTest.RunSNR_With_Parameters(List_of_Fitness_images,SNRparams,None,SkipOcr=False,GenParams=GenParams,ColSize=GenParams.ImageColumnSize)
+    ReturnImg,ReturnFitness=SNR_fitnessTest.RunSNR_With_Parameters(List_of_Fitness_images,SNRparams,None,SkipOcr=False,GenParams=GenParams,ColSize=GenParams.ImageColumnSize,ListCloudOCR=[CloudOCRObject])
     return ReturnFitness,TapOut,ReturnImg#sending back last image instead so we can potentially see improvement
 
 
@@ -951,6 +951,9 @@ def RemoveIndividualsCloseFitness(InputDict_Candidates,FitnessBuffer,NameOfGen):
     return(InputDict_Candidates)
 
 if __name__ == "__main__":
+    #create CLoud OCR object as global as it interferes when saving the state
+    global CloudOCRObject
+    CloudOCRObject=None
     #Global timestamp
     Global_timestamp=str(datetime.utcnow())
     Global_timestamp=Global_timestamp.replace(":","")
@@ -965,7 +968,7 @@ if __name__ == "__main__":
     #create cloud OCR if we are using it
     if GenParams.UseCloudOCR==True:
         #instancing class will initialise Cloud service and attempt to authenticate agent
-        GenParams.CloudOCRObject=VisionAPI_Demo.CloudOCR()
+        CloudOCRObject=VisionAPI_Demo.CloudOCR()
 
     #create first generation
     DictOfFirstGen=dict()
@@ -988,32 +991,22 @@ if __name__ == "__main__":
         
         if _3DVisLabLib.yesno("load previous state?")==True:
 
-            if GenParams.UseCloudOCR==False:
-                file_pi2 = open(filepath, 'rb')
-                SaveList=[]
-                SaveList = pickle.load(file_pi2)
-                file_pi2.close()
-                #depickle genomes and working object
-                GenParams=None
-                DictFitCandidates=None
-                GenParams=copy.deepcopy(SaveList[0])
-                DictFitCandidates=copy.deepcopy(SaveList[1])
-                #custom modifications to saved state - warning - can cause crash if incompatible new parameters such as
-                #more top candidates than generation can provide
-                #print("WARNING! Modifying existing run parameters")
-                #GenParams.TestImageBatchSize=10
-                #GenParams.NewImageCycle=5
-                #GenParams.No_TopCandidates=20
-                #GenParams.GetRandomSet_TestImages_AndFielding()
-            else:
-                file_pi2 = open(filepath, 'rb')
-                SaveList=[]
-                SaveList = pickle.load(file_pi2)
-                file_pi2.close()
-                #depickle genomes and working object
-                DictFitCandidates=None
-                GenParams.FitnessRecord=copy.deepcopy(SaveList[0])
-                DictFitCandidates=copy.deepcopy(SaveList[1])
+            file_pi2 = open(filepath, 'rb')
+            SaveList=[]
+            SaveList = pickle.load(file_pi2)
+            file_pi2.close()
+            #depickle genomes and working object
+            GenParams=None
+            DictFitCandidates=None
+            GenParams=copy.deepcopy(SaveList[0])
+            DictFitCandidates=copy.deepcopy(SaveList[1])
+            #custom modifications to saved state - warning - can cause crash if incompatible new parameters such as
+            #more top candidates than generation can provide
+            #print("WARNING! Modifying existing run parameters")
+            #GenParams.TestImageBatchSize=10
+            #GenParams.NewImageCycle=5
+            #GenParams.No_TopCandidates=20
+            #GenParams.GetRandomSet_TestImages_AndFielding()
             
         else:
             #prompt user to check filepaths are OK for deletion
@@ -1119,22 +1112,13 @@ if __name__ == "__main__":
         #save state
         if i%1==0:
             #cant pickle the cloud object
-            if GenParams.UseCloudOCR==False:
-                SaveList=[GenParams,DictFitCandidates]
-                #make sure we can save and load state
-                filepath=GenParams.OutputFolder +"\\" + "SavedState" + ".obj"
-                GenParams.NameOfSavedState=filepath
-                file_pi = open(filepath, 'wb') 
-                pickle.dump((SaveList), file_pi)
-                file_pi.close()
-            else:#just save fitness details rather than running details
-                SaveList=[GenParams.FitnessRecord,DictFitCandidates]
-                #make sure we can save and load state
-                filepath=GenParams.OutputFolder +"\\" + "SavedState" + ".obj"
-                GenParams.NameOfSavedState=filepath
-                file_pi = open(filepath, 'wb') 
-                pickle.dump((SaveList), file_pi)
-                file_pi.close()
+            SaveList=[GenParams,DictFitCandidates]
+            #make sure we can save and load state
+            filepath=GenParams.OutputFolder +"\\" + "SavedState" + ".obj"
+            GenParams.NameOfSavedState=filepath
+            file_pi = open(filepath, 'wb') 
+            pickle.dump((SaveList), file_pi)
+            file_pi.close()
 
         #keep persistant generation aligned
         GenParams.Generation=GenParams.Generation+1
