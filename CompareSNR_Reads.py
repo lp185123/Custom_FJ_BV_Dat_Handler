@@ -108,6 +108,7 @@ class CheckSN_Answers():
                         else:
                             buildhtml.append("<h2>" + MatchResult+  "</h2>")
                     #basic info
+                    #print(vars(SingleResult))
                     buildhtml.append("""<h2 style="color:DodgerBlue;font-family:arial;">""" + "TemplateOCR_____: " +SingleResult.TemplateSNR +  "</h2>")
                     buildhtml.append("""<h2 style="color:Tomato;font-family:arial">""" +      "FieldedCloudOCR__:" + SingleResult.RepairedExternalOCR +  "</h2>")
                     buildhtml.append("<h3>" + "AutoFielding:" + str(SingleResult.ExpectedFielding) +  "</h2>")

@@ -11,38 +11,33 @@ from GeneticAlg_SNR import Individual
 
 #at time of writing point this to folder of S39 images with savedstate obj file (preprocessing)
 #can disable preprocessing but need this file until fixed
-Input_S39_ExtractionImages=r"E:\SR RTs - BL0003 version 91.00.00.03\Extracted"
+Input_S39_ExtractionImages=r"E:\SR RTs - BL0003 version 91.00.00.03\Extracted_SingleDC"
 #output folder for single processed files with snr answer as filename
 OutputFolderSingleImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ProcessSingles"
 #output folder tiled images
 OutputFolderTiledImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput"
 #column size of tiled images - if a ML saved state is available this will be overridden
-ColumnSize=40
+ColumnSize=30
 #Preprocessing on/off - if ML optimisation has been used
 PreProcessing=False
 #can force mirroring or it can be found in genparameters
 MirrorImage=True
-
 
 #prompt user to check filepaths are OK for deletion
 print("Please check output folders can be deleted:\n",OutputFolderSingleImages,"\n",OutputFolderTiledImages)
 Response=_3DVisLabLib.yesno("Continue?")
 if Response==False:
     raise Exception("User declined to delete folders - process terminated")
-
 #delete output folder
 _3DVisLabLib.DeleteFiles_RecreateFolder(OutputFolderSingleImages)
 #delete output folder
 _3DVisLabLib.DeleteFiles_RecreateFolder(OutputFolderTiledImages)
-
-#check if saved state exists
+#check if saved state exists - if so deserialise it
 SavedState_GenParams=PreProcessAllImages.GetML_SavedState(Input_S39_ExtractionImages,PreProcessing)
-
 #create single images
 PreProcessAllImages.ProcessImages(InputPath=Input_S39_ExtractionImages,
 OutputPath=OutputFolderSingleImages,
 Processing=PreProcessing,MirrorImage=MirrorImage,GenParams=SavedState_GenParams)
-
 
 TileImages_for_OCR.TileImage("DISPATCH",
 OutputFolderSingleImages,OutputFolderTiledImages,ColumnSize,20,SavedState_GenParams)

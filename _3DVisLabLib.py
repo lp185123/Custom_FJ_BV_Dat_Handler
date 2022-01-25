@@ -82,6 +82,40 @@ def ImageViewer_Quick_no_resize(inputimage,pausetime_Secs=0,presskey=False,destr
         time.sleep(pausetime_Secs)
     if destroyWindow==True: cv2.destroyAllWindows()
 
+def ImageViewer_Quickv2_UserControl(inputimage,pausetime_Secs=0,presskey=False,destroyWindow=True):
+    ###handy quick function to view images with keypress escape andmore options
+    if inputimage is None:
+        return None
+    CopyOfImage=cv2.resize(inputimage.copy(),(800,600))
+    cv2.imshow("img", CopyOfImage); 
+    UserRequest=""
+    if presskey==True:
+        while(1):
+            cv2.imshow('img',CopyOfImage)
+            k = cv2.waitKey(33)
+            
+            #return character from keyboard input ascii code
+            if k != -1:#no input detected
+                try:
+                    UserRequest=(chr(k))
+                    break
+                except:
+                    UserRequest=None
+            else:
+                continue
+             
+
+    if presskey==False:
+        if cv2.waitKey(20) & 0xFF == 27:#need [waitkey] for GUI to update
+                #for some reason
+                pass
+            
+    if pausetime_Secs>0:
+        time.sleep(pausetime_Secs)
+    if destroyWindow==True: cv2.destroyAllWindows()
+
+    return UserRequest
+    
 def get_optimal_font_scale(text, width,Height):
     #find best fit for font scale - NOTE this can be improved by passing in font details
     for scale in reversed(range(0, 60, 1)):

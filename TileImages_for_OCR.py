@@ -210,6 +210,7 @@ class TileImage:
         #if more than 1 we have a problem
         if len(dict_imageshapes)==1:
             print("All images in same format - can proceed")
+            print("Collimated images saved in:",self.OutputFolder)
             return
         
         #print image sizes found

@@ -1,9 +1,5 @@
 import VisionAPI_Demo
 import _3DVisLabLib
-import io
-import os
-import _3DVisLabLib
-import re
 
 
 #instancing class will initialise Cloud service and attempt to authenticate agent
@@ -28,7 +24,6 @@ if Response==False:
 #delete output folder
 _3DVisLabLib.DeleteFiles_RecreateFolder(Result_Output)
 
-
 #get list of files in folder
 InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(Result_Input)
 #filter for .jpg images
@@ -40,13 +35,9 @@ if len(ListAllImages)==0:
 
 #loop through images, get OCR read from cloud service and save file to output folder
 ListOCR_Reads=[]
-for Img_to_Ocr in ListAllImages:
-    print("Uploading to Cloud",Img_to_Ocr)
+for Index, Img_to_Ocr in enumerate(ListAllImages):
+    print("File",str(Index),"/",str(len(ListAllImages)), "_Uploading to Cloud OCR",Img_to_Ocr)
     OCR_Result=GoogleCloudOCR.PerformOCR(Img_to_Ocr,None)
-    # remove non alphanuemeric characters
-    #OCR_Result = re.sub(r'[^a-zA-Z0-9]', '', OCR_Result)
-    #OCR_Result=OCR_Result.encode("utf-8")#non latin chars such as hindi can break code
-    #ListOCR_Reads.append(OCR_Result)
     #create matching answer text file
     DelimitedImgFile=Img_to_Ocr.split("\\")
     DelimitedImgFile_LastElem=DelimitedImgFile[-1]
@@ -55,16 +46,3 @@ for Img_to_Ocr in ListAllImages:
     print("Saving answer to",AnswerFile)
     with open(AnswerFile, 'w') as f:
         f.write(OCR_Result)
-
-
-    #open text file
-    #text_file = open(AnswerFile)
-    #write string to file
-    #n = text_file.write(OCR_Result)
-    #close file
-    #text_file.close()
-
-    
-
-#joined_ReadString=GoogleCloudOCR.PerformOCR(r"C:\Working\FindIMage_In_Dat\ForResearch\OCR_Testdata\Brazil\Collimated_NoProcessing\0.jpg",None)
-#print(joined_ReadString)

@@ -373,6 +373,8 @@ def GenerateSN_Fielding(InputListSNRReads):
     TestLength=(random.choice(list(SNR_Dict.values())))
     for Elem in SNR_Dict.values():
         if len(Elem)!=len(TestLength):
+            print("SNR size mismatch - cannot automatically define fielding: ", Elem, "vs",TestLength)
+            continue
             raise Exception("SNR size mismatch - cannot automatically define fielding: ", Elem, "vs",TestLength)
 
     #all SNR reads same length - can test each element for type (num/alphabet)

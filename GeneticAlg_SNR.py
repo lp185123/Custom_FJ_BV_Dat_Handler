@@ -18,12 +18,12 @@ class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=5
+        self.No_of_First_gen=200
         self.No_TopCandidates=5
-        self.NewIndividualsPerGen=1
-        self.TestImageBatchSize=60
-        self.ImageColumnSize=31
-        self.NewImageCycle=134567
+        self.NewIndividualsPerGen=0
+        self.TestImageBatchSize=393
+        self.ImageColumnSize=40
+        self.NewImageCycle=99999
         self.ImageTapOut=3#terminate anything that has poor performance out the box
         self.UseCloudOCR=True
         self.MirrorImage=True
@@ -33,7 +33,7 @@ class GA_Parameters():
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\TestSNs"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR"
-        self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\Brazil"
+        self.FilePath=r"E:\SR RTs - BL0003 version 91.00.00.03\Extracted_SingleDC"
         #save out parameter converging image
         self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"
         
@@ -162,7 +162,7 @@ class GA_Parameters():
         
         
         #tally up error/fitness
-        Error=0
+        Error=None
         Tapout=False
         ReturnImg=None
         #self check is used to ensure the logic hasnt broken
@@ -171,19 +171,21 @@ class GA_Parameters():
                 TempError=(InputParameters[I]-SelfTestTargetParameters[I])*(InputParameters[I]-SelfTestTargetParameters[I])
                 Error=Error+TempError
         else:
-        #try:
-            #application specific fitness check
-            fitness, Tapout,ReturnImg=ExternalCheckFitness_SNR(InputParameters,self.DictFilename_V_Images,SNR_fitnessTest,self.ImageTapOut,GenParams)
-            Error=1-fitness
-        # except Exception as e:
-        #     print("error with checking fitness using parameters")
-        #     print(InputParameters)
-        #     print(e)
-        #     Error=99999999#try and push bad set of parameters to extinction #TODO remove this instead of pushing it down
+            try:
+                #application specific fitness check
+                fitness, Tapout,ReturnImg=ExternalCheckFitness_SNR(InputParameters,self.DictFilename_V_Images,SNR_fitnessTest,self.ImageTapOut,GenParams)
+                Error=1-fitness
+            except Exception as e:
+                print("error with checking fitness using parameters")
+                print(InputParameters)
+                print(e)
+                Error=9999999#try and push bad set of parameters to extinction #TODO remove this instead of pushing it down
+                #warning! An exception might kill a good genome!!
 
        
         
         #add tiny amount of random noise to avoid breaking dictionary
+        #this is not ideal - works for now
         Error=Error+(random.random()/10000)
 
         
@@ -890,7 +892,7 @@ def PlotAndSave(Title,Filepath,Data):
     try:
         plt.plot(Data)
         plt.ylabel(Title)
-        plt.ylim([0, 1])
+        plt.ylim([0, max(Data)])
         plt.savefig(Filepath)
         plt.cla()
         plt.clf()
