@@ -18,11 +18,11 @@ class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=200
-        self.No_TopCandidates=5
+        self.No_of_First_gen=3
+        self.No_TopCandidates=2
         self.NewIndividualsPerGen=0
-        self.TestImageBatchSize=393
-        self.ImageColumnSize=40
+        self.TestImageBatchSize=8
+        self.ImageColumnSize=8
         self.NewImageCycle=99999
         self.ImageTapOut=3#terminate anything that has poor performance out the box
         self.UseCloudOCR=True
@@ -33,7 +33,7 @@ class GA_Parameters():
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\TestSNs"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR"
-        self.FilePath=r"E:\SR RTs - BL0003 version 91.00.00.03\Extracted_SingleDC"
+        self.FilePath=r"C:\Working\FindIMage_In_Dat\Output"
         #save out parameter converging image
         self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"
         

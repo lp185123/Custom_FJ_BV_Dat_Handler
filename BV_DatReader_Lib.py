@@ -927,7 +927,7 @@ def RipOneImagePerDat(InputFiles_cleaned,UserManualMemoryScan):
         if UserManualMemoryScan.ColourOffsetManual==0:
             DataVerify_image = cv2.cvtColor(DataVerify_image, cv2.COLOR_BGR2GRAY)
 
-        ImageViewer_Quickv2_UserControl(DataVerify_image,0,False,False)
+        #ImageViewer_Quickv2_UserControl(DataVerify_image,0,False,False)
 
         #save out thumbnail
         Savestring=FileName.lower().replace(".dat",".jpg")
