@@ -18,11 +18,12 @@ class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=3
-        self.No_TopCandidates=2
-        self.NewIndividualsPerGen=0
-        self.TestImageBatchSize=8
-        self.ImageColumnSize=8
+        self.No_of_First_gen=20
+        #number of top candidates must always be smaller than first gen!
+        self.No_TopCandidates=5
+        self.NewIndividualsPerGen=1
+        self.TestImageBatchSize=398
+        self.ImageColumnSize=30
         self.NewImageCycle=99999
         self.ImageTapOut=3#terminate anything that has poor performance out the box
         self.UseCloudOCR=True
@@ -36,7 +37,7 @@ class GA_Parameters():
         self.FilePath=r"C:\Working\FindIMage_In_Dat\Output"
         #save out parameter converging image
         self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"
-        
+        self.DefaultError=5#if fitness checking breaks what do we set error too - currently cannot handle Null value
         self.LastImage=None
         self.NameOfSavedState=None
         self.Generation=0
@@ -167,6 +168,7 @@ class GA_Parameters():
         ReturnImg=None
         #self check is used to ensure the logic hasnt broken
         if self.SelfCheck==True:
+            Error=0#if selfcheck is on we handle this differently
             for I in InputParameters:
                 TempError=(InputParameters[I]-SelfTestTargetParameters[I])*(InputParameters[I]-SelfTestTargetParameters[I])
                 Error=Error+TempError
@@ -179,14 +181,14 @@ class GA_Parameters():
                 print("error with checking fitness using parameters")
                 print(InputParameters)
                 print(e)
-                Error=9999999#try and push bad set of parameters to extinction #TODO remove this instead of pushing it down
+                Error=GenParams.DefaultError#try and push bad set of parameters to extinction #TODO remove this instead of pushing it down
                 #warning! An exception might kill a good genome!!
 
        
         
         #add tiny amount of random noise to avoid breaking dictionary
         #this is not ideal - works for now
-        Error=Error+(random.random()/10000)
+        Error=Error#+(random.random()/10000)
 
         
         return Error,Tapout,ReturnImg#have to invert fitness to get error
@@ -202,7 +204,7 @@ class Individual():
 
         #user populate this area - each parameter has Upper, Lower, range,  test value and if integer
         self.UserInputParamsDict=dict()
-        #self.UserInputParamsDict["PSM"]=self.ParameterDetails(3,3,[3,5,6,7,8,13],3,True)#tesseract psm is always 3 so can disable 
+        self.UserInputParamsDict["PSM"]=self.ParameterDetails(3,3,[3,5,6,7,8,13],3,True)#tesseract psm is always 3 so can disable 
         self.UserInputParamsDict["ResizeX"]=self.ParameterDetails(150,50,[],100,True)
         self.UserInputParamsDict["ResizeY"]=self.ParameterDetails(150,50,[],100,True)#india x50 y156
         
@@ -214,7 +216,6 @@ class Individual():
         #self.UserInputParamsDict["Denoise"]=self.ParameterDetails(1,0,[0,1],1,True)
         self.UserInputParamsDict["Negative"]=self.ParameterDetails(1,0,[0,1],1,True)
         self.UserInputParamsDict["Equalise"]=self.ParameterDetails(1,0,[0,1],1,True)
-
 
 
         #self.UserInputParamsDict["Canny"]=self.ParameterDetails(1,0,[],0,True)
@@ -351,7 +352,7 @@ class Individual():
     def HouseKeep(self):
         #fix any invalid numbers - keep between 0 and 1
         for Param in self.Parameters:
-            self.Parameters[Param]=_3DVisLabLib.clamp(self.Parameters[Param],0,1)
+            self.Parameters[Param]=round(_3DVisLabLib.clamp(self.Parameters[Param],0,1),4)
 
     def FixRangedValue(self,Parameter,Range):
         #if this gets too cpu heavy then optimise with successive approximation
@@ -536,8 +537,6 @@ def BuildSNR_Parameters(InputParameters,SNR_fitnessTest,GenParams):
         print(paramname, " parameter not found when building SNR parameters")
 
 
-
-
     # SNRparams.AdapativeThreshold=InputParameters["AdapativeThreshold"]
 
     # SNRparams.Canny=InputParameters["Canny"]
@@ -619,7 +618,25 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
             InputGenDict[I].Fitness, TapOut,InputGenDict[I].LastImage=(GenParams.CheckFitness_single(GenParams,ApplicationParams,SNR_fitnessTest,InputGenDict[I].SelfTestTargetParameters))
         else:
             TotalOldTimers=TotalOldTimers+1
-        DictOfFitness[InputGenDict[I].Fitness]=InputGenDict[I].name
+        #TODO fix this - fitnesses are overwriting each other! bad code 
+        while True:
+            if not(InputGenDict[I].Fitness in DictOfFitness):
+                DictOfFitness[InputGenDict[I].Fitness]=InputGenDict[I].name
+                #break out of while
+                break
+            #if an individual with the same fitness is in - give boost to the older indv
+            #boost = give penalty to younger one and push it down the sorted list
+            if InputGenDict[I].Age< InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Age:
+                InputGenDict[I].Fitness=InputGenDict[I].Fitness+ 0.01#very arbitary penalty - #TODO magic number warning
+            else:
+                InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Fitness=InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Fitness+ 0.01
+                NewFitness=InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Fitness
+                TempIndvName=DictOfFitness[InputGenDict[I].Fitness]
+                del DictOfFitness[InputGenDict[I].Fitness]
+                DictOfFitness[NewFitness]=TempIndvName
+            
+
+
         if TapOut==True:
             TotalTapouts=TotalTapouts+1
             
@@ -670,6 +687,13 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
     #save out some plots
     PlotAndSave("TopFitnessHistory",GenParams.OutputFolder + "\\TopFitnessHistory_gen" + str(GenParams.Generation) + ".jpg",GenParams.GetFitnessHistory()[:])
     PlotAndSave("ColonyFitness",GenParams.OutputFolder + "\\ColonyFitness_gen" + str(GenParams.Generation) +".jpg",SortedFitness[:])
+
+    #get age of fittest members
+    Indv_Age=[]
+    for elemn in SortedFitness:
+        Indv_Age.append(InputGenDict[DictOfFitness[elemn]].Age)
+    PlotAndSave("ColonyAge",GenParams.OutputFolder + "\\ColonyAge_gen" + str(GenParams.Generation) +".jpg",Indv_Age)
+
 
     #need random number or will overwrite records #TODO must be another dictionary which allows duplicate keys
     randomNo=random.random()/10000
@@ -972,6 +996,13 @@ if __name__ == "__main__":
         #instancing class will initialise Cloud service and attempt to authenticate agent
         CloudOCRObject=VisionAPI_Demo.CloudOCR()
 
+
+    #create test generation with no processing
+    #DictOfFirstGen=dict()
+    #NewIndividual=Individual(" baseline gen")
+    #DictOfFirstGen[NewIndividual.name]=copy.deepcopy(NewIndividual)
+
+    
     #create first generation
     DictOfFirstGen=dict()
     
@@ -1059,7 +1090,7 @@ if __name__ == "__main__":
         
         #every n loops and if we arent having much movement with fitness, and fitness is >0 (hasnt converged)
         #WARNING: if fitness is oscillating this will not meet condition, perhaps check gradient as well
-        if (i%3==0 and (GenParams.CheckRepeatingFitness(3,0.01))==True) and (GenParams.GetFitnessHistory()[-1]>0.01):
+        if (i%4==0 and (GenParams.CheckRepeatingFitness(3,0.01))==True) and (GenParams.GetFitnessHistory()[-1]>0.01):
             #here check that fitness isnt near 0 as we should get a new batch of evaluation data if so 
             StepSize=5
             for looper in range (0,15):

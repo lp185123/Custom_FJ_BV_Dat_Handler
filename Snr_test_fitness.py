@@ -630,7 +630,7 @@ class TestSNR_Fitness():
         #after a successful ML stage will have a folder of input s39 images and an OBJ file which is the saved state
         #run this to generate all the single images processed or unprocessed - then a file which will link the
         #images back to the original images incase we need to trace them back to source
-
+        
         #make sure no invalid values
         ParameterObject.Housekeep()#this could be empty
         #hold the processed image and origin image incase we have to link back

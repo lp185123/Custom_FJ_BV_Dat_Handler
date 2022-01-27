@@ -21,7 +21,7 @@ ColumnSize=30
 #Preprocessing on/off - if ML optimisation has been used
 PreProcessing=False
 #can force mirroring or it can be found in genparameters
-MirrorImage=True
+MirrorImage=False
 
 #prompt user to check filepaths are OK for deletion
 print("Please check output folders can be deleted:\n",OutputFolderSingleImages,"\n",OutputFolderTiledImages)

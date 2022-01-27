@@ -10,7 +10,7 @@ from copy import deepcopy
 from collections import namedtuple
 import enum
 import DatScraper_tool
-
+import json
 
 class OperationCodes(enum.Enum):
     ERROR="error"
@@ -65,7 +65,7 @@ class UserInputParameters():
         self.UnderFeed_RGBwaves=["D","E2","F2"]
 
         #testing automatic fill
-        self.InputFilePath=r"E:\NCR\Currencies\lebanon\Sorted\100000\Gen D"
+        self.InputFilePath=r"C:\Working\FindIMage_In_Dat\Input"
         self.OutputFilePath=r"C:\Working\FindIMage_In_Dat\Output"
         self.FirstImageOnly=True
         self.AutomaticMode=True
@@ -74,6 +74,7 @@ class UserInputParameters():
         self.GetSNR=False
         self.GetRGBImage=True
 
+    def UserPopulateParameters(self):
         self.UserInput_and_test()
         self.PrintAllUserInputs()
 
@@ -172,6 +173,8 @@ def Image_from_Automatic_mode(filteredImages,Notefound,data_hex):
 def AutomaticExtraction(UserParameters):
     #get all files in input folder - already done but to make code modular
     InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(UserParameters.InputFilePath)
+    #CreateImageVDatfileRecord provenance tracker
+    ImgVDatFile_andRecord=dict()
     #clean files
     InputFiles_cleaned=[]
     for elem in InputFiles:
@@ -222,7 +225,7 @@ def AutomaticExtraction(UserParameters):
                 OutputImage=RGB_Image.copy()
 
             #display image
-            _3DVisLabLib.ImageViewer_Quickv2(OutputImage,0,False,False)
+            #_3DVisLabLib.ImageViewer_Quickv2(OutputImage,0,False,False)
 
             if UserParameters.GetSNR==True:
                 SNR_ReadResult=str(filteredImages[Notefound].note.snr)
@@ -246,6 +249,12 @@ def AutomaticExtraction(UserParameters):
                 Savestring=UserParameters.OutputFilePath +"\\" + SNR_ReadResult + "File" + str(FileIndex) + "_Image_"+str(Index) +"_"+ ReplacedExtension
                 print("saving image to ", Savestring)
                 cv2.imwrite(Savestring,OutputImage)
+                #CreateImageVDatfileRecord provenance tracker
+                ImgVDatFile_andRecord[Savestring]=(DatFile,Index+1,SNR_ReadResult)
+    #save out dictionary so we can trace images back to dat files and record number
+    Savestring=UserParameters.OutputFilePath +"\\TraceImg_to_DatRecord.json" 
+    with open(Savestring, 'w') as outfile:
+        json.dump(ImgVDatFile_andRecord, outfile)
 
         #if user requests Serial number read alongside images
         #TODO are we even using this?
@@ -809,7 +818,8 @@ def GetEveryNthChar(InputString, StepSize):
     return SteppedString
 
 def RipAllImagePerDat(OutputFolder,InputFiles_cleaned,RawHex,UserManualMemoryScan,UserManualMemoryScanA,UserManualMemoryScanB,ExtractionHelper):
-    
+    #CreateImageVDatfileRecord provenance tracker
+    ImgVDatFile_andRecord=dict()
     #clean output folder
     print ("Cleaning output folder :", OutputFolder)
     result=_3DVisLabLib.yesno("Continue to delete all contents (including nested) of folder?")
@@ -877,8 +887,14 @@ def RipAllImagePerDat(OutputFolder,InputFiles_cleaned,RawHex,UserManualMemorySca
             print("saving image to ", Savestring)
             try:
                 cv2.imwrite(Savestring,imageinstance.copy())
+                #CreateImageVDatfileRecord provenance tracker
+                ImgVDatFile_andRecord[Savestring]=(FileName,counter1+1,str(snrRead))
             except:
                 pass
+    #save out dictionary so we can trace images back to dat files and record number
+    Savestring=OutputFolder +"\\TraceImg_to_DatRecord.json" 
+    with open(Savestring, 'w') as outfile:
+        json.dump(ImgVDatFile_andRecord, outfile)
 
 
 def RipOneImagePerDat(InputFiles_cleaned,UserManualMemoryScan):

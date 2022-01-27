@@ -10,6 +10,8 @@ import GeneticAlg_SNR
 #needed for serialised data module (Pickle)
 from GeneticAlg_SNR import GA_Parameters
 from GeneticAlg_SNR import Individual
+import os
+import json
 
 def GetML_SavedState(InputPath=None,Processing=False):
     if Processing==False: return None
@@ -45,6 +47,23 @@ def GetML_SavedState(InputPath=None,Processing=False):
 
 def ProcessImages(InputPath=None,OutputPath=None,Processing=False,MirrorImage=True,GenParams=None):#dont use if __name__ == "__main__" yet 
     InputFolder=InputPath#r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
+
+    #open json file which may exist from original .dat file extraction process TraceImg_to_DatRecord.json
+    SourceImage_to_Dat_object=None
+    SourceImage_to_File=InputPath +"\\TraceImg_to_DatRecord.json"
+    try:
+        with open(SourceImage_to_File) as json_file:
+            SourceImage_to_Dat_object = json.load(json_file)
+    except:
+        print("Error loading file which links dat files and records to processed images",SourceImage_to_File)
+        print("Process can continue but will not be able to link images to dat file records")
+        if not(_3DVisLabLib.yesno("Continue without linking images to dat file records??")):
+            raise Exception("Error loading file which links dat files and records to processed images",SourceImage_to_File)
+
+
+
+        
+    
 
 
 
