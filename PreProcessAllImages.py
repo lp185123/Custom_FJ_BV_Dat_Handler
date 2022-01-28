@@ -83,7 +83,7 @@ def ProcessImages(InputPath=None,OutputPath=None,Processing=False,MirrorImage=Tr
         #now saved state is rebuilt - load list of images 
         #get all files in input folder
         print("looking in saved state", GenParams.FilePath , "for images - *WARNING* will not conform to nested folder structure")
-        InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(GenParams.FilePath)
+        InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(InputFolder)#(GenParams.FilePath)
         #Get list of images
         ListAllImg_files=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
         print(len(ListAllImg_files), " images found")

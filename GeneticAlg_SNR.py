@@ -1,4 +1,4 @@
-import numpy as np
+#import numpy as np
 import copy
 from datetime import datetime
 import random
@@ -12,18 +12,18 @@ import matplotlib
 matplotlib.use('Agg')#can get "Tcl_AsyncDelete: async handler deleted by the wrong thread" crashes otherwise
 import matplotlib.pyplot as plt
 import VisionAPI_Demo
-import TileImages_for_OCR
+#import TileImages_for_OCR
 
 class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=20
+        self.No_of_First_gen=100
         #number of top candidates must always be smaller than first gen!
-        self.No_TopCandidates=5
+        self.No_TopCandidates=10
         self.NewIndividualsPerGen=1
         self.TestImageBatchSize=398
-        self.ImageColumnSize=30
+        self.ImageColumnSize=35#dont want to go more than 40 as performance breaks down
         self.NewImageCycle=99999
         self.ImageTapOut=3#terminate anything that has poor performance out the box
         self.UseCloudOCR=True
@@ -34,7 +34,7 @@ class GA_Parameters():
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\TestSNs"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR"
-        self.FilePath=r"C:\Working\FindIMage_In_Dat\Output"
+        self.FilePath=r"C:\Working\FindIMage_In_Dat\Examples\Brazil_set_3"
         #save out parameter converging image
         self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"
         self.DefaultError=5#if fitness checking breaks what do we set error too - currently cannot handle Null value
@@ -43,10 +43,8 @@ class GA_Parameters():
         self.Generation=0
         self.BestPerformerTemp=None
         self.Fielding=None
-        #self.CloudOCRObject=None
 
         self.GetCollimatedTestSet_AndFielding(self.ImageColumnSize,self.TestImageBatchSize)
-        #self.GetRandomSet_TestImages_AndFielding()
 
     def CheckRepeatingFitness(self,Range,Error):
         LastFitness= self.GetFitnessHistory()
@@ -204,7 +202,7 @@ class Individual():
 
         #user populate this area - each parameter has Upper, Lower, range,  test value and if integer
         self.UserInputParamsDict=dict()
-        self.UserInputParamsDict["PSM"]=self.ParameterDetails(3,3,[3,5,6,7,8,13],3,True)#tesseract psm is always 3 so can disable 
+        #self.UserInputParamsDict["PSM"]=self.ParameterDetails(3,3,[3,5,6,7,8,13],3,True)#tesseract psm is always 3 so can disable 
         self.UserInputParamsDict["ResizeX"]=self.ParameterDetails(150,50,[],100,True)
         self.UserInputParamsDict["ResizeY"]=self.ParameterDetails(150,50,[],100,True)#india x50 y156
         
@@ -482,7 +480,7 @@ def BuildSNR_Parameters(InputParameters,SNR_fitnessTest,GenParams):
     # SNRparams.CropPixels=LoadParameter(SNRparams.CropPixels,InputParameters,"CropPixels")
     # SNRparams.CannyThresh1=LoadParameter(SNRparams.CannyThresh1,InputParameters,"CannyThresh1")
     # SNRparams.CannyThresh2=LoadParameter(SNRparams.CannyThresh2,InputParameters,"CannyThresh2")
-    if GenParams is not None: SNRparams.Mirror= GenParams.MirrorImage
+    
 
     for paramname in InputParameters:
         if paramname=="AdapativeThreshold":
@@ -535,6 +533,11 @@ def BuildSNR_Parameters(InputParameters,SNR_fitnessTest,GenParams):
             continue
 
         print(paramname, " parameter not found when building SNR parameters")
+
+    if GenParams is not None:
+        if GenParams.Generation==0:
+            SNRparams=Snr_test_fitness.SNR_Parameters()
+    if GenParams is not None: SNRparams.Mirror= GenParams.MirrorImage
 
 
     # SNRparams.AdapativeThreshold=InputParameters["AdapativeThreshold"]
@@ -977,8 +980,8 @@ def RemoveIndividualsCloseFitness(InputDict_Candidates,FitnessBuffer,NameOfGen):
     return(InputDict_Candidates)
 
 if __name__ == "__main__":
-    #create CLoud OCR object as global as it interferes when saving the state
-    global CloudOCRObject
+    
+    global CloudOCRObject#create Cloud OCR object as global as it interferes when saving the state
     CloudOCRObject=None
     #Global timestamp
     Global_timestamp=str(datetime.utcnow())
@@ -987,43 +990,19 @@ if __name__ == "__main__":
     Global_timestamp=Global_timestamp.replace(".","")
     #initialise OCR object
     SNR_fitnessTest=Snr_test_fitness.TestSNR_Fitness()
-
     #initialise working details and fitness testing details
     GenParams=GA_Parameters()
-    
     #create cloud OCR if we are using it
     if GenParams.UseCloudOCR==True:
         #instancing class will initialise Cloud service and attempt to authenticate agent
         CloudOCRObject=VisionAPI_Demo.CloudOCR()
-
-
-    #create test generation with no processing
-    #DictOfFirstGen=dict()
-    #NewIndividual=Individual(" baseline gen")
-    #DictOfFirstGen[NewIndividual.name]=copy.deepcopy(NewIndividual)
-
-    
-    #create first generation
-    DictOfFirstGen=dict()
-    
-    for  I in range(GenParams.No_of_First_gen):
-        NewIndividual=Individual(" Alpha gen")
-        if I ==0:
-            #force known result from last batch
-            pass
-            #NewIndividual.Parameters={'PSM': 3, 'Resize': 268.57872, 'Canny': 0.0, 'AdapativeThreshold': 156.11913, 'MedianBlurDist': 3, 'GausSize_Threshold': 19, 'SubtractMean': 5.68184}
-            
-        DictOfFirstGen[NewIndividual.name]=copy.deepcopy(NewIndividual)#ensure Python is creating instances
-    
-
    
     #load saved state into memory if it exists
     filepath=GenParams.OutputFolder +"\\" + "SavedState" + ".obj"
     if os.path.isfile(filepath)==True:
         print("Previous state detected - load state? WARNING - if saved state generated by older version of script may cause error")
-        
+        #get input from user after previous state detected
         if _3DVisLabLib.yesno("load previous state?")==True:
-
             file_pi2 = open(filepath, 'rb')
             SaveList=[]
             SaveList = pickle.load(file_pi2)
@@ -1047,27 +1026,49 @@ if __name__ == "__main__":
             Response=_3DVisLabLib.yesno("Delete contents (y) - continue writing (n) ?")
             if Response==True:
                 _3DVisLabLib.DeleteFiles_RecreateFolder(GenParams.OutputFolder)
-
-            #default first generation
-            #assess first generation - here we can potentially load in a saved state
-            DictFitCandidates=CheckFitness_Multi(DictOfFirstGen,GenParams,SNR_fitnessTest)
     else:
         #prompt user to check filepaths are OK for deletion
         print("Please check output folder can be deleted:\n",GenParams.OutputFolder)
         Response=_3DVisLabLib.yesno("Delete contents (y) - continue writing (n) ?")
         if Response==True:
             _3DVisLabLib.DeleteFiles_RecreateFolder(GenParams.OutputFolder)
-            
-        #default first generation
-        #assess first generation - here we can potentially load in a saved state
-        DictFitCandidates=CheckFitness_Multi(DictOfFirstGen,GenParams,SNR_fitnessTest)
-
+        
     #start main training loop
     for i in range (GenParams.Generation, 999999):
-        
-
-        GenerationName=" Gen " + str(i+1)
+        GenerationName=" Gen " + str(i)
         print("***********" + GenerationName + "***********")
+
+        #if first generation - get a baseline score for performance without image processing
+        if GenParams.Generation==0:
+            #create test generation with no processing
+            print("Generating baseline fitness with no processing")
+            #create population of 1 with no processing (generation=0 detected elsewhere)
+            DictOfFirstGen=dict()
+            NewIndividual=Individual("baseline gen")
+            Temp_No_of_First_gen=GenParams.No_of_First_gen
+            Temp_No_TopCandidates=GenParams.No_TopCandidates
+            GenParams.No_of_First_gen=1
+            GenParams.No_TopCandidates=1
+            DictOfFirstGen[NewIndividual.name]=copy.deepcopy(NewIndividual)
+            DictFitCandidates=CheckFitness_Multi(DictOfFirstGen,GenParams,SNR_fitnessTest)
+            GenParams.No_of_First_gen=Temp_No_of_First_gen
+            GenParams.No_TopCandidates=Temp_No_TopCandidates
+            #keep persistant generation aligned
+            GenParams.Generation=GenParams.Generation+1
+            continue
+            
+        if GenParams.Generation==1:
+            #create seed population
+            print("Generating first seed generation")
+            DictOfFirstGen=dict()
+            for  I in range(GenParams.No_of_First_gen):
+                NewIndividual=Individual(" Alpha gen")
+                DictOfFirstGen[NewIndividual.name]=copy.deepcopy(NewIndividual)#ensure Python is creating instances
+            DictFitCandidates=CheckFitness_Multi(DictOfFirstGen,GenParams,SNR_fitnessTest)
+            #keep persistant generation aligned
+            GenParams.Generation=GenParams.Generation+1
+            continue
+
         print("generation size=", len(DictFitCandidates))
         NextGen=CrossBreed(DictFitCandidates,GenerationName)
         print("NextGen size", len(NextGen))
@@ -1077,17 +1078,6 @@ if __name__ == "__main__":
             NewIndividual=Individual(GenerationName + "r")
             DictFitCandidates[NewIndividual.name]=copy.deepcopy(NewIndividual)#ensure Python is creating instances
 
-
-        #if modulus 20 then do huge image batch
-        if i%9999999==0 and i>0:
-            GenParams.TestImageBatchSize=20
-            GenParams.GetRandomSet_TestImages_AndFielding()
-            for individual in DictFitCandidates:
-                DictFitCandidates[individual].SetFitness(None)
-            GenParams.TestImageBatchSize=4
-            continue
-            
-        
         #every n loops and if we arent having much movement with fitness, and fitness is >0 (hasnt converged)
         #WARNING: if fitness is oscillating this will not meet condition, perhaps check gradient as well
         if (i%4==0 and (GenParams.CheckRepeatingFitness(3,0.01))==True) and (GenParams.GetFitnessHistory()[-1]>0.01):
@@ -1097,7 +1087,6 @@ if __name__ == "__main__":
                 #gradient descent loop
                 print("$$$$$$$$$Gradient descent", looper,"/15")
                 DictFitCandidates_gd=GradientDescent(DictFitCandidates,GenerationName +"_gD",StepSize)
-                #DictFitCandidates,DuplicateCount=RemoveDuplicateIndividuals(DictFitCandidates,GenerationName)
                 DictFitCandidates_gd=RemoveCloseParameterIndividuals(DictFitCandidates_gd,GenerationName,0.02)
                 DictFitCandidates_gd=CheckFitness_Multi(DictFitCandidates_gd,GenParams,SNR_fitnessTest)
 
@@ -1110,9 +1099,6 @@ if __name__ == "__main__":
                     DictFitCandidates[GenParams.BestPerformerTemp.name]=copy.deepcopy(GenParams.BestPerformerTemp)
                     print("$$$$$$$$$Gradient descent, improvement - adding to progenitors")
 
-                #can end up with flat line of individuals as we scrape off the top fitness but they
-                #are all slight variations
-                #DictFitCandidates=RemoveIndividualsCloseFitness(DictFitCandidates,0.01,GenerationName)
                 #if no response - increase step size
                 if (GenParams.CheckRepeatingFitness(4,0.01)==True) and looper>1:
                     print("$$$$$$$$$Gradient descent", "increasing step")
@@ -1121,7 +1107,6 @@ if __name__ == "__main__":
                 if (GenParams.CheckRepeatingFitness(3,0.01)==True) and looper>5:
                     print("$$$$$$$$$Gradient descent", "stuck in minima, breaking")
                     break
-
     
         #every nth cycle mix up fitness testing set, or if fitness has converged to close to zero
         if (i%GenParams.NewImageCycle==0 and i>0) or (GenParams.GetFitnessHistory()[-1]<0.01):
@@ -1133,16 +1118,10 @@ if __name__ == "__main__":
             for individual in DictFitCandidates:
                 DictFitCandidates[individual].SetFitness(None)
 
-            #start increasing image batch size every new batch of image(s)
-            #if GenParams.TestImageBatchSize< 6 : GenParams.TestImageBatchSize =GenParams.TestImageBatchSize+1
-
         #check no duplicates
-        #DictFitCandidates,DuplicateCount=RemoveDuplicateIndividuals(DictFitCandidates,GenerationName)
-        #DictFitCandidates=RemoveIndividualsCloseFitness(DictFitCandidates,0.01,GenerationName)
         DictFitCandidates=RemoveCloseParameterIndividuals(DictFitCandidates,GenerationName,0.02)
 
-        
-        #save state
+        #save state every generation loop
         if i%1==0:
             #cant pickle the cloud object
             SaveList=[GenParams,DictFitCandidates]

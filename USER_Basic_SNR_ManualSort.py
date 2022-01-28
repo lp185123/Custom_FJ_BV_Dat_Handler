@@ -8,12 +8,13 @@ import TileImages_for_OCR
 import shutil
 import json
 import os
+import pyttsx3
 #hardcoded output folders
 OutputGoodSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ManualCheck_GoodSNR"
 OutputBadSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ManualCheck_BadSNR"
 SaveStateFile=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\\ManCheckSaveState" + ".json"
 #ask user for input folder
-DefaultFolder=r"E:\SR RTs - BL0003 version 91.00.00.03\Extracted_SingleDC"
+DefaultFolder=r"C:\Working\FindIMage_In_Dat\Examples\Brazil_set_3\ManualCheck_BadSNR"
 InputFolder = input("Please enter images folder: Default is:   " + DefaultFolder)
 if len(InputFolder)==0:
     InputFolder = DefaultFolder
@@ -22,6 +23,12 @@ if len(InputFolder)==0:
 InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(InputFolder)
 #filter out non images
 ListAllImages=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
+#voice synth
+Voicesynthesizer = pyttsx3.init()
+Voicesynthesizer.setProperty('rate', 150)
+
+
+
 
 #prompt user to check filepaths are OK for deletion
 print("Please check output folders can be deleted:\n",OutputGoodSNR_Folder, "\n",OutputBadSNR_Folder)
@@ -105,6 +112,7 @@ while True:
         print(Indexer,List_imgpaths[Indexer])
         print(len(Imgpath_Vs_SNR_State),"/" ,len(Imgpath_vs_userImgStack),"to check")
         ImageForUSer=Imgpath_vs_userImgStack[List_imgpaths[Indexer]][1]
+        SNR=Imgpath_vs_userImgStack[List_imgpaths[Indexer]][0]
         #add colour if we have already manual checked snr
         if List_imgpaths[Indexer] in Imgpath_Vs_SNR_State:
             ImageForUSer = cv2.cvtColor(ImageForUSer, cv2.COLOR_GRAY2BGR)
@@ -112,6 +120,12 @@ while True:
                 ImageForUSer[:,:,1]=255
             if Imgpath_Vs_SNR_State[List_imgpaths[Indexer]]==ReturnCode_SNR_nOK:
                 ImageForUSer[:,:,2]=255
+        _3DVisLabLib.ImageViewer_Quickv2_UserControl(ImageForUSer,0,False,False)
+        #Voicesynthesizer.say(SNR) 
+        #Voicesynthesizer.runAndWait() 
+        #Voicesynthesizer.stop()
+
+
         returncode=_3DVisLabLib.ImageViewer_Quickv2_UserControl(ImageForUSer,0,True,False)
         if returncode==ReturnCode_SNR_OK:
             Imgpath_Vs_SNR_State[List_imgpaths[Indexer]]=returncode
