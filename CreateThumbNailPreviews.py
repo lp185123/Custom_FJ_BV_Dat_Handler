@@ -274,6 +274,7 @@ def main(S39_only=False):
 if __name__ == "__main__":
     #entry point
     #try:
+    print("WARNING! MM8 images WIP - still issue with image depth size WIP")
     if _3DVisLabLib.yesno("Get S39 and SNR only with default folders etc?"):main(True)
     else:
         main(False)

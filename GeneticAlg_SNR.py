@@ -18,13 +18,13 @@ class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=100
+        self.No_of_First_gen=20
         #number of top candidates must always be smaller than first gen!
-        self.No_TopCandidates=10
-        self.NewIndividualsPerGen=1
-        self.TestImageBatchSize=398
+        self.No_TopCandidates=15
+        self.NewIndividualsPerGen=3
+        self.TestImageBatchSize=35
         self.ImageColumnSize=35#dont want to go more than 40 as performance breaks down
-        self.NewImageCycle=99999
+        self.NewImageCycle=1
         self.ImageTapOut=3#terminate anything that has poor performance out the box
         self.UseCloudOCR=True
         self.MirrorImage=True
@@ -34,7 +34,7 @@ class GA_Parameters():
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\TestSNs"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR"
-        self.FilePath=r"C:\Working\FindIMage_In_Dat\Examples\Brazil_set_3"
+        self.FilePath=r"C:\Working\FindIMage_In_Dat\Examples\Brazil_set_4\All"
         #save out parameter converging image
         self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"
         self.DefaultError=5#if fitness checking breaks what do we set error too - currently cannot handle Null value
@@ -606,12 +606,64 @@ def ExternalCheckFitness_SNR(InputParameters,List_of_Fitness_images,SNR_fitnessT
     return NormalisedScore,TapOut,ReturnImg#sending back last image instead so we can potentially see improvement
   
 def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
+
+
+    def Reshuffle_Recursive_Add(InputIndv_i, DictGeneration_i,DictOfFitness_i,Age_Penalty,stackno):
+            stackno=stackno+1
+            print("Len gen=",len(DictGeneration_i),"Len fitness=",len(DictOfFitness_i))
+            print("stackn",stackno)
+            print("r enter: ",InputIndv_i.name,InputIndv_i.Fitness)
+            #if fitness not in dictionary, can add and exit
+            
+            if not(InputIndv_i.Fitness in DictOfFitness_i):
+                print("r: adding to dict",InputIndv_i.name,InputIndv_i.Fitness,)
+                DictOfFitness_i[InputIndv_i.Fitness]=InputIndv_i.name
+                #break out of while
+            else:
+                #if an individual with the same fitness is in - give boost to the older indv
+                #boost = give penalty to younger one and push it down the sorted list
+                if InputIndv_i.Age<= DictGeneration_i[DictOfFitness_i[InputIndv_i.Fitness]].Age:
+                    print("r: conflict, is younger, penalty adding",InputIndv_i.name,InputIndv_i.Fitness,)
+                    #add age penalty to younger indv
+                    InputIndv_i.Fitness=InputIndv_i.Fitness+ Age_Penalty
+                    #recursive call here
+                    InputIndv_i, DictGeneration_i,DictOfFitness_i,Age_Penalty,stackno=Reshuffle_Recursive_Add(InputIndv_i, DictGeneration_i,DictOfFitness_i,Age_Penalty,stackno)
+                else:
+                    print("r: conflict, have to insert as is older ",InputIndv_i.name,InputIndv_i.Fitness,)
+                    #trickier problem as now have to add penalty to individual alread in the list
+                    #which is same fitness but younger
+                    #get individual
+                    Fitness=copy.deepcopy(InputIndv_i.Fitness)
+                    Idv2Shuffle=DictGeneration_i[DictOfFitness_i[InputIndv_i.Fitness]]
+                    print("r: indv to reshuffle",Idv2Shuffle.name,Idv2Shuffle.Fitness)
+                    #delete from dicttionary of fitness
+                    print("len b4 del ",len(DictOfFitness_i),Fitness)
+                    del DictOfFitness_i[Fitness]
+                    print("len after del ",len(DictOfFitness_i))
+                    #fitness penalty
+                    Idv2Shuffle.Fitness=Idv2Shuffle.Fitness+Age_Penalty
+                    print("r: added fitness to reshuffler",Idv2Shuffle.name,Idv2Shuffle.Fitness)
+                    #add in current individual
+                    print("r: added older to fitness dict",InputIndv_i.name,InputIndv_i.Fitness,"fitness",Fitness)
+                    if Fitness in DictOfFitness_i:
+                        print("Error 5: Impossible!!! Should have been deleted")
+                    DictOfFitness_i[Fitness]=InputIndv_i.name
+                    print("len after adding older into fitness ",len(DictOfFitness_i))
+                    #try to reinsert
+                    print("Inserting younger into loop")
+                    InputIndv_i, DictGeneration_i,DictOfFitness_i,Age_Penalty,stackno=Reshuffle_Recursive_Add(Idv2Shuffle, DictGeneration_i,DictOfFitness_i,Age_Penalty,stackno)
+            #update stack checker incase we do many recursions due to logic error
+            
+            return InputIndv_i, DictGeneration_i,DictOfFitness_i,Age_Penalty,stackno
+
+
     print("Check Fitness of ", len(InputGenDict), "genomes")
     DictOfFitness=dict()
     TotalTapouts=0
     TotalOldTimers=0
     TapOut=False
     #check fitness against static test (fitness=error)
+    print("InputGenDict len", len(InputGenDict), "before sorting")
     for I in InputGenDict:
         #we can skip candidates with known fitness by using name as look-up. WARNING! make sure we arent mutating candidates once established!
         if InputGenDict[I].Fitness is None:
@@ -619,32 +671,56 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
             #map parameters from normalised range to application specific range
             ApplicationParams=InputGenDict[I].ApplicationSpecificMapping()
             InputGenDict[I].Fitness, TapOut,InputGenDict[I].LastImage=(GenParams.CheckFitness_single(GenParams,ApplicationParams,SNR_fitnessTest,InputGenDict[I].SelfTestTargetParameters))
+            if InputGenDict[I].Fitness is not None:InputGenDict[I].Fitness=round(InputGenDict[I].Fitness,6)
         else:
             TotalOldTimers=TotalOldTimers+1
-        #TODO fix this - fitnesses are overwriting each other! bad code 
-        while True:
-            if not(InputGenDict[I].Fitness in DictOfFitness):
-                DictOfFitness[InputGenDict[I].Fitness]=InputGenDict[I].name
-                #break out of while
-                break
-            #if an individual with the same fitness is in - give boost to the older indv
-            #boost = give penalty to younger one and push it down the sorted list
-            if InputGenDict[I].Age< InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Age:
-                InputGenDict[I].Fitness=InputGenDict[I].Fitness+ 0.01#very arbitary penalty - #TODO magic number warning
-            else:
-                InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Fitness=InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Fitness+ 0.01
-                NewFitness=InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Fitness
-                TempIndvName=DictOfFitness[InputGenDict[I].Fitness]
-                del DictOfFitness[InputGenDict[I].Fitness]
-                DictOfFitness[NewFitness]=TempIndvName
-            
+        #TODO fix this - fitnesses are overwriting each other! bad code
+        # Current Fitness len
+        CurrentLength=len(DictOfFitness) 
 
+        print("START LOOOOPPPPP")
+        InputGenDict[I], DictOfFitness,DictOfFitness,Age_Penalty,stackno=Reshuffle_Recursive_Add(InputGenDict[I], InputGenDict,DictOfFitness,0.01,0)
+        #print(stackno)
+
+
+
+        # Age_Penalty=0.01
+        # while True:
+        #     if not(InputGenDict[I].Fitness in DictOfFitness):
+        #         DictOfFitness[InputGenDict[I].Fitness]=InputGenDict[I].name
+        #         #break out of while
+        #         break
+        #     #if an individual with the same fitness is in - give boost to the older indv
+        #     #boost = give penalty to younger one and push it down the sorted list
+        #     if InputGenDict[I].Age< InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Age:
+        #         InputGenDict[I].Fitness=InputGenDict[I].Fitness+ Age_Penalty#very arbitary penalty - #TODO magic number warning
+        #     else:
+        #         #get younger individual already in fitness record and add penalty to fitness
+        #         InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Fitness=InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Fitness+ Age_Penalty
+        #         #get temp variables
+        #         NewFitness=InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Fitness
+        #         TempIndvName=DictOfFitness[InputGenDict[I].Fitness]
+        #         #delete younger individual record
+        #         del DictOfFitness[InputGenDict[I].Fitness]
+        #         #here we have to check if an individual already exists with same recalculated fitness
+        #         if not(InputGenDict[I].Fitness in DictOfFitness):
+        #             #add back with new fitness
+        #             DictOfFitness[NewFitness]=TempIndvName
+        #         else:
+        #             pass
+
+                
+
+
+        if InputGenDict[I].Fitness is None:
+            print("Error 2!! Should never be true!!")
+        if CurrentLength+1!=len(DictOfFitness):
+            print("Error!!! losing members!!")
+            eecece
 
         if TapOut==True:
             TotalTapouts=TotalTapouts+1
-            
-    print("Tapouts for fitness check = ",TotalTapouts )
-    print("Old timers for fitness check = ",TotalOldTimers)
+    print("DictOfFitness len", len(DictOfFitness), "after sorting")
     TotalTapouts=0#TODO shouldnt have to do this
 
     #sort by error

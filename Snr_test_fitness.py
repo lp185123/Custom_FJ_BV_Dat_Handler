@@ -224,6 +224,7 @@ def Repair_ExternalOCR(TemplateSNR,ExternalSNR,ExpectedFielding):
                 if item[indexer]=="S":TempValue="5"
                 if item[indexer]=="I":TempValue="1"
                 if item[indexer]=="i":TempValue="1"
+                if item[indexer]=="l":TempValue="1"
                 if item[indexer]=="G":TempValue="6"
                 if item[indexer]=="O":TempValue="0"
                 if item[indexer]=="o":TempValue="0"
@@ -313,7 +314,7 @@ def CompareOCR_Reads(TemplateSNR,ExternalSNR,ExpectedFielding=None):
                     break
 
         if OCR_analysis.Pass==False:break
-
+        
         #repair external OCR if we have prior knowledge
         RepairedExternalOCR=Repair_ExternalOCR(TemplateSNR,ExternalSNR,ExpectedFielding)
         OCR_analysis.RepairedExternalOCR=RepairedExternalOCR
