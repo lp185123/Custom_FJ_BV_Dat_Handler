@@ -14,15 +14,28 @@ def main(S39_only=False):
     if S39_only==False:
         GetParametersFromUser.UserPopulateParameters()
     else:
+        # #load parameter with S39 specific data
+        # GetParametersFromUser.AutomaticMode=True
+        # GetParametersFromUser.BlockTypeWave='None'
+        # GetParametersFromUser.BlockType_ImageFormat='SRU SNR image1'
+        # GetParametersFromUser.FirstImageOnly=False
+        # GetParametersFromUser.GetRGBImage=False
+        # GetParametersFromUser.GetSNR=True
+        # GetParametersFromUser.InputFilePath=GetParametersFromUser.InputFilePath
+        # GetParametersFromUser.OutputFilePath=GetParametersFromUser.OutputFilePath
+
+        
         #load parameter with S39 specific data
         GetParametersFromUser.AutomaticMode=True
-        GetParametersFromUser.BlockTypeWave='None'
-        GetParametersFromUser.BlockType_ImageFormat='SRU SNR image1'
-        GetParametersFromUser.FirstImageOnly=False
-        GetParametersFromUser.GetRGBImage=False
-        GetParametersFromUser.GetSNR=True
-        GetParametersFromUser.InputFilePath=GetParametersFromUser.InputFilePath
+        GetParametersFromUser.BlockTypeWave='C'
+        GetParametersFromUser.BlockType_ImageFormat='SRU MM1 side image'
+        GetParametersFromUser.FirstImageOnly=True
+        GetParametersFromUser.GetRGBImage=True
+        GetParametersFromUser.GetSNR=False
+        Result = input("Please enter folder for analysis:")
+        GetParametersFromUser.InputFilePath=Result
         GetParametersFromUser.OutputFilePath=GetParametersFromUser.OutputFilePath
+
 
         
     #placeholder until dynamic folder discovery
@@ -275,7 +288,7 @@ if __name__ == "__main__":
     #entry point
     #try:
     print("WARNING! MM8 images WIP - still issue with image depth size WIP")
-    if _3DVisLabLib.yesno("Get S39 and SNR only with default folders etc?"):main(True)
+    if _3DVisLabLib.yesno("Get SR thumbnails only?"):main(True)
     else:
         main(False)
     #except Exception as e:

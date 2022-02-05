@@ -552,6 +552,7 @@ def SIFT_Feature_and_Match(imageA, imageB,Input_ParameterDictionary,Use_Brute_Fo
     #matches should be sorted by the crosscheck - can we take the top N?
     #how do we interrogate the "matches" object?
     if BruteForce==True:
+        raise Exception("Should not be brute forcing sift ?? cannot proceed - _3dvislab library")
         Features_Report.append("BAD!!! SHOULDNT BE IN HERE!! BRUTE FORCE matcher")
             
         # create Brute-force Matcher object
@@ -676,10 +677,8 @@ class MultiProcessPooler:
             else:
                 self.UserUpdated=False
                 
-         
-            
-            
-def ORB_Feature_and_Match(imageA, imageB,Input_ParameterDictionary,Use_Brute_Force):
+
+def ORB_Feature_and_Match_SortImg(imageA, imageB,Input_ParameterDictionary,Use_Brute_Force):
     ImageLog=[]
     ImageTextLog=[]
     Features_Report=["-------"]
@@ -707,13 +706,10 @@ def ORB_Feature_and_Match(imageA, imageB,Input_ParameterDictionary,Use_Brute_For
     l_pts2 = []
     
     
-        
-    
-        
     #putting on crosscheck kills FLANN compatibility 
     if BruteForce==False:
         Features_Report.append("Using FLANN matcher")
-        matchDistance=0.8
+        matchDistance=0.2
         #FLANN Parameters for ORB (need different mode for SIFT etc)
         FLANN_INDEX_LSH = 6
         index_params= dict(algorithm = FLANN_INDEX_LSH,
@@ -760,12 +756,24 @@ def ORB_Feature_and_Match(imageA, imageB,Input_ParameterDictionary,Use_Brute_For
         Features_Report.append("Brute Force matches = " + str(len(matches)))
         # Sort them in the order of their distance.
         matches = sorted(matches, key = lambda x:x.distance)
+        #UnsortedMatches=copy.deepcopy(matches)
+
+        #print("Top match=",matches[0].distance)
+        #filtered matches
+        matches_filtered=[]
+        for matchobject in matches:
+            if matchobject.distance<9999999999:
+                matches_filtered.append(matchobject)
+        
+        matches = sorted(matches_filtered, key = lambda x:x.distance)
+
+
         # Draw first 100 matches.
         img3=imageA.copy()
         #skim top matches
         ShowMatches=len(matches)
         ShowMatches=min(len(matches),ShowMatches)#protect array access
-        img3=cv2.drawMatches(imageA,kp1,imageB,kp2,matches[:5],img3,flags=2,**draw_params)
+        img3=cv2.drawMatches(imageA,kp1,imageB,kp2,matches[:30],img3,flags=2,**draw_params)
         
         #display(str(ShowMatches) + " of " + str(len(matches)) + " brute force ORB matches",img3)
         ImageLog.append(img3)
@@ -774,9 +782,130 @@ def ORB_Feature_and_Match(imageA, imageB,Input_ParameterDictionary,Use_Brute_For
 
         # pop out matches into our point array
         for (match1) in (matches[:]):
-                l_good.append([match1])
+            l_good.append([match1])
+            l_pts2.append(kp2[match1.trainIdx].pt)
+            l_pts1.append(kp1[match1.queryIdx].pt)
+            
+#     # pop out matches into our point array
+#        for (match1) in enumerate(matches):
+#            #print(match1.distance)
+#            l_good.append([match1])
+#            l_pts2.append(kp2[match1.trainIdx].pt)
+#            l_pts1.append(kp1[match1.queryIdx].pt)
+#        
+   
+    Features_Report.append("matches returned  = " + str(len(l_pts1)))
+    Features_Report.append("-------")
+    return l_pts1, l_pts2, Features_Report,ImageLog,ImageTextLog,matches
+
+            
+            
+def ORB_Feature_and_Match(imageA, imageB,Input_ParameterDictionary,Use_Brute_Force):
+    ImageLog=[]
+    ImageTextLog=[]
+    Features_Report=["-------"]
+    BruteForce=Use_Brute_Force
+    Features_Report.append("ORB matcher used")
+    #ORB descriptor
+    #create some parameters we can swap in and out easily
+    
+    draw_params=dict(matchColor=(0,255,0),singlePointColor=(255,0,0))
+    #create orb object
+    #dictionary comes from main reconstruction file
+    ORB=cv2.ORB_create(**Input_ParameterDictionary)
+    kp1, des1 = ORB.detectAndCompute(imageA,None)
+    kp2, des2 = ORB.detectAndCompute(imageB,None)
+    Features_Report.append("Raw Keypoints ImgA = " + str(len(kp1)))
+    Features_Report.append("Raw Keypoints ImgB = " + str(len(kp2)))
+    KeypointsORB=imageA.copy()#temp image for displaying features
+    #display("ORB " + str(len(kp1)) +" unfiltered keypoints Img A", draw_keypoints(KeypointsORB,kp1))
+    ImageLog.append(draw_keypoints(KeypointsORB,kp1))
+    ImageTextLog.append("ORB " + str(len(kp1)) +" unfiltered keypoints Img A")
+    
+    
+    l_good = [] 
+    l_pts1 = []
+    l_pts2 = []
+    
+    
+    #putting on crosscheck kills FLANN compatibility 
+    if BruteForce==False:
+        Features_Report.append("Using FLANN matcher")
+        matchDistance=0.2
+        #FLANN Parameters for ORB (need different mode for SIFT etc)
+        FLANN_INDEX_LSH = 6
+        index_params= dict(algorithm = FLANN_INDEX_LSH,
+                   table_number = 6, # 12
+                   key_size = 12,     # 20
+                   multi_probe_level = 1) #2
+        search_params = dict(checks=100)   # or pass empty dictionary
+        #create flann matcher
+        flann=cv2.FlannBasedMatcher(index_params,search_params)
+        
+         
+        Features_Report.append("KNN ratio match - distance = " + str(matchDistance))
+        
+        #use NORM_HAMMING for ORB matches
+        # If ORB is using WTA_K == 3 or 4, cv.NORM_HAMMING2 should be used.
+        matchesknn=flann.knnMatch(des1,des2, k=2)#returns K best matches
+        Features_Report.append("KNN matches found = " + str(len(matchesknn)))
+        
+        # ratio test
+        for i,(match1,match2) in enumerate(matchesknn):
+            if match1.distance < matchDistance*match2.distance:
+                l_good.append([match2])
                 l_pts2.append(kp2[match1.trainIdx].pt)
                 l_pts1.append(kp1[match1.queryIdx].pt)
+        
+        Features_Report.append("Ratio matches left  = " + str(len(l_good)))
+        
+        flann_matches = cv2.drawMatchesKnn(imageA,kp1,imageB,kp2,l_good,None,**draw_params)
+        #display("FLANN matches", flann_matches)
+        ImageLog(flann_matches)
+        ImageTextLog("FLANN matches")
+    #matches should be sorted by the crosscheck - can we take the top N?
+    #how do we interrogate the "matches" object?
+    if BruteForce==True:
+        Features_Report.append("Using BRUTE FORCE matcher")
+            
+        # create Brute-force Matcher object
+        # If ORB is using WTA_K == 3 or 4, cv2.NORM_HAMMING2 should be used.
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)#we can sort out matches ourself
+        #crossheck = true executes a sort of ratio test like we do for SIFT
+        
+        # Match descriptors.
+        matches= bf.match(des1,des2)
+        Features_Report.append("Brute Force matches = " + str(len(matches)))
+        # Sort them in the order of their distance.
+        matches = sorted(matches, key = lambda x:x.distance)
+
+        #print("Top match=",matches[0].distance)
+        #filtered matches
+        matches_filtered=[]
+        for matchobject in matches:
+            if matchobject.distance<9999999999:
+                matches_filtered.append(matchobject)
+        
+        matches = sorted(matches_filtered, key = lambda x:x.distance)
+
+
+        # Draw first 100 matches.
+        img3=imageA.copy()
+        #skim top matches
+        ShowMatches=len(matches)
+        ShowMatches=min(len(matches),ShowMatches)#protect array access
+        img3=cv2.drawMatches(imageA,kp1,imageB,kp2,matches[:30],img3,flags=2,**draw_params)
+        
+        #display(str(ShowMatches) + " of " + str(len(matches)) + " brute force ORB matches",img3)
+        ImageLog.append(img3)
+        ImageTextLog.append(str(ShowMatches) + " of " + str(len(matches)) + " brute force ORB matches")
+        #cv2.imwrite('CORRECTDISTORTION/BruteForce_Matches.jpg',img3)
+
+        # pop out matches into our point array
+        for (match1) in (matches[:]):
+            l_good.append([match1])
+            l_pts2.append(kp2[match1.trainIdx].pt)
+            l_pts1.append(kp1[match1.queryIdx].pt)
             
 #     # pop out matches into our point array
 #        for (match1) in enumerate(matches):
@@ -1130,7 +1259,8 @@ def TestOrientation(InputArrayOfXY,ExpectedIndexOfMax_SUMXY):#v1
         Match=True
     return Match
 
-
+def MakeFolder(FolderPath):
+    os.mkdir(FolderPath)
 
 
 def DeleteFiles_RecreateFolder(FolderPath):

@@ -12,20 +12,23 @@ import matplotlib
 matplotlib.use('Agg')#can get "Tcl_AsyncDelete: async handler deleted by the wrong thread" crashes otherwise
 import matplotlib.pyplot as plt
 import VisionAPI_Demo
+from math import floor
+from decimal import Decimal
 #import TileImages_for_OCR
 
 class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=20
+        self.No_of_First_gen=10
         #number of top candidates must always be smaller than first gen!
-        self.No_TopCandidates=15
-        self.NewIndividualsPerGen=3
-        self.TestImageBatchSize=35
-        self.ImageColumnSize=35#dont want to go more than 40 as performance breaks down
-        self.NewImageCycle=1
+        self.No_TopCandidates=8
+        self.NewIndividualsPerGen=1
+        self.TestImageBatchSize=30
+        self.ImageColumnSize=30#dont want to go more than 40 as performance breaks down
+        self.NewImageCycle=4
         self.ImageTapOut=3#terminate anything that has poor performance out the box
+        self.GradientDescentCycle=10
         self.UseCloudOCR=True
         self.MirrorImage=True
         self.DictFilename_V_Images=dict()#load this with fitness check images
@@ -34,7 +37,7 @@ class GA_Parameters():
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\TestSNs"
         #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR"
-        self.FilePath=r"C:\Working\FindIMage_In_Dat\Examples\Brazil_set_4\All"
+        self.FilePath=r"C:\Working\FindIMage_In_Dat\Examples\Brazil_set_3"
         #save out parameter converging image
         self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"
         self.DefaultError=5#if fitness checking breaks what do we set error too - currently cannot handle Null value
@@ -80,8 +83,6 @@ class GA_Parameters():
 
         #attempt to get fielding of input images:
         self.Fielding=Snr_test_fitness.GenerateSN_Fielding(ListAllImages)
-
-        
 
         #load images into memory
         for ImageInstance in ImagesToLoad:
@@ -141,19 +142,19 @@ class GA_Parameters():
     def GetFitnessHistory(self):
         fitnessrecords=[]
         for Element in self.FitnessRecord:
-            fitnessrecords.append(round(Element,3))
+            fitnessrecords.append(GA_Round(Element,4))
         return fitnessrecords
     
     def GetAverageFitnessHistory(self):
         fitnessrecords=[]
         for Element in self.FitnessRecord:
-            fitnessrecords.append(round(self.FitnessRecord[Element][2],3))
+            fitnessrecords.append(self.FitnessRecord[Element][2])
         return fitnessrecords
     
     def GetAverageAgeHistory(self):
         fitnessrecords=[]
         for Element in self.FitnessRecord:
-            fitnessrecords.append(round(self.FitnessRecord[Element][3],3))
+            fitnessrecords.append(self.FitnessRecord[Element][3])
         return fitnessrecords
 
 
@@ -170,6 +171,7 @@ class GA_Parameters():
             for I in InputParameters:
                 TempError=(InputParameters[I]-SelfTestTargetParameters[I])*(InputParameters[I]-SelfTestTargetParameters[I])
                 Error=Error+TempError
+            
         else:
             try:
                 #application specific fitness check
@@ -186,9 +188,12 @@ class GA_Parameters():
         
         #add tiny amount of random noise to avoid breaking dictionary
         #this is not ideal - works for now
-        Error=Error#+(random.random()/10000)
-
-        
+        #Error=round(Error,4)
+        if Error is None:
+            print("Error is None")
+        #even if rounding the error still get very long floating points??
+        Error=GA_Round(Error,4)
+        #print("check fitness single error",Error)
         return Error,Tapout,ReturnImg#have to invert fitness to get error
 
 class Individual():
@@ -350,7 +355,7 @@ class Individual():
     def HouseKeep(self):
         #fix any invalid numbers - keep between 0 and 1
         for Param in self.Parameters:
-            self.Parameters[Param]=round(_3DVisLabLib.clamp(self.Parameters[Param],0,1),4)
+            self.Parameters[Param]=GA_Round(_3DVisLabLib.clamp(self.Parameters[Param],0,1),4)
 
     def FixRangedValue(self,Parameter,Range):
         #if this gets too cpu heavy then optimise with successive approximation
@@ -370,7 +375,7 @@ class Individual():
 
     def RoundParameters(self):
         for elem in self.Parameters:
-            self.Parameters[elem]=round(self.Parameters[elem],5)
+            self.Parameters[elem]=GA_Round(self.Parameters[elem],5)
 
     def GetGenes(self):
         #return parameters/gene of individual
@@ -452,6 +457,25 @@ class Individual():
         #make sure no invalid parameters hanging around
         self.RoundParameters()
         self.HouseKeep()
+
+def GA_Round(number,decimalpoints):
+    #round() doesnt seem to work 100%
+    #return floor(number * 10 ** decimalpoints/ 10 ** decimalpoints)
+    #number=format(number, '.4f')
+    #return number
+    # temp =Decimal(str(number))
+    # penny = Decimal('0.01')
+    # temp.quantize(penny)
+    # return temp
+    # return floor(number * 10 ** decimalpoints) / 10 ** decimalpoints
+    if number is None:
+        return None
+    temp = number* (10 **decimalpoints)
+    tempint=int(temp)
+    tempfloat=tempint/(10 **decimalpoints)
+    return tempfloat
+
+    #return round(number,decimalpoints)
 
 def BuildSNR_Parameters(InputParameters,SNR_fitnessTest,GenParams):
     #use input parameters to drive SNR parameters
@@ -610,47 +634,53 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
 
     def Reshuffle_Recursive_Add(InputIndv_i, DictGeneration_i,DictOfFitness_i,Age_Penalty,stackno):
             stackno=stackno+1
-            print("Len gen=",len(DictGeneration_i),"Len fitness=",len(DictOfFitness_i))
-            print("stackn",stackno)
-            print("r enter: ",InputIndv_i.name,InputIndv_i.Fitness)
+            #can only have 999 recursions - if we start getting deeper than 10 probably something gone wrong
+            #start adding random amounts to the fitness to avoid stack overflow 
+            #for instance if we have 1000 members all with same fitness this could potentially happen
+            if stackno>500:
+                InputIndv_i.Fitness=InputIndv_i.Fitness+(random()/1000)
+                print("WARNING!! To avoid recursive function overflow, adding random number to fitness")
+            #print("Len gen=",len(DictGeneration_i),"Len fitness=",len(DictOfFitness_i))
+            #print("stackn",stackno)
+            #print("r enter: ",InputIndv_i.name,InputIndv_i.Fitness)
             #if fitness not in dictionary, can add and exit
             
             if not(InputIndv_i.Fitness in DictOfFitness_i):
-                print("r: adding to dict",InputIndv_i.name,InputIndv_i.Fitness,)
+                #print("r: adding to dict",InputIndv_i.name,InputIndv_i.Fitness,)
                 DictOfFitness_i[InputIndv_i.Fitness]=InputIndv_i.name
                 #break out of while
             else:
                 #if an individual with the same fitness is in - give boost to the older indv
                 #boost = give penalty to younger one and push it down the sorted list
                 if InputIndv_i.Age<= DictGeneration_i[DictOfFitness_i[InputIndv_i.Fitness]].Age:
-                    print("r: conflict, is younger, penalty adding",InputIndv_i.name,InputIndv_i.Fitness,)
+                    #print("r: conflict, is younger, penalty adding",InputIndv_i.name,InputIndv_i.Fitness,)
                     #add age penalty to younger indv
                     InputIndv_i.Fitness=InputIndv_i.Fitness+ Age_Penalty
                     #recursive call here
                     InputIndv_i, DictGeneration_i,DictOfFitness_i,Age_Penalty,stackno=Reshuffle_Recursive_Add(InputIndv_i, DictGeneration_i,DictOfFitness_i,Age_Penalty,stackno)
                 else:
-                    print("r: conflict, have to insert as is older ",InputIndv_i.name,InputIndv_i.Fitness,)
+                    #print("r: conflict, have to insert as is older ",InputIndv_i.name,InputIndv_i.Fitness,)
                     #trickier problem as now have to add penalty to individual alread in the list
                     #which is same fitness but younger
                     #get individual
                     Fitness=copy.deepcopy(InputIndv_i.Fitness)
                     Idv2Shuffle=DictGeneration_i[DictOfFitness_i[InputIndv_i.Fitness]]
-                    print("r: indv to reshuffle",Idv2Shuffle.name,Idv2Shuffle.Fitness)
+                    #print("r: indv to reshuffle",Idv2Shuffle.name,Idv2Shuffle.Fitness)
                     #delete from dicttionary of fitness
-                    print("len b4 del ",len(DictOfFitness_i),Fitness)
+                    #print("len b4 del ",len(DictOfFitness_i),Fitness)
                     del DictOfFitness_i[Fitness]
-                    print("len after del ",len(DictOfFitness_i))
+                    #print("len after del ",len(DictOfFitness_i))
                     #fitness penalty
                     Idv2Shuffle.Fitness=Idv2Shuffle.Fitness+Age_Penalty
-                    print("r: added fitness to reshuffler",Idv2Shuffle.name,Idv2Shuffle.Fitness)
+                    #print("r: added fitness to reshuffler",Idv2Shuffle.name,Idv2Shuffle.Fitness)
                     #add in current individual
-                    print("r: added older to fitness dict",InputIndv_i.name,InputIndv_i.Fitness,"fitness",Fitness)
+                    #print("r: added older to fitness dict",InputIndv_i.name,InputIndv_i.Fitness,"fitness",Fitness)
                     if Fitness in DictOfFitness_i:
                         print("Error 5: Impossible!!! Should have been deleted")
                     DictOfFitness_i[Fitness]=InputIndv_i.name
-                    print("len after adding older into fitness ",len(DictOfFitness_i))
+                    #print("len after adding older into fitness ",len(DictOfFitness_i))
                     #try to reinsert
-                    print("Inserting younger into loop")
+                    #print("Inserting younger into loop")
                     InputIndv_i, DictGeneration_i,DictOfFitness_i,Age_Penalty,stackno=Reshuffle_Recursive_Add(Idv2Shuffle, DictGeneration_i,DictOfFitness_i,Age_Penalty,stackno)
             #update stack checker incase we do many recursions due to logic error
             
@@ -671,60 +701,43 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
             #map parameters from normalised range to application specific range
             ApplicationParams=InputGenDict[I].ApplicationSpecificMapping()
             InputGenDict[I].Fitness, TapOut,InputGenDict[I].LastImage=(GenParams.CheckFitness_single(GenParams,ApplicationParams,SNR_fitnessTest,InputGenDict[I].SelfTestTargetParameters))
-            if InputGenDict[I].Fitness is not None:InputGenDict[I].Fitness=round(InputGenDict[I].Fitness,6)
+            
         else:
             TotalOldTimers=TotalOldTimers+1
         #TODO fix this - fitnesses are overwriting each other! bad code
         # Current Fitness len
-        CurrentLength=len(DictOfFitness) 
+        #CurrentLength=len(DictOfFitness) 
+        #for elem in InputGenDict:
+        #    if InputGenDict[elem].Fitness is None:
+        #        print("b4 Fitness is none!")
+        #    print(InputGenDict[elem].Fitness)
 
-        print("START LOOOOPPPPP")
-        InputGenDict[I], DictOfFitness,DictOfFitness,Age_Penalty,stackno=Reshuffle_Recursive_Add(InputGenDict[I], InputGenDict,DictOfFitness,0.01,0)
-        #print(stackno)
+        #print("START recursion")
+        #InputGenDict[I], DictOfFitness,DictOfFitness,Age_Penalty,stackno=Reshuffle_Recursive_Add(InputGenDict[I], InputGenDict,DictOfFitness,0.01,0)
+        #print("END recursion")
 
+        #     if n
 
-
-        # Age_Penalty=0.01
-        # while True:
-        #     if not(InputGenDict[I].Fitness in DictOfFitness):
-        #         DictOfFitness[InputGenDict[I].Fitness]=InputGenDict[I].name
-        #         #break out of while
-        #         break
-        #     #if an individual with the same fitness is in - give boost to the older indv
-        #     #boost = give penalty to younger one and push it down the sorted list
-        #     if InputGenDict[I].Age< InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Age:
-        #         InputGenDict[I].Fitness=InputGenDict[I].Fitness+ Age_Penalty#very arbitary penalty - #TODO magic number warning
-        #     else:
-        #         #get younger individual already in fitness record and add penalty to fitness
-        #         InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Fitness=InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Fitness+ Age_Penalty
-        #         #get temp variables
-        #         NewFitness=InputGenDict[DictOfFitness[InputGenDict[I].Fitness]].Fitness
-        #         TempIndvName=DictOfFitness[InputGenDict[I].Fitness]
-        #         #delete younger individual record
-        #         del DictOfFitness[InputGenDict[I].Fitness]
-        #         #here we have to check if an individual already exists with same recalculated fitness
-        #         if not(InputGenDict[I].Fitness in DictOfFitness):
-        #             #add back with new fitness
-        #             DictOfFitness[NewFitness]=TempIndvName
-        #         else:
-        #             pass
-
-                
-
-
-        if InputGenDict[I].Fitness is None:
-            print("Error 2!! Should never be true!!")
-        if CurrentLength+1!=len(DictOfFitness):
-            print("Error!!! losing members!!")
-            eecece
+        #if InputGenDict[I].Fitness is None:
+        #    print("Error 2!! Should never be true!!")
+        #if CurrentLength+1!=len(DictOfFitness):
+        #    print("Error!!! losing members!!")
+            
 
         if TapOut==True:
             TotalTapouts=TotalTapouts+1
+    listMember_names=list(InputGenDict.keys())
+    for member in listMember_names:
+        Dummy, InputGenDict,DictOfFitness,Age_Penalty,stackno=Reshuffle_Recursive_Add(InputGenDict[member], InputGenDict,DictOfFitness,0.01,0)
+        
+
+
     print("DictOfFitness len", len(DictOfFitness), "after sorting")
     TotalTapouts=0#TODO shouldnt have to do this
 
     #sort by error
     SortedFitness=(sorted(DictOfFitness.keys()))
+
 
     #TODO here we can start recording matrix stuff for the PCA
     #ensure user hasn't provided incorrect settings
@@ -736,6 +749,13 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
 
     #take slice of most fit candidates
     TopFitness=SortedFitness[0:GenParams.No_TopCandidates]
+
+
+    if TopFitness[0]!=min(TopFitness):
+        print("Sorting error for TopFitness!!")
+    if SortedFitness[0]!=min(SortedFitness):
+        print("Sorting error for SortedFitness!!")
+
 
     #print best fitness
     print("Gen lowest Error (best fitness) = ", SortedFitness[0])
@@ -764,16 +784,24 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
         cv2.imwrite(filepath,InputGenDict[DictOfFitness[SortedFitness[0]]].LastImage)
 
     #save out some plots
-    PlotAndSave("TopFitnessHistory",GenParams.OutputFolder + "\\TopFitnessHistory_gen" + str(GenParams.Generation) + ".jpg",GenParams.GetFitnessHistory()[:])
-    PlotAndSave("ColonyFitness",GenParams.OutputFolder + "\\ColonyFitness_gen" + str(GenParams.Generation) +".jpg",SortedFitness[:])
+    if GenParams.Generation>0:
+        PlotAndSave("MostFit_History",GenParams.OutputFolder + "\\MostFit_History_gen" + str(GenParams.Generation) + ".jpg",GenParams.GetFitnessHistory()[:],min(2,max(GenParams.GetFitnessHistory()[:])))
+        PlotAndSave("ColonyFitness",GenParams.OutputFolder + "\\ColonyFitness_gen" + str(GenParams.Generation) +".jpg",SortedFitness[:],min(2,max(SortedFitness)))
 
     #get age of fittest members
     Indv_Age=[]
+    Indv_Fitness=[]
     for elemn in SortedFitness:
         Indv_Age.append(InputGenDict[DictOfFitness[elemn]].Age)
-    PlotAndSave("ColonyAge",GenParams.OutputFolder + "\\ColonyAge_gen" + str(GenParams.Generation) +".jpg",Indv_Age)
-
-
+        Indv_Fitness.append(InputGenDict[DictOfFitness[elemn]].Fitness)
+    try:
+        PlotAndSave("TopAge",GenParams.OutputFolder + "\\TopAge_gen" + str(GenParams.Generation) +".jpg",Indv_Age,max(Indv_Age))
+        PlotAndSave("TopFitness",GenParams.OutputFolder + "\\TopFitness" + str(GenParams.Generation) +".jpg",Indv_Fitness,max(Indv_Fitness))
+        #PlotAndSave_2datas("TopAgeVFitness",GenParams.OutputFolder + "\\TopAgeVFitness" + str(GenParams.Generation) +".jpg",Indv_Age,max(Indv_Age),Indv_Fitness,max(Indv_Fitness))
+        PlotAndSave("AverageAge",GenParams.OutputFolder + "\\AverageAge" + str(GenParams.Generation) +".jpg",GenParams.GetAverageAgeHistory(),max(GenParams.GetAverageAgeHistory()))
+    except:
+        pass
+    
     #need random number or will overwrite records #TODO must be another dictionary which allows duplicate keys
     randomNo=random.random()/10000
     GenParams.FitnessRecordAdd(SortedFitness[0]+randomNo,InputGenDict[DictOfFitness[SortedFitness[0]]].name,InputGenDict[DictOfFitness[SortedFitness[0]]].Parameters,TotalFitness,TotalAge,InputGenDict[DictOfFitness[SortedFitness[0]]].ApplicationSpecificMapping())
@@ -988,7 +1016,7 @@ def RemoveCloseParameterIndividuals(InputDict_Candidates,NameOfGen,Buffer):
 
     return InputDict_Candidates
 
-def PlotAndSave(Title,Filepath,Data):
+def PlotAndSave(Title,Filepath,Data,maximumvalue):
     
     #this causes crashes
     #save out plot of 1D data
@@ -996,6 +1024,22 @@ def PlotAndSave(Title,Filepath,Data):
         plt.plot(Data)
         plt.ylabel(Title)
         plt.ylim([0, max(Data)])
+        plt.savefig(Filepath)
+        plt.cla()
+        plt.clf()
+        plt.close()
+    except Exception as e:
+        print("Error with matpyplot",e)
+
+def PlotAndSave_2datas(Title,Filepath,Data1,maximumvalue1,Data2,maximumvalue2):
+    
+    #this causes crashes
+    #save out plot of 1D data
+    try:
+        plt.plot(Data1,Data2,'bo')#bo will draw dots instead of connected line
+        plt.ylabel(Title)
+        plt.ylim([0, max(Data1)])
+        plt.ylim([0, max(Data2)])
         plt.savefig(Filepath)
         plt.cla()
         plt.clf()
@@ -1145,18 +1189,31 @@ if __name__ == "__main__":
             GenParams.Generation=GenParams.Generation+1
             continue
 
+        if GenParams.Generation>1:
+            DictFitCandidates=CheckFitness_Multi(DictFitCandidates,GenParams,SNR_fitnessTest)
         print("generation size=", len(DictFitCandidates))
-        NextGen=CrossBreed(DictFitCandidates,GenerationName)
-        print("NextGen size", len(NextGen))
-        DictFitCandidates=CheckFitness_Multi(NextGen,GenParams,SNR_fitnessTest)
+        DictFitCandidates=CrossBreed(DictFitCandidates,GenerationName)
+        print("NextGen size", len(DictFitCandidates))
         #add some random individuals
         for I in range(GenParams.NewIndividualsPerGen):
             NewIndividual=Individual(GenerationName + "r")
             DictFitCandidates[NewIndividual.name]=copy.deepcopy(NewIndividual)#ensure Python is creating instances
 
+
+
+
+        # print("generation size=", len(DictFitCandidates))
+        # NextGen=CrossBreed(DictFitCandidates,GenerationName)
+        # print("NextGen size", len(NextGen))
+        # DictFitCandidates=CheckFitness_Multi(NextGen,GenParams,SNR_fitnessTest)
+        # #add some random individuals
+        # for I in range(GenParams.NewIndividualsPerGen):
+        #     NewIndividual=Individual(GenerationName + "r")
+        #     DictFitCandidates[NewIndividual.name]=copy.deepcopy(NewIndividual)#ensure Python is creating instances
+
         #every n loops and if we arent having much movement with fitness, and fitness is >0 (hasnt converged)
         #WARNING: if fitness is oscillating this will not meet condition, perhaps check gradient as well
-        if (i%4==0 and (GenParams.CheckRepeatingFitness(3,0.01))==True) and (GenParams.GetFitnessHistory()[-1]>0.01):
+        if (i%GenParams.GradientDescentCycle==0 and (GenParams.CheckRepeatingFitness(3,0.01))==True) and (GenParams.GetFitnessHistory()[-1]>0.01):
             #here check that fitness isnt near 0 as we should get a new batch of evaluation data if so 
             StepSize=5
             for looper in range (0,15):
@@ -1185,10 +1242,10 @@ if __name__ == "__main__":
                     break
     
         #every nth cycle mix up fitness testing set, or if fitness has converged to close to zero
-        if (i%GenParams.NewImageCycle==0 and i>0) or (GenParams.GetFitnessHistory()[-1]<0.01):
+        if (i%GenParams.NewImageCycle==0 and i>0):# or (GenParams.GetFitnessHistory()[-1]<0.01):
             print("New set ofimages")
             #get new testing set of images
-            GenParams.GetRandomSet_TestImages_AndFielding()
+            GenParams.GetCollimatedTestSet_AndFielding(GenParams.ImageColumnSize,GenParams.TestImageBatchSize)
             #will have to retest all old timers fitnesses, setting fitness to None will allow the fitness
             #value to be reasessed
             for individual in DictFitCandidates:
