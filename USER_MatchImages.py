@@ -38,49 +38,12 @@ class MatchImagesObject():
                         firstLevel=4, WTA_K=2,
                         scoreType=0,patchSize=100)
 
-
-MatchImages=MatchImagesObject()
-
-#delete all files in folder
-print("Delete output folders:\n",MatchImages.Outputfolder)
-if _3DVisLabLib.yesno("?"):
-    _3DVisLabLib.DeleteFiles_RecreateFolder(MatchImages.Outputfolder)
-
-#get all files in input folder
-InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(MatchImages.InputFolder)
-#filter out non images
-ListAllImages=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
-#get object that links images to dat records
-print("attempting to load image to dat record trace file",MatchImages.InputFolder + "\\" + MatchImages.TraceExtractedImg_to_DatRecord)
-try:
-    Json_to_load=MatchImages.InputFolder + "\\" + MatchImages.TraceExtractedImg_to_DatRecord
-    with open(Json_to_load) as json_file:
-        MatchImages.TraceExtractedImg_to_DatRecordObj = json.load(json_file)
-        print("json loaded succesfully")
-        MatchImages.TraceExtractedImg_to_DatRecordObj
-except Exception as e:
-    print("JSON_Open error attempting to open json file " + str(MatchImages.InputFolder + "\\" + MatchImages.TraceExtractedImg_to_DatRecord) + " " + str(e))
-    if _3DVisLabLib.yesno("Continue operation? No image to dat record trace will be possible so only image matching & sorting")==False:
-        raise Exception("User declined to continue after JSOn image vs dat record file not found")
-
-#reuse all feature matching code
 def GetAverageOfMatches(List,Span):
     Spanlist=List[0:Span]
     Distances=[]
     for elem in Spanlist:
         Distances.append(elem.distance)
     return round(mean(Distances),2)
-
-#load images into memory
-for Index, ImagePath in enumerate(ListAllImages):
-    print("Loading in image",ImagePath )
-    Pod1Image = cv2.imread(ImagePath,0)
-    Pod1Image_col = cv2.imread(ImagePath)
-    keypoints,descriptor=_3DVisLabLib.OrbKeyPointsOnly(Pod1Image_col,MatchImages.FeatureMatch_Dict_Common.ORB_default)
-    MatchImages.ImagesInMem_to_Process[ImagePath]=(Pod1Image,Pod1Image_col,keypoints,descriptor)
-    #cant deepcopy non standard datatypes, just make a copy at same time
-    MatchImages.ImagesInMem_to_Process_copy[ImagePath]=(Pod1Image,Pod1Image_col,keypoints,descriptor)
-
 
 def GetClosestImage_KpsOnly(InputImgFilename, InputImageDict,averagingMatchpts):
     #for use with pre-existing keypoints and descriptors
@@ -170,67 +133,6 @@ def GetClosestImage(InputImgFilename, InputImageDict,averagingMatchpts):
         raise Exception("Error - GetClosestImage - cannot match image with itself")
     return file1,file2,BestImage,BestMatch,ImgVsMatch
 
-index=0
-#have to make top pairs folder first
-_3DVisLabLib. MakeFolder(MatchImages.Outputfolder + "\\Pairs\\")
-_3DVisLabLib. MakeFolder(MatchImages.Outputfolder + "\\Duplicates\\")
-
-while len(MatchImages.ImagesInMem_to_Process_copy)>0:
-    break
-    index=index+1
-    
-    RandomImage=random.choice(list(MatchImages.ImagesInMem_to_Process_copy.keys()))
-    #print("starting with image",RandomImage)
-    #_3DVisLabLib.ImageViewer_Quick_no_resize(MatchImages.ImagesInMem_to_Process_copy[RandomImage][0],0,True,False)
-
-    #build list of likewise images
-
-    if not index in MatchImages.ImagesInMem_Pairing.keys():
-        MatchImages.ImagesInMem_Pairing[index]=[RandomImage]
-
-    MatchedImage,InputImage,BestImage,BestMatch,ImgVSMatch=GetClosestImage_KpsOnly(RandomImage,MatchImages.ImagesInMem_to_Process_copy,15)
-    
-
-
-    #if we have two files - copy them into processed/paired dictionary and remove from unprocessed
-    if (MatchedImage is not None) and (InputImage is not None):
-        #build pairing lists
-        MatchImages.ImagesInMem_Pairing[index].append(MatchedImage)
-        if index%1==99999999:#only show images one out of N times
-            TempFolder=MatchImages.Outputfolder + "\\Pairs\\" + str(BestMatch) + "_" +str(index) 
-            #_3DVisLabLib. MakeFolder(TempFolder)
-            cv2.imwrite(TempFolder  + "_File1_"+ ".jpg",MatchImages.ImagesInMem_to_Process_copy[MatchedImage][1])
-            cv2.imwrite(TempFolder + "_File2_"+ ".jpg",MatchImages.ImagesInMem_to_Process_copy[InputImage][1])
-            
-            
-            if MatchImages.TraceExtractedImg_to_DatRecordObj is not None:
-                with open(TempFolder + "_DatRecord.txt", 'w') as f:
-                    f.writelines(str(MatchImages.TraceExtractedImg_to_DatRecordObj[MatchedImage]))
-                    f.writelines(str(MatchImages.TraceExtractedImg_to_DatRecordObj[InputImage]))
-
-                #with open(TempFolder + "_FirstImgMatches.txt", 'w') as f:
-            #    for item in ImgVSMatch:
-            #        f.writelines(str(ImgVSMatch[item])+ ",")
-        #dvdvdvd
-        del MatchImages.ImagesInMem_to_Process_copy[MatchedImage]
-        del MatchImages.ImagesInMem_to_Process_copy[InputImage]
-        
-    else:
-        print("Could not match image!!")
-        #orphaned image
-        del MatchImages.ImagesInMem_to_Process_copy[RandomImage]
-    print(MatchedImage,InputImage)
-    print(index,"/",len(MatchImages.ImagesInMem_to_Process_copy))
-
-    #_3DVisLabLib.ImageViewer_Quick_no_resize(BestImage,0,False,False)
-
-
-#first loop is done - now start pairing up images recursively
-#need to know when to stop - user can potentially give number of denoms or otherwise maybe normal distribution or some
-#way of establishing a stopping point
-
-
-
 def DoubleUp_ImgMatches():
     index=0
     print(index)
@@ -280,7 +182,48 @@ def DoubleUp_ImgMatches():
             #no match
             del ImgPairings_keyDict[TestlistImages_index]
 
+#create resource manager
+MatchImages=MatchImagesObject()
 
+#delete all files in folder
+print("Delete output folders:\n",MatchImages.Outputfolder)
+if _3DVisLabLib.yesno("?"):
+    _3DVisLabLib.DeleteFiles_RecreateFolder(MatchImages.Outputfolder)
+
+#get all files in input folder
+InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(MatchImages.InputFolder)
+
+#filter out non images
+ListAllImages=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
+#get object that links images to dat records
+print("attempting to load image to dat record trace file",MatchImages.InputFolder + "\\" + MatchImages.TraceExtractedImg_to_DatRecord)
+try:
+    Json_to_load=MatchImages.InputFolder + "\\" + MatchImages.TraceExtractedImg_to_DatRecord
+    with open(Json_to_load) as json_file:
+        MatchImages.TraceExtractedImg_to_DatRecordObj = json.load(json_file)
+        print("json loaded succesfully")
+        MatchImages.TraceExtractedImg_to_DatRecordObj
+except Exception as e:
+    print("JSON_Open error attempting to open json file " + str(MatchImages.InputFolder + "\\" + MatchImages.TraceExtractedImg_to_DatRecord) + " " + str(e))
+    if _3DVisLabLib.yesno("Continue operation? No image to dat record trace will be possible so only image matching & sorting")==False:
+        raise Exception("User declined to continue after JSOn image vs dat record file not found")
+
+
+#load images into memory
+for Index, ImagePath in enumerate(ListAllImages):
+    print("Loading in image",ImagePath )
+    Pod1Image = cv2.imread(ImagePath,0)
+    Pod1Image_col = cv2.imread(ImagePath)
+    keypoints,descriptor=_3DVisLabLib.OrbKeyPointsOnly(Pod1Image_col,MatchImages.FeatureMatch_Dict_Common.ORB_default)
+    MatchImages.ImagesInMem_to_Process[ImagePath]=(Pod1Image,Pod1Image_col,keypoints,descriptor)
+    #cant deepcopy non standard datatypes, just make a copy at same time
+    MatchImages.ImagesInMem_to_Process_copy[ImagePath]=(Pod1Image,Pod1Image_col,keypoints,descriptor)
+
+#make subfolders
+_3DVisLabLib. MakeFolder(MatchImages.Outputfolder + "\\Pairs\\")
+_3DVisLabLib. MakeFolder(MatchImages.Outputfolder + "\\Duplicates\\")
+#MatchedImage,InputImage,BestImage,BestMatch,ImgVSMatch=GetClosestImage_KpsOnly(RandomImage,MatchImages.ImagesInMem_to_Process_copy,15)
+   
 for Index, img in enumerate(MatchImages.ImagesInMem_to_Process):
     MatchImages.ImagesInMem_Pairing[Index]=[img]
 
