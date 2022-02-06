@@ -7,19 +7,29 @@ import random
 from statistics import mean 
 import copy
 import random
+import time
+import statistics
+import scipy
+import numpy as np
+import gc
+#gc.disable()
 
 class MatchImagesObject():
     """Class to hold information for image sorting & match process"""
     def __init__(self):
-        self.InputFolder=r"C:\Working\FindIMage_In_Dat\Output"
+        self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         self.Outputfolder=r"C:\Working\FindIMage_In_Dat\MatchImages"
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
         self.OutputDuplicates=self.Outputfolder + "\\Duplicates\\"
         self.TraceExtractedImg_to_DatRecordObj=None
         self.ImagesInMem_to_Process=dict()
-        self.ImagesInMem_to_Process_Orphans=dict()#cant deepcopy feature match keypoints
+        #self.ImagesInMem_to_Process_Orphans=dict()#cant deepcopy feature match keypoints
         self.ImagesInMem_Pairing=dict()
+        self.ImagesInMem_Pairing_orphans=dict()
+        self.GetDuplicates=False
+        self.startTime =None
+        self.Endtime =None
         
 
     class FeatureMatch_Dict_Common:
@@ -94,9 +104,12 @@ def ClosestList_images(InputImgDict_IndexID, InputImageDict_OfLists,averagingMat
         Descriptor1=BaseImgDict[InputList[0]][3]
         Keypoints2=BaseImgDict[TestList[0]][2]
         Descriptor2=BaseImgDict[TestList[0]][3]
+        Histo1=BaseImgDict[InputList[0]][4]
+        Histo2=BaseImgDict[TestList[0]][4]
         UnsortedMatches=_3DVisLabLib.Orb_FeatureMatch(Keypoints1,Descriptor1,Keypoints2,Descriptor2,99999)
+        HistogramSimilarity=CompareHistograms(Histo1,Histo2)
         #pts1,pts2,ORB_Report,ImageLog,ImageTextLog,UnsortedMatches=_3DVisLabLib.ORB_Feature_and_Match_SortImg(InputImageDict[InputImgFilename][0],InputImageDict[TestImage][0],MatchImages.FeatureMatch_Dict_Common.ORB_default,True)
-        AverageMatchDistance=GetAverageOfMatches(UnsortedMatches,averagingMatchpts)
+        AverageMatchDistance=GetAverageOfMatches(UnsortedMatches,averagingMatchpts)+HistogramSimilarity
         ImgVsMatch[TestList[0]]=AverageMatchDistance
         #print("average match distance=",GetAverageOfMatches(UnsortedMatches,4))
         #keep best match so far
@@ -133,25 +146,38 @@ def GetClosestImage(InputImgFilename, InputImageDict,averagingMatchpts):
         raise Exception("Error - GetClosestImage - cannot match image with itself")
     return file1,file2,BestImage,BestMatch,ImgVsMatch
 
+
+def CompareHistograms(histo_Img1,histo_Img2):
+    def L2Norm(H1,H2):
+        distance =0
+        for i in range(len(H1)):
+            distance += np.square(H1[i]-H2[i])
+        return np.sqrt(distance)
+
+    similarity_metric = L2Norm(histo_Img1,histo_Img2)
+    return similarity_metric
+
 def DoubleUp_ImgMatches():
     index=0
-    print(index)
+    List_BestMatches_QuickMetric=[]
     #create temp dictionary so we can remove keys as we test images
     ImgPairings_keyDict=dict()
     for Key in MatchImages.ImagesInMem_Pairing:
         ImgPairings_keyDict[Key]=Key
     while len(ImgPairings_keyDict)>0:
+        print("length of list pairing dictionary",len(MatchImages.ImagesInMem_Pairing))
         index=index+1
-        print(index)
+        #print(index,"/",str(len(ImgPairings_keyDict)),"cycle", cycle)
         #go through pairs of images - each time in theory each value list length should double
         TestlistImages_index=random.choice(list(ImgPairings_keyDict.keys()))
         
         #find closest pair - check first instance of pair only - not sure if this is significant
         BestList,BestID,BestMatch,ImgVsMatch=ClosestList_images(TestlistImages_index,MatchImages.ImagesInMem_Pairing,15,MatchImages.ImagesInMem_to_Process,ImgPairings_keyDict)
 
-        print("BestMatch",BestMatch)
+        #print("BestMatch",BestMatch)
 
         if BestList is not None:
+            
             #check if duplicate then save if so
             if BestMatch <0.01:
                 print("Duplicate found")
@@ -167,9 +193,14 @@ def DoubleUp_ImgMatches():
                         TempOut2=TempOut2.replace("\\","/")
                         f.writelines(TempOut1)
                         f.writelines(TempOut2)
+            else:
+                #dont add duplicates or it can mess up the stats
+                List_BestMatches_QuickMetric.append(BestMatch)
             #merge the two lists
             #rebuild the tuple of list of images and list of bestmatch scores
-            MatchImages.ImagesInMem_Pairing[TestlistImages_index]=(MatchImages.ImagesInMem_Pairing[TestlistImages_index][0]+MatchImages.ImagesInMem_Pairing[BestID][0],MatchImages.ImagesInMem_Pairing[TestlistImages_index][1])
+            Temp_ListMatchScores=MatchImages.ImagesInMem_Pairing[TestlistImages_index][1]
+            Temp_ListMatchScores.append(BestMatch)
+            MatchImages.ImagesInMem_Pairing[TestlistImages_index]=(MatchImages.ImagesInMem_Pairing[TestlistImages_index][0]+MatchImages.ImagesInMem_Pairing[BestID][0],Temp_ListMatchScores)
             #delete the test list as its now merged with input list
             del MatchImages.ImagesInMem_Pairing[BestID]
             
@@ -180,9 +211,12 @@ def DoubleUp_ImgMatches():
             
 
         else:
+            #add to orphans
+            MatchImages.ImagesInMem_Pairing_orphans[TestlistImages_index]=ImgPairings_keyDict[TestlistImages_index]
             #no match
             del ImgPairings_keyDict[TestlistImages_index]
-
+            
+    return List_BestMatches_QuickMetric
 #create resource manager
 MatchImages=MatchImagesObject()
 
@@ -190,6 +224,10 @@ MatchImages=MatchImagesObject()
 print("Delete output folders:\n",MatchImages.Outputfolder)
 if _3DVisLabLib.yesno("?"):
     _3DVisLabLib.DeleteFiles_RecreateFolder(MatchImages.Outputfolder)
+
+#ask if user wants to check for duplicates
+print("Get duplicates only?? - this will be in quadratic/O(n)^2 time (very long)!!!")
+MatchImages.GetDuplicates= _3DVisLabLib.yesno("?")
 
 #get all files in input folder
 InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(MatchImages.InputFolder)
@@ -209,36 +247,94 @@ except Exception as e:
     if _3DVisLabLib.yesno("Continue operation? No image to dat record trace will be possible so only image matching & sorting")==False:
         raise Exception("User declined to continue after JSOn image vs dat record file not found")
 
-
+MatchImages.startTime=time.time()
 #load images into memory
 for Index, ImagePath in enumerate(ListAllImages):
     print("Loading in image",ImagePath )
     Pod1Image = cv2.imread(ImagePath,0)
     Pod1Image_col = cv2.imread(ImagePath)
+    #get feature match keypoints
     keypoints,descriptor=_3DVisLabLib.OrbKeyPointsOnly(Pod1Image_col,MatchImages.FeatureMatch_Dict_Common.ORB_default)
-    MatchImages.ImagesInMem_to_Process[ImagePath]=(Pod1Image,Pod1Image_col,keypoints,descriptor)
+    #get histogram for comparing colours
+    hist = cv2.calcHist([Pod1Image_col], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
+    hist = cv2.normalize(hist, hist).flatten()
+    #load into tuple for object
+    MatchImages.ImagesInMem_to_Process[ImagePath]=(Pod1Image,Pod1Image_col,keypoints,descriptor,hist)
 
 #make subfolders
 _3DVisLabLib. MakeFolder(MatchImages.Outputfolder + "\\Pairs\\")
 _3DVisLabLib. MakeFolder(MatchImages.Outputfolder + "\\Duplicates\\")
 #MatchedImage,InputImage,BestImage,BestMatch,ImgVSMatch=GetClosestImage_KpsOnly(RandomImage,MatchImages.ImagesInMem_to_Process_copy,15)
-   
+
+
+
 for Index, img in enumerate(MatchImages.ImagesInMem_to_Process):
     MatchImages.ImagesInMem_Pairing[Index]=([img],[])
 
-DoubleUp_ImgMatches()
-DoubleUp_ImgMatches()
-# try:
 
-#     DoubleUp_ImgMatches()
-#     DoubleUp_ImgMatches()
-#     DoubleUp_ImgMatches()
-#     DoubleUp_ImgMatches()
-# except:
-#     pass
-#lets print out doubles
+if MatchImages.GetDuplicates==True:
+    Duplicates=0
+    print("Getting duplicates - this will be in quadratic/O(n)^2 time (very long)!!!")
+    #check each file against all other files
+    index = 0
+    ParsedDict=()
+    for External_MemImg in MatchImages.ImagesInMem_to_Process:
+        #test two images 
+        MatchedImage,InputImage,BestImage,BestMatch,ImgVSMatch=GetClosestImage_KpsOnly(External_MemImg,MatchImages.ImagesInMem_to_Process,15)
+        if MatchedImage is not None:
+            #have a match - lets see if its a perfect match (duplicate)
+            #in theory should be 0.0 as a score but potentially small variation due to .jpg compression?
+            if BestMatch<0.01:
+                cv2.imwrite(MatchImages.OutputDuplicates  + str(index)+ "_File1_"+ ".jpg",MatchImages.ImagesInMem_to_Process[MatchedImage][1])
+                cv2.imwrite(MatchImages.OutputDuplicates + str(index)+ "_File2_"+ ".jpg",MatchImages.ImagesInMem_to_Process[InputImage][1])
+                #if tracer file exists we can also save link to dat file and record
+                if MatchImages.TraceExtractedImg_to_DatRecordObj is not None:
+                        with open(MatchImages.OutputDuplicates + str(index) +"_DatRecord.txt", 'w') as f:
+                            TempOut1=str(MatchImages.TraceExtractedImg_to_DatRecordObj[MatchedImage])
+                            TempOut2=str(MatchImages.TraceExtractedImg_to_DatRecordObj[InputImage])
+                            TempOut1=TempOut1.replace("\\","/")
+                            TempOut2=TempOut2.replace("\\","/")
+                            f.writelines(TempOut1)
+                            f.writelines(TempOut2)
+                Duplicates=Duplicates+1
+        #update user
+        index=index+len(MatchImages.ImagesInMem_to_Process)
+        print(str(index),"/",str(len(MatchImages.ImagesInMem_to_Process)**2))
+    print(Duplicates,"Duplicates found and stored at",MatchImages.OutputDuplicates)
+    MatchImages.Endtime= time.time()
+    print("time taken (s):",round(MatchImages.Endtime -MatchImages.startTime ))
+    exit()
+
+Mean_Std_Per_cyclelist=[]
+try:
+    for looper in range (0,1):
+        List_Bestmatches=DoubleUp_ImgMatches()
+        temp_stdev=statistics.pstdev(List_Bestmatches)
+        temp_mean=sum(List_Bestmatches) / len(List_Bestmatches)
+        Mean_Std_Per_cyclelist.append((looper,temp_stdev,temp_mean))
+        #here we can remove any matches that are N standard deviations away from the mean
+        Cutoff_Std_Deviation=temp_mean+(temp_stdev*1)#magic number until we put it in data object
+        for ListIndex, ListOfImages in enumerate(MatchImages.ImagesInMem_Pairing):
+            MatchDistance=(MatchImages.ImagesInMem_Pairing[ListOfImages][1][0])
+            #if distance is bigger than std deviation cut off - remove and place into orphans dictionary
+            if MatchDistance>Cutoff_Std_Deviation:
+                MatchImages.ImagesInMem_Pairing_orphans[ListOfImages]=MatchImages.ImagesInMem_Pairing[ListOfImages]
+                del MatchImages.ImagesInMem_Pairing[ListOfImages]
+
+
+        plop=1
+except Exception as e:
+    print("Error with organise loop")
+    print(e)
+
+#lets write out pairing
 for ListIndex, ListOfImages in enumerate(MatchImages.ImagesInMem_Pairing):
     for imgIndex, Images in enumerate (MatchImages.ImagesInMem_Pairing[ListOfImages][0]):
-        TempFfilename=MatchImages.OutputPairs  + "00" + str(ListIndex) + "_" +str(imgIndex) + ".jpg"
+        MatchDistance=str(MatchImages.ImagesInMem_Pairing[ListOfImages][1])
+        TempFfilename=MatchImages.OutputPairs  + "00" + str(ListIndex) + "_" +str(imgIndex) + "_mD" + MatchDistance + ".jpg"
         cv2.imwrite(TempFfilename,MatchImages.ImagesInMem_to_Process[Images][1])
 
+MatchImages.Endtime= time.time()
+print("Orphans",len(MatchImages.ImagesInMem_Pairing_orphans))
+print("time taken (s):",round(MatchImages.Endtime- MatchImages.startTime ))
+print(Mean_Std_Per_cyclelist)

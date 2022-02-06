@@ -6,11 +6,16 @@ import _3DVisLabLib
 from copy import deepcopy
 import BV_DatReader_Lib
 import DatScraper_tool
+import gc
+gc.disable()
 
 def main(S39_only=False):
-
+    
     #get parameters object will be loaded with user selection
     GetParametersFromUser=BV_DatReader_Lib.UserInputParameters()
+    if _3DVisLabLib.yesno("Delete output folder" + GetParametersFromUser.OutputFilePath):
+        _3DVisLabLib.DeleteFiles_RecreateFolder(GetParametersFromUser.OutputFilePath)
+
     if S39_only==False:
         GetParametersFromUser.UserPopulateParameters()
     else:
@@ -287,6 +292,7 @@ def main(S39_only=False):
 if __name__ == "__main__":
     #entry point
     #try:
+    
     print("WARNING! MM8 images WIP - still issue with image depth size WIP")
     if _3DVisLabLib.yesno("Get SR thumbnails only?"):main(True)
     else:

@@ -248,6 +248,7 @@ def AutomaticExtraction(UserParameters):
                 ReplacedExtension=DelimitedDat_LastElem.lower().replace(".dat",".jpg")
                 Savestring=UserParameters.OutputFilePath +"\\" + SNR_ReadResult + "File" + str(FileIndex) + "_Image_"+str(Index) +"_"+ ReplacedExtension
                 print("saving image to ", Savestring)
+                print("Dat file",FileIndex,"/",str(len(InputFiles_cleaned)))
                 cv2.imwrite(Savestring,OutputImage)
                 #CreateImageVDatfileRecord provenance tracker
                 ImgVDatFile_andRecord[Savestring]=(DatFile,Index+1,SNR_ReadResult)
