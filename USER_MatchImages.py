@@ -278,7 +278,9 @@ if MatchImages.GetDuplicates==True:
     #check each file against all other files
     index = 0
     ParsedDict=()
-    for External_MemImg in MatchImages.ImagesInMem_to_Process:
+    while len( MatchImages.ImagesInMem_to_Process)>0:
+        #get random image from those in memory
+        External_MemImg=random.choice(list(MatchImages.ImagesInMem_to_Process.keys()))
         #test two images 
         MatchedImage,InputImage,BestImage,BestMatch,ImgVSMatch=GetClosestImage_KpsOnly(External_MemImg,MatchImages.ImagesInMem_to_Process,15)
         if MatchedImage is not None:
@@ -297,9 +299,12 @@ if MatchImages.GetDuplicates==True:
                             f.writelines(TempOut1)
                             f.writelines(TempOut2)
                 Duplicates=Duplicates+1
+        #delete key
+        del MatchImages.ImagesInMem_to_Process[External_MemImg]
         #update user
-        index=index+len(MatchImages.ImagesInMem_to_Process)
-        print(str(index),"/",str(len(MatchImages.ImagesInMem_to_Process)**2))
+        print(str(len(MatchImages.ImagesInMem_to_Process)))
+        #index=index+len(MatchImages.ImagesInMem_to_Process)
+        #print(str(index),"/",str(len(MatchImages.ImagesInMem_to_Process)**2))
     print(Duplicates,"Duplicates found and stored at",MatchImages.OutputDuplicates)
     MatchImages.Endtime= time.time()
     print("time taken (s):",round(MatchImages.Endtime -MatchImages.startTime ))
@@ -307,25 +312,35 @@ if MatchImages.GetDuplicates==True:
 
 Mean_Std_Per_cyclelist=[]
 try:
-    for looper in range (0,1):
+    for looper in range (0,3):
         List_Bestmatches=DoubleUp_ImgMatches()
+        LowMatches_to_remove=[]
         temp_stdev=statistics.pstdev(List_Bestmatches)
         temp_mean=sum(List_Bestmatches) / len(List_Bestmatches)
-        Mean_Std_Per_cyclelist.append((looper,temp_stdev,temp_mean))
-        #here we can remove any matches that are N standard deviations away from the mean
         Cutoff_Std_Deviation=temp_mean+(temp_stdev*1)#magic number until we put it in data object
+        Mean_Std_Per_cyclelist.append((looper,temp_stdev,temp_mean,copy.deepcopy(Cutoff_Std_Deviation)))
+        #here we can remove any matches that are N standard deviations away from the mean
+        
         for ListIndex, ListOfImages in enumerate(MatchImages.ImagesInMem_Pairing):
-            MatchDistance=(MatchImages.ImagesInMem_Pairing[ListOfImages][1][0])
-            #if distance is bigger than std deviation cut off - remove and place into orphans dictionary
-            if MatchDistance>Cutoff_Std_Deviation:
-                MatchImages.ImagesInMem_Pairing_orphans[ListOfImages]=MatchImages.ImagesInMem_Pairing[ListOfImages]
-                del MatchImages.ImagesInMem_Pairing[ListOfImages]
-
+            try:
+                #will have a list of match distance per cycle - get the last one
+                MatchDistance=(MatchImages.ImagesInMem_Pairing[ListOfImages][1][-1])
+                #if distance is bigger than std deviation cut off - remove and place into orphans dictionary
+                if MatchDistance>Mean_Std_Per_cyclelist[0][3]:#use first instance of std-deviation
+                    LowMatches_to_remove.append(ListOfImages)
+            except:
+                print("error with ",ListOfImages,"in", "MatchImages.ImagesInMem_Pairing","moving to orphans")
+                LowMatches_to_remove.append(ListOfImages)
+        #remove high distance matches now
+        print("bad matches found",len(LowMatches_to_remove))
+        for badmatch in LowMatches_to_remove:
+            MatchImages.ImagesInMem_Pairing_orphans[badmatch]=MatchImages.ImagesInMem_Pairing[badmatch]
+            del MatchImages.ImagesInMem_Pairing[badmatch]
 
         plop=1
 except Exception as e:
-    print("Error with organise loop")
     print(e)
+    raise Exception("Error with organise loop")
 
 #lets write out pairing
 for ListIndex, ListOfImages in enumerate(MatchImages.ImagesInMem_Pairing):
