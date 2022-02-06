@@ -105,8 +105,8 @@ def GetClosestImage_KpsOnly(InputImgFilename, InputImageDict,averagingMatchpts):
             #BestImage=copy.deepcopy(ImageLog[1])
             file1=TestImage
             file2=InputImgFilename
-    if file1.lower()==file2.lower():
-        raise Exception("Error - GetClosestImage - cannot match image with itself")
+            if file1.lower()==file2.lower():
+                raise Exception("Error - GetClosestImage_KpsOnly - cannot match image with itself")
     return file1,file2,BestImage,BestMatch,ImgVsMatch
 
 def ClosestList_images(InputImgDict_IndexID, InputImageDict_OfLists,averagingMatchpts,BaseImgDict,ImgPairings_keyDict):
@@ -128,7 +128,7 @@ def ClosestList_images(InputImgDict_IndexID, InputImageDict_OfLists,averagingMat
         Descriptor1=BaseImgDict[InputList[0]][3]
         Keypoints2=BaseImgDict[TestList[0]][2]
         Descriptor2=BaseImgDict[TestList[0]][3]
-        UnsortedMatches=_3DVisLabLib.Orb_FeatureMatch(Keypoints1,Descriptor1,Keypoints2,Descriptor2,999999)
+        UnsortedMatches=_3DVisLabLib.Orb_FeatureMatch(Keypoints1,Descriptor1,Keypoints2,Descriptor2,99999)
         #pts1,pts2,ORB_Report,ImageLog,ImageTextLog,UnsortedMatches=_3DVisLabLib.ORB_Feature_and_Match_SortImg(InputImageDict[InputImgFilename][0],InputImageDict[TestImage][0],MatchImages.FeatureMatch_Dict_Common.ORB_default,True)
         AverageMatchDistance=GetAverageOfMatches(UnsortedMatches,averagingMatchpts)
         ImgVsMatch[TestList[0]]=AverageMatchDistance
@@ -185,7 +185,7 @@ while len(MatchImages.ImagesInMem_to_Process_copy)>0:
     #build list of likewise images
 
     if not index in MatchImages.ImagesInMem_Pairing.keys():
-        MatchImages.ImagesInMem_Pairing[index]=[RandomImage]
+        MatchImages.ImagesInMem_Pairing[index]=([RandomImage],[])
 
     MatchedImage,InputImage,BestImage,BestMatch,ImgVSMatch=GetClosestImage_KpsOnly(RandomImage,MatchImages.ImagesInMem_to_Process_copy,15)
     
@@ -213,11 +213,12 @@ while len(MatchImages.ImagesInMem_to_Process_copy)>0:
         #dvdvdvd
         del MatchImages.ImagesInMem_to_Process_copy[MatchedImage]
         del MatchImages.ImagesInMem_to_Process_copy[InputImage]
-        print(MatchedImage,InputImage)
+        
     else:
-        print("No result!!")
-    
-
+        print("Could not match image!!")
+        #orphaned image
+        del MatchImages.ImagesInMem_to_Process_copy[RandomImage]
+    print(MatchedImage,InputImage)
     print(index,"/",len(MatchImages.ImagesInMem_to_Process_copy))
 
     #_3DVisLabLib.ImageViewer_Quick_no_resize(BestImage,0,False,False)
@@ -231,6 +232,7 @@ while len(MatchImages.ImagesInMem_to_Process_copy)>0:
 
 def DoubleUp_ImgMatches():
     index=0
+    print(index)
     #create temp dictionary so we can remove keys as we test images
     ImgPairings_keyDict=dict()
     for Key in MatchImages.ImagesInMem_Pairing:
@@ -244,20 +246,31 @@ def DoubleUp_ImgMatches():
         #find closest pair - check first instance of pair only - not sure if this is significant
         BestList,BestID,BestMatch,ImgVsMatch=ClosestList_images(TestlistImages_index,MatchImages.ImagesInMem_Pairing,15,MatchImages.ImagesInMem_to_Process,ImgPairings_keyDict)
 
-        #merge the two lists
-        MatchImages.ImagesInMem_Pairing[TestlistImages_index]=MatchImages.ImagesInMem_Pairing[TestlistImages_index]+MatchImages.ImagesInMem_Pairing[BestID]
-        #delete the test list as its now merged with input list
-        del MatchImages.ImagesInMem_Pairing[BestID]
-        
-        #delete key from test dictionary
-        del ImgPairings_keyDict[TestlistImages_index]
-        del ImgPairings_keyDict[BestID]
-try:
+        print("BestMatch",BestMatch)
 
-    DoubleUp_ImgMatches()
-    DoubleUp_ImgMatches()
-except:
-    pass
+        if BestList is not None:
+            #merge the two lists
+            MatchImages.ImagesInMem_Pairing[TestlistImages_index]=MatchImages.ImagesInMem_Pairing[TestlistImages_index]+MatchImages.ImagesInMem_Pairing[BestID]
+            #delete the test list as its now merged with input list
+            del MatchImages.ImagesInMem_Pairing[BestID]
+            
+            #delete key from test dictionary
+            del ImgPairings_keyDict[TestlistImages_index]
+            del ImgPairings_keyDict[BestID]
+
+        else:
+            #no match
+            del ImgPairings_keyDict[TestlistImages_index]
+
+
+# try:
+
+#     DoubleUp_ImgMatches()
+#     DoubleUp_ImgMatches()
+#     DoubleUp_ImgMatches()
+#     DoubleUp_ImgMatches()
+# except:
+#     pass
 #lets print out doubles
 for ListIndex, ListOfImages in enumerate(MatchImages.ImagesInMem_Pairing):
     for imgIndex, Images in enumerate (MatchImages.ImagesInMem_Pairing[ListOfImages]):
