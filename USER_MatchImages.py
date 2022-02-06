@@ -6,6 +6,7 @@ import cv2
 import random
 from statistics import mean 
 import copy
+import random
 
 class MatchImagesObject():
     """Class to hold information for image sorting & match process"""
@@ -13,7 +14,8 @@ class MatchImagesObject():
         self.InputFolder=r"C:\Working\FindIMage_In_Dat\Output"
         self.Outputfolder=r"C:\Working\FindIMage_In_Dat\MatchImages"
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
-
+        self.OutputPairs=self.Outputfolder + "\\Pairs\\"
+        self.OutputDuplicates=self.Outputfolder + "\\Duplicates\\"
         self.TraceExtractedImg_to_DatRecordObj=None
         self.ImagesInMem_to_Process=dict()
         self.ImagesInMem_to_Process_copy=dict()#cant deepcopy feature match keypoints
@@ -40,7 +42,8 @@ class MatchImagesObject():
 MatchImages=MatchImagesObject()
 
 #delete all files in folder
-if _3DVisLabLib.yesno("Delete all files in " + str(MatchImages.Outputfolder) + "?"):
+print("Delete output folders:\n",MatchImages.Outputfolder)
+if _3DVisLabLib.yesno("?"):
     _3DVisLabLib.DeleteFiles_RecreateFolder(MatchImages.Outputfolder)
 
 #get all files in input folder
@@ -142,10 +145,6 @@ def ClosestList_images(InputImgDict_IndexID, InputImageDict_OfLists,averagingMat
 
     return BestList,BestID,BestMatch,ImgVsMatch
 
-
-
-
-
 def GetClosestImage(InputImgFilename, InputImageDict,averagingMatchpts):
     #for each image in folder get set of feature matching points using orb/sift etc
     ImgVsMatch=dict()
@@ -174,8 +173,10 @@ def GetClosestImage(InputImgFilename, InputImageDict,averagingMatchpts):
 index=0
 #have to make top pairs folder first
 _3DVisLabLib. MakeFolder(MatchImages.Outputfolder + "\\Pairs\\")
+_3DVisLabLib. MakeFolder(MatchImages.Outputfolder + "\\Duplicates\\")
 
 while len(MatchImages.ImagesInMem_to_Process_copy)>0:
+    break
     index=index+1
     
     RandomImage=random.choice(list(MatchImages.ImagesInMem_to_Process_copy.keys()))
@@ -185,7 +186,7 @@ while len(MatchImages.ImagesInMem_to_Process_copy)>0:
     #build list of likewise images
 
     if not index in MatchImages.ImagesInMem_Pairing.keys():
-        MatchImages.ImagesInMem_Pairing[index]=([RandomImage],[])
+        MatchImages.ImagesInMem_Pairing[index]=[RandomImage]
 
     MatchedImage,InputImage,BestImage,BestMatch,ImgVSMatch=GetClosestImage_KpsOnly(RandomImage,MatchImages.ImagesInMem_to_Process_copy,15)
     
@@ -249,6 +250,21 @@ def DoubleUp_ImgMatches():
         print("BestMatch",BestMatch)
 
         if BestList is not None:
+            #check if duplicate then save if so
+            if BestMatch <0.01:
+                print("Duplicate found")
+                RandoNo=str(random.random()/100)
+                cv2.imwrite(MatchImages.OutputDuplicates  + RandoNo+ "_File1_"+ ".jpg",MatchImages.ImagesInMem_to_Process[BestList[0]][1])
+                cv2.imwrite(MatchImages.OutputDuplicates + RandoNo+ "_File2_"+ ".jpg",MatchImages.ImagesInMem_to_Process[MatchImages.ImagesInMem_Pairing[TestlistImages_index][0]][1])
+            #if tracer file exists to trace images back to dat records save filenames y
+                if MatchImages.TraceExtractedImg_to_DatRecordObj is not None:
+                    with open(MatchImages.OutputDuplicates + RandoNo +"_DatRecord.txt", 'w') as f:
+                        TempOut1=str(MatchImages.TraceExtractedImg_to_DatRecordObj[BestList[0]])
+                        TempOut2=str(MatchImages.TraceExtractedImg_to_DatRecordObj[MatchImages.ImagesInMem_Pairing[TestlistImages_index][0]])
+                        TempOut1=TempOut1.replace("\\","/")
+                        TempOut2=TempOut2.replace("\\","/")
+                        f.writelines(TempOut1)
+                        f.writelines(TempOut2)
             #merge the two lists
             MatchImages.ImagesInMem_Pairing[TestlistImages_index]=MatchImages.ImagesInMem_Pairing[TestlistImages_index]+MatchImages.ImagesInMem_Pairing[BestID]
             #delete the test list as its now merged with input list
@@ -258,11 +274,18 @@ def DoubleUp_ImgMatches():
             del ImgPairings_keyDict[TestlistImages_index]
             del ImgPairings_keyDict[BestID]
 
+            
+
         else:
             #no match
             del ImgPairings_keyDict[TestlistImages_index]
 
 
+for Index, img in enumerate(MatchImages.ImagesInMem_to_Process):
+    MatchImages.ImagesInMem_Pairing[Index]=[img]
+
+DoubleUp_ImgMatches()
+DoubleUp_ImgMatches()
 # try:
 
 #     DoubleUp_ImgMatches()
