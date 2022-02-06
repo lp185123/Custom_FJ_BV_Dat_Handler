@@ -677,6 +677,36 @@ class MultiProcessPooler:
             else:
                 self.UserUpdated=False
                 
+def OrbKeyPointsOnly(imageA,Input_ParameterDictionary):
+    """only get feature matching keypoints"""
+    ORB=cv2.ORB_create(**Input_ParameterDictionary)
+    kp1, des1 = ORB.detectAndCompute(imageA,None)
+    return kp1, des1
+    
+def Orb_FeatureMatch(kp1, des1,kp2, des2,MaxDistance):
+    l_good = [] 
+    l_pts1 = []
+    l_pts2 = []
+    # create Brute-force Matcher object
+    # If ORB is using WTA_K == 3 or 4, cv2.NORM_HAMMING2 should be used.
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)#we can sort out matches ourself
+    # Match descriptors.
+    matches= bf.match(des1,des2)
+    # Sort them in the order of their distance.
+    matches = sorted(matches, key = lambda x:x.distance)
+    #filtered matches
+    matches_filtered=[]
+    for matchobject in matches:
+        if matchobject.distance<MaxDistance:
+            matches_filtered.append(matchobject)
+    matches = sorted(matches_filtered, key = lambda x:x.distance)
+    # pop out matches into our point array
+    for (match1) in (matches[:]):
+        l_good.append([match1])
+        l_pts2.append(kp2[match1.trainIdx].pt)
+        l_pts1.append(kp1[match1.queryIdx].pt)
+    
+    return matches
 
 def ORB_Feature_and_Match_SortImg(imageA, imageB,Input_ParameterDictionary,Use_Brute_Force):
     ImageLog=[]
