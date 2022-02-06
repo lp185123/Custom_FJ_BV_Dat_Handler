@@ -18,7 +18,7 @@ class MatchImagesObject():
         self.OutputDuplicates=self.Outputfolder + "\\Duplicates\\"
         self.TraceExtractedImg_to_DatRecordObj=None
         self.ImagesInMem_to_Process=dict()
-        self.ImagesInMem_to_Process_copy=dict()#cant deepcopy feature match keypoints
+        self.ImagesInMem_to_Process_Orphans=dict()#cant deepcopy feature match keypoints
         self.ImagesInMem_Pairing=dict()
         
 
@@ -88,8 +88,8 @@ def ClosestList_images(InputImgDict_IndexID, InputImageDict_OfLists,averagingMat
             continue
         if TestListID not in ImgPairings_keyDict:
             continue
-        InputList=InputImageDict_OfLists[InputImgDict_IndexID]
-        TestList=InputImageDict_OfLists[TestListID]
+        InputList=InputImageDict_OfLists[InputImgDict_IndexID][0]
+        TestList=InputImageDict_OfLists[TestListID][0]
         Keypoints1=BaseImgDict[InputList[0]][2]
         Descriptor1=BaseImgDict[InputList[0]][3]
         Keypoints2=BaseImgDict[TestList[0]][2]
@@ -157,18 +157,19 @@ def DoubleUp_ImgMatches():
                 print("Duplicate found")
                 RandoNo=str(random.random()/100)
                 cv2.imwrite(MatchImages.OutputDuplicates  + RandoNo+ "_File1_"+ ".jpg",MatchImages.ImagesInMem_to_Process[BestList[0]][1])
-                cv2.imwrite(MatchImages.OutputDuplicates + RandoNo+ "_File2_"+ ".jpg",MatchImages.ImagesInMem_to_Process[MatchImages.ImagesInMem_Pairing[TestlistImages_index][0]][1])
+                cv2.imwrite(MatchImages.OutputDuplicates + RandoNo+ "_File2_"+ ".jpg",MatchImages.ImagesInMem_to_Process[MatchImages.ImagesInMem_Pairing[TestlistImages_index][0][0]][1])
             #if tracer file exists to trace images back to dat records save filenames y
                 if MatchImages.TraceExtractedImg_to_DatRecordObj is not None:
                     with open(MatchImages.OutputDuplicates + RandoNo +"_DatRecord.txt", 'w') as f:
                         TempOut1=str(MatchImages.TraceExtractedImg_to_DatRecordObj[BestList[0]])
-                        TempOut2=str(MatchImages.TraceExtractedImg_to_DatRecordObj[MatchImages.ImagesInMem_Pairing[TestlistImages_index][0]])
+                        TempOut2=str(MatchImages.TraceExtractedImg_to_DatRecordObj[MatchImages.ImagesInMem_Pairing[TestlistImages_index][0][0]])
                         TempOut1=TempOut1.replace("\\","/")
                         TempOut2=TempOut2.replace("\\","/")
                         f.writelines(TempOut1)
                         f.writelines(TempOut2)
             #merge the two lists
-            MatchImages.ImagesInMem_Pairing[TestlistImages_index]=MatchImages.ImagesInMem_Pairing[TestlistImages_index]+MatchImages.ImagesInMem_Pairing[BestID]
+            #rebuild the tuple of list of images and list of bestmatch scores
+            MatchImages.ImagesInMem_Pairing[TestlistImages_index]=(MatchImages.ImagesInMem_Pairing[TestlistImages_index][0]+MatchImages.ImagesInMem_Pairing[BestID][0],MatchImages.ImagesInMem_Pairing[TestlistImages_index][1])
             #delete the test list as its now merged with input list
             del MatchImages.ImagesInMem_Pairing[BestID]
             
@@ -216,8 +217,6 @@ for Index, ImagePath in enumerate(ListAllImages):
     Pod1Image_col = cv2.imread(ImagePath)
     keypoints,descriptor=_3DVisLabLib.OrbKeyPointsOnly(Pod1Image_col,MatchImages.FeatureMatch_Dict_Common.ORB_default)
     MatchImages.ImagesInMem_to_Process[ImagePath]=(Pod1Image,Pod1Image_col,keypoints,descriptor)
-    #cant deepcopy non standard datatypes, just make a copy at same time
-    MatchImages.ImagesInMem_to_Process_copy[ImagePath]=(Pod1Image,Pod1Image_col,keypoints,descriptor)
 
 #make subfolders
 _3DVisLabLib. MakeFolder(MatchImages.Outputfolder + "\\Pairs\\")
@@ -225,7 +224,7 @@ _3DVisLabLib. MakeFolder(MatchImages.Outputfolder + "\\Duplicates\\")
 #MatchedImage,InputImage,BestImage,BestMatch,ImgVSMatch=GetClosestImage_KpsOnly(RandomImage,MatchImages.ImagesInMem_to_Process_copy,15)
    
 for Index, img in enumerate(MatchImages.ImagesInMem_to_Process):
-    MatchImages.ImagesInMem_Pairing[Index]=[img]
+    MatchImages.ImagesInMem_Pairing[Index]=([img],[])
 
 DoubleUp_ImgMatches()
 DoubleUp_ImgMatches()
@@ -239,7 +238,7 @@ DoubleUp_ImgMatches()
 #     pass
 #lets print out doubles
 for ListIndex, ListOfImages in enumerate(MatchImages.ImagesInMem_Pairing):
-    for imgIndex, Images in enumerate (MatchImages.ImagesInMem_Pairing[ListOfImages]):
-        TempFfilename=MatchImages.Outputfolder + "\\Pairs\\" + "00" + str(ListIndex) + "_" +str(imgIndex) + ".jpg"
+    for imgIndex, Images in enumerate (MatchImages.ImagesInMem_Pairing[ListOfImages][0]):
+        TempFfilename=MatchImages.OutputPairs  + "00" + str(ListIndex) + "_" +str(imgIndex) + ".jpg"
         cv2.imwrite(TempFfilename,MatchImages.ImagesInMem_to_Process[Images][1])
 
