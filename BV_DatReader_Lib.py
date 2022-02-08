@@ -57,7 +57,7 @@ class UserInputParameters():
         self.BlockTypeWave=""
         self.GetSNR=False
         self.GetRGBImage=False#if user selects "C" - automatically superimpose with other channels to complete an RGB image
-
+        self.FolderPerDat=False
         self.HardCodedSnr_BlockType="SRU SNR image1"
         self.HardCodedSnr_Wave="None"
         #image subset waves for RGB channels
@@ -73,6 +73,7 @@ class UserInputParameters():
         self.BlockTypeWave="C"
         self.GetSNR=False
         self.GetRGBImage=True
+        self.FolderPerDat=False
 
     def UserPopulateParameters(self):
         self.UserInput_and_test()
@@ -85,7 +86,7 @@ class UserInputParameters():
         self.FirstImageOnly,
         self.AutomaticMode,
         self.BlockType_ImageFormat,
-        self.BlockTypeWave]
+        self.BlockTypeWave,self.FolderPerDat]
 
         print(ListParams)
 
@@ -116,7 +117,9 @@ class UserInputParameters():
 
         self.AutomaticMode=_3DVisLabLib.yesno("Automatic(y) or Manual (m) mode?")
         if self.AutomaticMode==False: return False
-        self.FirstImageOnly=not _3DVisLabLib.yesno("All Images (y) or First image only (n)?\n nb [First Image Only] will write into input folder as complimentary image files")
+        self.FirstImageOnly=not _3DVisLabLib.yesno("All Images =y   First image only =n ?\n nb [First Image Only] will write images into source folder as complimentary image files")
+        if self.FirstImageOnly==False:
+            self.FolderPerDat= _3DVisLabLib.yesno("Create subfolder per dat all all images in one folder?")
 
         while True:
             #ask user what block type (format of image)
@@ -138,7 +141,7 @@ class UserInputParameters():
             print("\n \n \n \n \n")
             for Elem in DatScraper_tool.ImageExtractor.WAVE_DICTIONARY:
                 print(DatScraper_tool.ImageExtractor.WAVE_DICTIONARY[Elem])
-            Result = input("Please enter wave type:")
+            Result = input("Please enter wave type: - press C if you want to enable colour images")
             if Result in DatScraper_tool.ImageExtractor.WAVE_DICTIONARY.values():
                 self.BlockTypeWave=Result
                 break
@@ -181,7 +184,14 @@ def AutomaticExtraction(UserParameters):
         if ((".dat") in elem.lower()):
             InputFiles_cleaned.append(elem)
     for FileIndex, DatFile in enumerate(InputFiles_cleaned):
-    #get all images from first .dat file in input folder(s) (nested)
+        #get all images from first .dat file in input folder(s) (nested)
+        #create subfolder from name of dat file
+
+        Subfolder=((DatFile.lower().split("\\"))[-1]).replace(".dat","")
+        DatFolder=UserParameters.OutputFilePath +"\\FileIndex_" +str(FileIndex)+ "__DatName_"+ Subfolder
+        #first image usually previewed alongside dats, dont create folders in default output
+        if UserParameters.FirstImageOnly==False and UserParameters.FolderPerDat==True:_3DVisLabLib. MakeFolder(DatFolder)
+        
         print("Processing",DatFile)
         #get all images found in file
         images = DatScraper_tool.ImageExtractor(DatFile)
@@ -204,6 +214,7 @@ def AutomaticExtraction(UserParameters):
         #load in dat file as hex
         data_hex=Load_Hex_File(DatFile)
         #roll through filtered images and extract from datamass
+        NoteCount=0
         for Index,Notefound in enumerate(filteredImages):
             (OutputImage,dummy)=Image_from_Automatic_mode(filteredImages,Notefound,data_hex)
             SNR_ReadResult=""
@@ -234,7 +245,7 @@ def AutomaticExtraction(UserParameters):
                     continue
                     raise Exception(DatFile, "Could not parse SNR (by user request)")
                 SNR_ReadResult="["+ SNR_ReadResult +"]"
-
+            NoteCount=NoteCount+1
             #if user only requires first image, break out of loop
             if UserParameters.FirstImageOnly==True:
                 #save out thumbnail
@@ -246,12 +257,19 @@ def AutomaticExtraction(UserParameters):
                 DelimitedDat=DatFile.split("\\")
                 DelimitedDat_LastElem=DelimitedDat[-1]
                 ReplacedExtension=DelimitedDat_LastElem.lower().replace(".dat",".jpg")
-                Savestring=UserParameters.OutputFilePath +"\\" + SNR_ReadResult + "File" + str(FileIndex) + "_Image_"+str(Index) +"_"+ ReplacedExtension
-                print("saving image to ", Savestring)
-                print("Dat file",FileIndex,"/",str(len(InputFiles_cleaned)))
+
+                #does user want images sorted into folders or no
+                if UserParameters.FolderPerDat==True:
+                    Savestring=DatFolder +"\\" + SNR_ReadResult + "File" + str(FileIndex) + "_Image_"+str(Index) +"_"+ ReplacedExtension
+                else:
+                    Savestring=UserParameters.OutputFilePath +"\\" + SNR_ReadResult + "File" + str(FileIndex) + "_Image_"+str(Index) +"_"+ ReplacedExtension
+
+                #print("saving image to ", Savestring)
+                #print("Dat file",FileIndex,"/",str(len(InputFiles_cleaned)))
                 cv2.imwrite(Savestring,OutputImage)
                 #CreateImageVDatfileRecord provenance tracker
                 ImgVDatFile_andRecord[Savestring]=(DatFile,Index+1,SNR_ReadResult)
+        print(DatFile,NoteCount)
     #save out dictionary so we can trace images back to dat files and record number
     Savestring=UserParameters.OutputFilePath +"\\TraceImg_to_DatRecord.json" 
     with open(Savestring, 'w') as outfile:
