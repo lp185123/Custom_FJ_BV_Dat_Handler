@@ -1,7 +1,8 @@
 import _3DVisLabLib
 import os
 import shutil
-InputPath=r"E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\Gen"
+
+InputPath=r"E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\Gen_backup"
 OutputFolder=r"E:\NCR\SR_Generations\Sprint\Russia\StandardGen\20220131_ReleaseVer2.3.0\Data"
 
 
@@ -10,7 +11,7 @@ InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(InputPath)
 #Get pickle file - warning will just take first one 
 ListAllObj_files=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles,ImageTypes=[".dat"])
 
-for dat in ListAllObj_files:
+for Indexer,dat in enumerate(ListAllObj_files):
     Fullfilepath=dat.split("\\")
     filepath=Fullfilepath[-1].split("_")
     DenomiPath="Denomi."
@@ -49,7 +50,7 @@ for dat in ListAllObj_files:
     if isDirectory==False:
         raise Exception(FinalPath + " path does not exist!! Cannt proceed")
 
-    FinalPathAndDat=FinalPath+"\\" + dat.split("\\")[-1]
+    FinalPathAndDat=FinalPath+"\\" +str(Indexer) + dat.split("\\")[-1]
 
     src = dat
     dst =  FinalPathAndDat

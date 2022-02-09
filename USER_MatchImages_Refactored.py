@@ -144,6 +144,8 @@ def main():
         #self.DuplicatesFound=[]
     if MatchImages.GetDuplicates==True:
         ScanIndex=0
+        StartingLength_images=len(MatchImages.DuplicatesToCheck)
+        DuplicatesFound=0
         while len(MatchImages.DuplicatesToCheck)>0:
             print("Image Set remaining:",len(MatchImages.DuplicatesToCheck),"/",len(MatchImages.ImagesInMem_to_Process))
             #get any image from set
@@ -156,6 +158,7 @@ def main():
                 if HistogramSimilarity<MatchImages.HistogramSelfSimilarityThreshold:
                     if BaseImageKey!=image:
                         print("Duplicate found!!",BaseImageKey,image)
+                        DuplicatesFound=DuplicatesFound+1
                         cv2.imwrite(MatchImages.OutputDuplicates  + str(ScanIndex)+ "_File1_"+ str(HistogramSimilarity)+".jpg",MatchImages.ImagesInMem_to_Process[BaseImageKey].ImageColour)
                         cv2.imwrite(MatchImages.OutputDuplicates + str(ScanIndex)+ "_File2_"+ str(HistogramSimilarity)+".jpg",MatchImages.ImagesInMem_to_Process[image].ImageColour)
                         #if tracer file exists we can also save link to dat file and record
@@ -165,10 +168,106 @@ def main():
                                 DictOutputDetails["BASEIMAGE"]=MatchImages.TraceExtractedImg_to_DatRecordObj[image]
                                 DictOutputDetails["TESTEDIMAGE"]=MatchImages.TraceExtractedImg_to_DatRecordObj[BaseImageKey]
                                 with open(Savefile_json, 'w') as outfile:
-                                    json.dump(DictOutputDetails, outfile)#1 is the answer file
+                                    json.dump(DictOutputDetails, outfile)
                         del MatchImages.DuplicatesToCheck[image]
-                #print(HistogramSimilarity)
             del MatchImages.DuplicatesToCheck[BaseImageKey]
+        print(DuplicatesFound,"/",StartingLength_images," Duplicates found and stored at",MatchImages.OutputDuplicates)
+        MatchImages.Endtime= time.time()
+        print("time taken (hrs):",round((MatchImages.Endtime- MatchImages.startTime)/60/60 ),2)
+        exit()
+
+    #create indexed dictionary of images so we can start combining lists of images
+    MatchImages.ImagesInMem_Pairing=dict()
+    for Index, img in enumerate(MatchImages.ImagesInMem_to_Process):
+        ImgCol_InfoSheet=ImgCol_InfoSheet_Class()
+        ImgCol_InfoSheet.FirstImage=img
+        MatchImages.ImagesInMem_Pairing[Index]=([img],ImgCol_InfoSheet)
+    #match images loop
+    #while True:
+    #    pass
+
+    #couple up images
+    OutOfUse=0
+    for looper in range (0,3):
+        for BaseImageList in MatchImages.ImagesInMem_Pairing:
+            print(OutOfUse,"removed from", len(MatchImages.ImagesInMem_Pairing),looper)
+            #if list is inactive, skip
+            if MatchImages.ImagesInMem_Pairing[BaseImageList][1].InUse==False:
+                continue
+
+            CheckImages_InfoSheet=CheckImages_Class()
+            #get info for base image
+            Base_Image_name=MatchImages.ImagesInMem_Pairing[BaseImageList][1].FirstImage
+            Base_Image_Histo=MatchImages.ImagesInMem_to_Process[Base_Image_name].Histogram
+            Base_Image_FMatches=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Keypoints
+            Base_Image_Descrips=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Descriptors
+
+            for TestImageList in MatchImages.ImagesInMem_Pairing:
+                if MatchImages.ImagesInMem_Pairing[BaseImageList][1].InUse==False:
+                    continue
+                #check not testing itself
+                if BaseImageList==TestImageList:
+                    #set this to checked - warning will set base image to checked as well
+                    continue#skip iteration
+                #test images - this is where different strategies may come in
+                #get first image, can also use the list for this
+                #get info for test images
+                Test_Image_name=MatchImages.ImagesInMem_Pairing[TestImageList][1].FirstImage
+                Test_Image_Histo=MatchImages.ImagesInMem_to_Process[Test_Image_name].Histogram
+                Test_Image_FMatches=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Keypoints
+                Test_Image_Descrips=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Descriptors
+                HistogramSimilarity=CompareHistograms(Base_Image_Histo,Test_Image_Histo)
+                CheckImages_InfoSheet.AllHisto_results.append(HistogramSimilarity)
+                if HistogramSimilarity<CheckImages_InfoSheet.BestMatch_Histo:
+                    CheckImages_InfoSheet.BestMatch_Histo=HistogramSimilarity
+                    CheckImages_InfoSheet.BestMatch_Histo_listIndex=TestImageList
+
+            #after check all images, if a result then copy that list into the first list so combine the sets of images
+            if len(CheckImages_InfoSheet.AllHisto_results)>0:
+                #list of images now inactive as will be copied to another
+                #[0] here is the list of images, while [1] is the info card
+                #TempUpdatedList=MatchImages.ImagesInMem_Pairing[BaseImageList]
+                #del MatchImages.ImagesInMem_Pairing[BaseImageList]
+                MatchImages.ImagesInMem_Pairing[BaseImageList]=(MatchImages.ImagesInMem_Pairing[BaseImageList][0]+MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_Histo_listIndex][0],MatchImages.ImagesInMem_Pairing[BaseImageList][1])
+                MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_Histo_listIndex][1].InUse=False
+                OutOfUse=OutOfUse+1
+                #MatchImages.ImagesInMem_Pairing[BaseImageList][0]=MatchImages.ImagesInMem_Pairing[BaseImageList][0]+MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_Histo_listIndex][0]
+
+
+    #lets write out pairing
+    for ListIndex, ListOfImages in enumerate(MatchImages.ImagesInMem_Pairing):
+        #make folder for each set of images
+        if MatchImages.ImagesInMem_Pairing[ListOfImages][1].InUse==True:
+            SetMatchImages_folder=MatchImages.OutputPairs +"\\" + str(ListIndex) +"\\"
+            _3DVisLabLib. MakeFolder(SetMatchImages_folder)
+            for imgIndex, Images in enumerate (MatchImages.ImagesInMem_Pairing[ListOfImages][0]):
+                #MatchDistance=str(MatchImages.ImagesInMem_Pairing[ListOfImages][1])
+                TempFfilename=SetMatchImages_folder  + "00" + str(ListIndex) + "_" +str(imgIndex)  + ".jpg"
+                cv2.imwrite(TempFfilename,MatchImages.ImagesInMem_to_Process[Images].ImageColour)
+
+
+
+
+class CheckImages_Class():
+    def __init__(self):
+        self.AllHisto_results=[]
+        self.All_FM_results=[]
+        self.MatchingImgLists=[]
+        self.BestMatch_Histo=99999999
+        self.BestMatch_Histo_listIndex=None
+
+
+class ImgCol_InfoSheet_Class():
+    def __init__(self):
+        self.InUse=True
+        self.Cycles=0
+        self.AllImgs_Histo_Std=0
+        self.AllImgs_Hist_mean=0
+        self.AllImgs_FM_std=0
+        self.AllImgs_FM_mean=0
+        self.FirstImage=None
+
+
 
 
 
