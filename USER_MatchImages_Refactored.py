@@ -14,13 +14,34 @@ import numpy as np
 import gc
 #gc.disable()
 
+import matplotlib
+matplotlib.use('Agg')#can get "Tcl_AsyncDelete: async handler deleted by the wrong thread" crashes otherwise
+import matplotlib.pyplot as plt
 
+
+def PlotAndSave_2datas(Title,Filepath,Data1):
+    
+    #this causes crashes
+    #save out plot of 1D data
+    try:
+        #Data1=np.random.rand(30,22)
+        plt.pcolormesh((Data1), cmap = 'autumn')
+        #plt.plot(Data1,Data2,'bo')#bo will draw dots instead of connected line
+        plt.ylabel(Title)
+        #plt.ylim([0, max(Data1)])
+        #plt.ylim([0, max(Data2)])
+        plt.savefig(Filepath)
+        plt.cla()
+        plt.clf()
+        plt.close()
+    except Exception as e:
+        print("Error with matpyplot",e)
 
 class MatchImagesObject():
     """Class to hold information for image sorting & match process"""
     def __init__(self):
         #self.InputFolder=r"E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen"
-        self.InputFolder=r"C:\Working\FindIMage_In_Dat\Output"
+        self.InputFolder=r"E:\NCR\TestImages\UK_verysmall"
         self.Outputfolder=r"C:\Working\FindIMage_In_Dat\MatchImages"
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
@@ -63,7 +84,12 @@ class MatchImagesObject():
             self.FM_Keypoints=None
             self.FM_Descriptors=None
 
-
+def GetAverageOfMatches(List,Span):
+    Spanlist=List[0:Span]
+    Distances=[]
+    for elem in Spanlist:
+        Distances.append(elem.distance)
+    return round(mean(Distances),2)
 
 def CompareHistograms(histo_Img1,histo_Img2):
     def L2Norm(H1,H2):
@@ -75,6 +101,12 @@ def CompareHistograms(histo_Img1,histo_Img2):
     similarity_metric = L2Norm(histo_Img1,histo_Img2)
     return similarity_metric
 
+def normalize_2d(matrix):
+    # Only this is changed to use 2-norm put 2 instead of 1
+    norm = np.linalg.norm(matrix, 1)
+    # normalized matrix
+    matrix = matrix/norm  
+    return matrix
 
 def main():
     #create resource manager
@@ -188,12 +220,25 @@ def main():
 
     #couple up images
     OutOfUse=0
-    for looper in range (0,3):
+
+
+
+    HM_indexX=-1
+    HM_indexY=-1
+    HM_data_histo = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+    HM_data_FM = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+    HM_data_Both = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+    for looper in range (0,1):
+        
         for BaseImageList in MatchImages.ImagesInMem_Pairing:
+            
+            HM_indexX=HM_indexX+1
+            HM_indexY=-1
             print(OutOfUse,"removed from", len(MatchImages.ImagesInMem_Pairing),looper)
             #if list is inactive, skip
             if MatchImages.ImagesInMem_Pairing[BaseImageList][1].InUse==False:
-                continue
+                pass
+                #continue
 
             CheckImages_InfoSheet=CheckImages_Class()
             #get info for base image
@@ -203,12 +248,20 @@ def main():
             Base_Image_Descrips=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Descriptors
 
             for TestImageList in MatchImages.ImagesInMem_Pairing:
-                if MatchImages.ImagesInMem_Pairing[BaseImageList][1].InUse==False:
-                    continue
+                print(HM_indexX,HM_indexY)
+                HM_indexY=HM_indexY+1
+                if HM_indexY<HM_indexX:
+                    #data is diagonally symterical
+                    #continue
+                    pass
+                if MatchImages.ImagesInMem_Pairing[TestImageList][1].InUse==False:
+                    pass
+                    #continue
                 #check not testing itself
                 if BaseImageList==TestImageList:
+                    pass
                     #set this to checked - warning will set base image to checked as well
-                    continue#skip iteration
+                    #continue#skip iteration
                 #test images - this is where different strategies may come in
                 #get first image, can also use the list for this
                 #get info for test images
@@ -218,12 +271,26 @@ def main():
                 Test_Image_Descrips=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Descriptors
                 HistogramSimilarity=CompareHistograms(Base_Image_Histo,Test_Image_Histo)
                 CheckImages_InfoSheet.AllHisto_results.append(HistogramSimilarity)
+
+                UnsortedMatches=_3DVisLabLib.Orb_FeatureMatch(Base_Image_FMatches,Base_Image_Descrips,Test_Image_FMatches,Test_Image_Descrips,99999)
+                AverageMatchDistance=GetAverageOfMatches(UnsortedMatches,30)
+                CheckImages_InfoSheet.All_FM_results.append(AverageMatchDistance)
+
+                HM_data_histo[HM_indexX,HM_indexY]=HistogramSimilarity
+                HM_data_FM[HM_indexX,HM_indexY]=AverageMatchDistance
+                #HM_data_Both[HM_indexX,HM_indexY]=HistogramSimilarity+AverageMatchDistance
+                
+
                 if HistogramSimilarity<CheckImages_InfoSheet.BestMatch_Histo:
                     CheckImages_InfoSheet.BestMatch_Histo=HistogramSimilarity
                     CheckImages_InfoSheet.BestMatch_Histo_listIndex=TestImageList
 
+                if AverageMatchDistance<CheckImages_InfoSheet.BestMatch_FeatureMatch:
+                    CheckImages_InfoSheet.BestMatch_FeatureMatch=AverageMatchDistance
+                    CheckImages_InfoSheet.BestMatch_FeatureMatch_listIndex=TestImageList
+
             #after check all images, if a result then copy that list into the first list so combine the sets of images
-            if len(CheckImages_InfoSheet.AllHisto_results)>0:
+            if (len(CheckImages_InfoSheet.AllHisto_results)>0) and (True==False):
                 #list of images now inactive as will be copied to another
                 #[0] here is the list of images, while [1] is the info card
                 #TempUpdatedList=MatchImages.ImagesInMem_Pairing[BaseImageList]
@@ -232,6 +299,28 @@ def main():
                 MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_Histo_listIndex][1].InUse=False
                 OutOfUse=OutOfUse+1
                 #MatchImages.ImagesInMem_Pairing[BaseImageList][0]=MatchImages.ImagesInMem_Pairing[BaseImageList][0]+MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_Histo_listIndex][0]
+            if len(CheckImages_InfoSheet.All_FM_results)>0:
+                MatchImages.ImagesInMem_Pairing[BaseImageList]=(MatchImages.ImagesInMem_Pairing[BaseImageList][0]+MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_FeatureMatch_listIndex][0],MatchImages.ImagesInMem_Pairing[BaseImageList][1])
+                MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_FeatureMatch_listIndex][1].InUse=False
+                OutOfUse=OutOfUse+1
+
+        #normalise matrices
+        HM_data_FM=normalize_2d(HM_data_FM)
+        HM_data_histo=normalize_2d(HM_data_histo)
+        HM_data_Both=HM_data_FM+HM_data_histo
+        #if have equal length for both results, asssume they are aligned - can examine response
+        if len(CheckImages_InfoSheet.All_FM_results)==len(CheckImages_InfoSheet.AllHisto_results):
+            FilePath=MatchImages.OutputPairs +"\\" + str(looper) +  str(OutOfUse) +("HM_data_Both") +".jpg"
+            PlotAndSave_2datas("HM_data_Both",FilePath,HM_data_Both)
+            FilePath=MatchImages.OutputPairs +"\\" + str(looper) +  str(OutOfUse) +("HM_data_FM") +".jpg"
+            PlotAndSave_2datas("HM_data_FM",FilePath,HM_data_FM)
+            FilePath=MatchImages.OutputPairs +"\\" + str(looper) +  str(OutOfUse) +("HM_data_histo") +".jpg"
+            PlotAndSave_2datas("HM_data_histo",FilePath,HM_data_histo)
+
+
+    MatchImages.Endtime= time.time()
+    print("time taken (hrs):",round((MatchImages.Endtime- MatchImages.startTime)/60/60,2))
+    exit()
 
 
     #lets write out pairing
@@ -255,6 +344,8 @@ class CheckImages_Class():
         self.MatchingImgLists=[]
         self.BestMatch_Histo=99999999
         self.BestMatch_Histo_listIndex=None
+        self.BestMatch_FeatureMatch=99999999
+        self.BestMatch_FeatureMatch_listIndex=None
 
 
 class ImgCol_InfoSheet_Class():

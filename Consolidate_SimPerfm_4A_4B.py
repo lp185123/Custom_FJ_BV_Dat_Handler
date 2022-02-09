@@ -4,7 +4,8 @@ import win32clipboard
 
 class InfoStrings():
     List_known_4Bsuffix=["Clearly","_Damage","_Genuine_"]
-
+    list_known_countries=["Belarus","Brazil","Czech","Hungary","Malaysia","Poland","Mexico","Russia","Turkey","UK"]
+    list_known_GenerationTypes=["Minimum","Standard"]
 def yesno(question):
     """Simple Yes/No Function."""
     prompt = f'{question} ? (y/n): '
@@ -60,6 +61,9 @@ class SingleSimRes_Breakdown():
         self.Total4A_notes_PC=None
         self.Total4B_notes_PC=None
         self.Total_NotCat4_notes_PC=None
+
+        self.Country=None
+        self.GenerationType=None
 
     def GetPercentages(self):
         self.TotalNotes_PC=self.GetPercentageOfCat(self.TotalNotes)
@@ -165,18 +169,31 @@ if __name__ == "__main__":
         if 0!=int(Total_Notes)-int(_4B_Total)-int(_4A_Total)-int(Total_not_Cat4):
             raise Exception("ERROR self check total VS cat breakdown")
 
-
+        #get country - assume is in correct folder structure
+        Country=None
+        for CountryName in InfoStrings.list_known_countries:
+            if CountryName.lower() in Item.lower():
+                Country=CountryName
+        
+        #get type of generation
+        GenerationType=None
+        for GenName in InfoStrings.list_known_GenerationTypes:
+            if GenName.lower() in Item.lower():
+                GenerationType=GenName
+        
         #build info object
         ResultInfo_singleFile=SingleSimRes_Breakdown()
-        ResultInfo_singleFile.TotalNotes=Total_Notes
-        ResultInfo_singleFile.Total_NotCat4_notes=Total_not_Cat4
-        ResultInfo_singleFile.Total4A_notes=_4A_Total
-        ResultInfo_singleFile.Total4B_notes=_4B_Total
+        ResultInfo_singleFile.TotalNotes=int(Total_Notes)
+        ResultInfo_singleFile.Total_NotCat4_notes=int(Total_not_Cat4)
+        ResultInfo_singleFile.Total4A_notes=int(_4A_Total)
+        ResultInfo_singleFile.Total4B_notes=int(_4B_Total)
         ResultInfo_singleFile.DatFileUsed=FIleName_Dat
         ResultInfo_singleFile.NameOfSimFile=Item
         ResultInfo_singleFile.GetPercentages()
-        plop=1
-        
+        ResultInfo_singleFile.Country=Country
+        ResultInfo_singleFile.GenerationType=GenerationType
+
+        print(vars(ResultInfo_singleFile))
 
 
 

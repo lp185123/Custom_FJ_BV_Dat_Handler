@@ -1,0 +1,28 @@
+Duplicates (only showing first duplicate in each dat):
+
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Gen\_009_RUB5000_B_155_69\A\0004.dat, note 1
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Test\New\New\RUB5000B\New\0004.dat, note 1
+
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Gen\_005_RUB500_D_150_65\D\0001.dat, note 1
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Test\New\New\RUB500D\New\New\0001.dat, note 1
+
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Gen\_005_RUB500_D_150_65\C\0002.dat, note 1
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Test\New\New\RUB500D\New\New\0002.dat, note 1
+
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Gen\_005_RUB500_D_150_65\B\0003.dat, note 1
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Test\New\New\RUB500D\New\New\0003.dat, note 1
+
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Gen\_005_RUB500_D_150_65\A\0004.dat, note 1
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Test\New\New\RUB500D\New\New\0004.dat, note 1
+
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Gen\_005_RUB500_D_150_65\D\0005.dat, note 1
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Test\New\New\RUB500D\New\New\0005.dat, note 1
+
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Gen\_005_RUB500_D_150_65\C\0006.dat, note 1
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Test\New\New\RUB500D\New\New\0006.dat, note 1
+
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Gen\_005_RUB500_D_150_65\B\0007.dat, note 1
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Test\New\New\RUB500D\New\New\0007.dat, note 1
+
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Gen\_005_RUB500_D_150_65\A\0008.dat, note 1
+E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Test\New\New\RUB500D\New\New\0008.dat, note 1
