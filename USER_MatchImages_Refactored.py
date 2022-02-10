@@ -20,6 +20,8 @@ matplotlib.use('Agg')#can get "Tcl_AsyncDelete: async handler deleted by the wro
 import matplotlib.pyplot as plt
 
 
+
+
 def PlotAndSave_2datas(Title,Filepath,Data1):
     
     #this causes crashes
@@ -85,6 +87,9 @@ class MatchImagesObject():
             self.ImageAdjusted=None
             self.FM_Keypoints=None
             self.FM_Descriptors=None
+            self.FourierTransform_mag=None
+            self.ImageGrayscale=None
+            
 def PlotAndSave(Title,Filepath,Data,maximumvalue):
     
     #this causes crashes
@@ -169,7 +174,7 @@ def main():
         print("Loading in image",ImagePath )
         ImageInfo=MatchImages.ImageInfo()
 
-        Pod1Image = cv2.imread(ImagePath)
+        Pod1Image_Grayscale = cv2.imread(ImagePath,0)
         Pod1Image_col = cv2.imread(ImagePath)
         Pod1Image_col_adjusted=Pod1Image_col[0:int(Pod1Image_col.shape[0]/1.6),0:int(Pod1Image_col.shape[1]/3),:]
         Pod1Image_col=Pod1Image_col[0:int(Pod1Image_col.shape[0]/1.6),0:int(Pod1Image_col.shape[1]),:]
@@ -178,13 +183,24 @@ def main():
         #get histogram for comparing colours
         hist = cv2.calcHist([Pod1Image_col], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
         hist = cv2.normalize(hist, hist).flatten()
+        #get fourier transform
+        #dft = cv2.dft(np.float32(Pod1Image_Grayscale),flags = cv2.DFT_COMPLEX_OUTPUT)
+        #dft_shift = np.fft.fftshift(dft)
+        #magnitude = cv2.magnitude(dft_shift[:,:,0],dft_shift[:,:,1])
+        #product = 20*np.log(magnitude)
+
+        f = np.fft.fft2(Pod1Image_Grayscale)
+        fshift = np.fft.fftshift(f)
+        magnitude_spectrum = 20*np.log(np.abs(fshift))
+
         #load into tuple for object
         ImageInfo.Histogram=hist
-        ImageInfo.ImageGrayscale=Pod1Image
+        ImageInfo.ImageGrayscale=Pod1Image_Grayscale
         ImageInfo.ImageColour=Pod1Image_col
         ImageInfo.ImageAdjusted=Pod1Image_col_adjusted
         ImageInfo.FM_Keypoints=keypoints
         ImageInfo.FM_Descriptors=descriptor
+        ImageInfo.FourierTransform_mag=magnitude_spectrum
         MatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
 
     #build dictionary to remove items from
@@ -244,6 +260,7 @@ def main():
     HM_data_histo = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     HM_data_FM = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     HM_data_Both = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+    HM_data_FourierDifference = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     #for looper in range (0,1):
     
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
@@ -260,6 +277,7 @@ def main():
         Base_Image_Histo=MatchImages.ImagesInMem_to_Process[Base_Image_name].Histogram
         Base_Image_FMatches=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Keypoints
         Base_Image_Descrips=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Descriptors
+        Base_Image_FourierMag=MatchImages.ImagesInMem_to_Process[Base_Image_name].FourierTransform_mag
 
         for TestImageList in MatchImages.ImagesInMem_Pairing:
             print(BaseImageList,TestImageList)
@@ -282,6 +300,8 @@ def main():
             Test_Image_Histo=MatchImages.ImagesInMem_to_Process[Test_Image_name].Histogram
             Test_Image_FMatches=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Keypoints
             Test_Image_Descrips=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Descriptors
+            Test_Image_FourierMag=MatchImages.ImagesInMem_to_Process[Test_Image_name].FourierTransform_mag
+
             HistogramSimilarity=CompareHistograms(Base_Image_Histo,Test_Image_Histo)
             CheckImages_InfoSheet.AllHisto_results.append(HistogramSimilarity)
 
@@ -289,12 +309,16 @@ def main():
             AverageMatchDistance=GetAverageOfMatches(UnsortedMatches,MatchImages.AverageDistanceFM)
             CheckImages_InfoSheet.All_FM_results.append(AverageMatchDistance)
 
+            #get differnce between fourier magnitudes of image
+            FourierDifference=(abs(Base_Image_FourierMag-Test_Image_FourierMag)).sum()
+
             HM_data_histo[BaseImageList,TestImageList]=HistogramSimilarity
             HM_data_FM[BaseImageList,TestImageList]=AverageMatchDistance
+            HM_data_FourierDifference[BaseImageList,TestImageList]=FourierDifference
             #data is symmetrical - fill it in to help with visualisation
             HM_data_histo[TestImageList,BaseImageList]=HistogramSimilarity
             HM_data_FM[TestImageList,BaseImageList]=AverageMatchDistance
-            #HM_data_Both[HM_indexX,HM_indexY]=HistogramSimilarity+AverageMatchDistance
+            HM_data_FourierDifference[TestImageList,BaseImageList]=FourierDifference
             
 
             if HistogramSimilarity<CheckImages_InfoSheet.BestMatch_Histo:
@@ -323,7 +347,10 @@ def main():
     #normalise matrices
     HM_data_FM=normalize_2d(HM_data_FM)
     HM_data_histo=normalize_2d(HM_data_histo)
-    HM_data_Both=normalize_2d(HM_data_histo+HM_data_FM)
+    HM_data_FourierDifference=normalize_2d(HM_data_FourierDifference)
+    HM_data_Both=normalize_2d(HM_data_histo+HM_data_FM+HM_data_FourierDifference)
+    
+
     #if have equal length for both results, asssume they are aligned - can examine response
     if len(CheckImages_InfoSheet.All_FM_results)==len(CheckImages_InfoSheet.AllHisto_results):
         FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_Both") +".jpg"
@@ -332,6 +359,9 @@ def main():
         PlotAndSave_2datas("HM_data_FM",FilePath,HM_data_FM)
         FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_histo") +".jpg"
         PlotAndSave_2datas("HM_data_histo",FilePath,HM_data_histo)
+        FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_FourierDifference") +".jpg"
+        PlotAndSave_2datas("HM_data_FourierDifference",FilePath,HM_data_FourierDifference)
+
     
         #for every image or subsets of images, roll through heatmap finding nearest best match then
         #cross referencing it
