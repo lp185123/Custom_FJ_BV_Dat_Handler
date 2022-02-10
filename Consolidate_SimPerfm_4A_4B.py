@@ -3,7 +3,8 @@ import os
 import win32clipboard
 
 class InfoStrings():
-    List_known_4Bsuffix=["Clearly","_Damage","_Genuine_"]
+    List_known_4Asuffix=["_Genuine"]
+    List_known_4Bsuffix=["Clearly","_Damage"]
     list_known_countries=["Belarus","Brazil","Czech","Hungary","Malaysia","Poland","Mexico","Russia","Turkey","UK"]
     list_known_GenerationTypes=["Minimum","Standard"]
 def yesno(question):
@@ -103,7 +104,7 @@ if __name__ == "__main__":
         Delimited=content.split()
         #find first instance of total - warning! if this appears in the filename this might break
         TotalString=Delimited.index("Total")
-        FIleNameText=Delimited.index("Name")
+        FIleNameText=Delimited.index("Statistics")
         Statistics_Header=Delimited.index('Information')
 
 
@@ -139,8 +140,10 @@ if __name__ == "__main__":
         for _4B_Instance in Categories4B_dict:
             _4B_Total=_4B_Total+int(Categories4B_dict[_4B_Instance][0])
 
-        FIleName_Dat=Delimited[FIleNameText+1]
-
+        FIleName_Dat=' '.join(Delimited[0:FIleNameText-1])
+        
+                #if not ".dat" in FIleName_Dat.lower():
+                    #FIleName_Dat=Delimited[FIleNameText+1]=Delimited[FIleNameText+2]+Delimited[FIleNameText+3]
         #get ratio of 4A versus all notes
         _4A_vs_AllNotes=Delimited[TotalString+3]
         _4A_vs_AllNotes=_4A_vs_AllNotes.split("/")
@@ -163,11 +166,9 @@ if __name__ == "__main__":
         for Cats in CategoryBreakdown_dict:
             #get # of notes for each category
             totalNote_check=totalNote_check+int(CategoryBreakdown_dict[Cats][0])
-        if Total_Notes!=str(totalNote_check):
-            raise Exception("ERROR self check total VS cat breakdown")
-        #potentially circular test
-        if 0!=int(Total_Notes)-int(_4B_Total)-int(_4A_Total)-int(Total_not_Cat4):
-            raise Exception("ERROR self check total VS cat breakdown")
+
+
+        
 
         #get country - assume is in correct folder structure
         Country=None
@@ -193,11 +194,22 @@ if __name__ == "__main__":
         ResultInfo_singleFile.Country=Country
         ResultInfo_singleFile.GenerationType=GenerationType
 
+        print("\n\n")
+        print(ResultInfo_singleFile.Total4A_notes_PC,ResultInfo_singleFile.Total4B_notes_PC,ResultInfo_singleFile.Total_NotCat4_notes_PC)
         print(vars(ResultInfo_singleFile))
 
-
-
-
+        print("Checking last result")
+        if Total_Notes!=str(totalNote_check):
+            DoNothing=True
+            
+            raise Exception("ERROR self check total VS cat breakdown")
+        #potentially circular test
+        if 0!=int(Total_Notes)-int(_4B_Total)-int(_4A_Total)-int(Total_not_Cat4):
+            DoNothing=True
+            raise Exception("ERROR self check total VS cat breakdown")
+        if not ".dat" in FIleName_Dat.lower():
+            DoNothing=True
+            raise Exception("ERROR self check not .dat in dat filename")
 
         
 

@@ -338,7 +338,7 @@ def main():
     	stopAtFirst = False
 
     allFiles = []
-    for root, dirs, files in os.walk(r"E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen"):
+    for root, dirs, files in os.walk(r"E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen\Gen"):
         for name in files:
             if name[-4:len(name)] == '.dat':
                 allFiles.append(os.path.join(root, name))
@@ -386,9 +386,10 @@ def main():
     def ReadyToDelete(Delete):
         for DatFile in DuplicateFiles_dict:
             
-            if DatFile.split("\\")[8]=="Test":
+            if DatFile.split("\\")[9]=="FIT":
                 print("to be removed ",DatFile)
                 if Delete==True:
+                    pass
                     if os.path.exists(DatFile)==True:
                         os.remove(DatFile)
 

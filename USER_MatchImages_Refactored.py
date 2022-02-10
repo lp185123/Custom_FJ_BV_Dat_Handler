@@ -1,4 +1,5 @@
 
+from logging import raiseExceptions
 from tkinter import Y
 import _3DVisLabLib
 import json
@@ -41,11 +42,12 @@ class MatchImagesObject():
     """Class to hold information for image sorting & match process"""
     def __init__(self):
         #self.InputFolder=r"E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen"
-        self.InputFolder=r"E:\NCR\TestImages\UK_verysmall"
+        self.InputFolder=r"E:\NCR\TestImages\TinyTest"
         self.Outputfolder=r"C:\Working\FindIMage_In_Dat\MatchImages"
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
         self.OutputDuplicates=self.Outputfolder + "\\Duplicates\\"
+        self.AverageDistanceFM=20
         self.Std_dv_Cutoff=0.5#set this to cut off how close notes can be in similarity
         self.TraceExtractedImg_to_DatRecordObj=None
         self.ImagesInMem_to_Process=dict()
@@ -83,6 +85,21 @@ class MatchImagesObject():
             self.ImageAdjusted=None
             self.FM_Keypoints=None
             self.FM_Descriptors=None
+def PlotAndSave(Title,Filepath,Data,maximumvalue):
+    
+    #this causes crashes
+    #save out plot of 1D data
+    try:
+        plt.plot(Data)
+        plt.ylabel(Title)
+        plt.ylim([0, maximumvalue])
+        plt.savefig(Filepath)
+        plt.cla()
+        plt.clf()
+        plt.close()
+    except Exception as e:
+        print("Error with matpyplot",e)
+
 
 def GetAverageOfMatches(List,Span):
     Spanlist=List[0:Span]
@@ -154,9 +171,10 @@ def main():
 
         Pod1Image = cv2.imread(ImagePath)
         Pod1Image_col = cv2.imread(ImagePath)
-        Pod1Image_col_adjusted=Pod1Image_col[0:int(Pod1Image_col.shape[0]/2),0:int(Pod1Image_col.shape[1]),:]
+        Pod1Image_col_adjusted=Pod1Image_col[0:int(Pod1Image_col.shape[0]/1.6),0:int(Pod1Image_col.shape[1]/3),:]
+        Pod1Image_col=Pod1Image_col[0:int(Pod1Image_col.shape[0]/1.6),0:int(Pod1Image_col.shape[1]),:]
         #get feature match keypoints
-        keypoints,descriptor=_3DVisLabLib.OrbKeyPointsOnly(Pod1Image_col,MatchImages.FeatureMatch_Dict_Common.ORB_default)
+        keypoints,descriptor=_3DVisLabLib.OrbKeyPointsOnly(Pod1Image_col_adjusted,MatchImages.FeatureMatch_Dict_Common.ORB_default)
         #get histogram for comparing colours
         hist = cv2.calcHist([Pod1Image_col], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
         hist = cv2.normalize(hist, hist).flatten()
@@ -223,100 +241,168 @@ def main():
 
 
 
-    HM_indexX=-1
-    HM_indexY=-1
     HM_data_histo = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     HM_data_FM = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     HM_data_Both = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
-    for looper in range (0,1):
+    #for looper in range (0,1):
+    
+    for BaseImageList in MatchImages.ImagesInMem_Pairing:
         
-        for BaseImageList in MatchImages.ImagesInMem_Pairing:
-            
-            HM_indexX=HM_indexX+1
-            HM_indexY=-1
-            print(OutOfUse,"removed from", len(MatchImages.ImagesInMem_Pairing),looper)
-            #if list is inactive, skip
-            if MatchImages.ImagesInMem_Pairing[BaseImageList][1].InUse==False:
+        #print(OutOfUse,"removed from", len(MatchImages.ImagesInMem_Pairing),looper)
+        #if list is inactive, skip
+        if MatchImages.ImagesInMem_Pairing[BaseImageList][1].InUse==False:
+            pass
+            #continue
+
+        CheckImages_InfoSheet=CheckImages_Class()
+        #get info for base image
+        Base_Image_name=MatchImages.ImagesInMem_Pairing[BaseImageList][1].FirstImage
+        Base_Image_Histo=MatchImages.ImagesInMem_to_Process[Base_Image_name].Histogram
+        Base_Image_FMatches=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Keypoints
+        Base_Image_Descrips=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Descriptors
+
+        for TestImageList in MatchImages.ImagesInMem_Pairing:
+            print(BaseImageList,TestImageList)
+            if TestImageList<BaseImageList:
+                #data is diagonally symmeterical
+                continue
+                
+            if MatchImages.ImagesInMem_Pairing[TestImageList][1].InUse==False:
                 pass
                 #continue
+            #check not testing itself
+            if BaseImageList==TestImageList:
+                pass
+                #set this to checked - warning will set base image to checked as well
+                #continue#skip iteration
+            #test images - this is where different strategies may come in
+            #get first image, can also use the list for this
+            #get info for test images
+            Test_Image_name=MatchImages.ImagesInMem_Pairing[TestImageList][1].FirstImage
+            Test_Image_Histo=MatchImages.ImagesInMem_to_Process[Test_Image_name].Histogram
+            Test_Image_FMatches=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Keypoints
+            Test_Image_Descrips=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Descriptors
+            HistogramSimilarity=CompareHistograms(Base_Image_Histo,Test_Image_Histo)
+            CheckImages_InfoSheet.AllHisto_results.append(HistogramSimilarity)
 
-            CheckImages_InfoSheet=CheckImages_Class()
-            #get info for base image
-            Base_Image_name=MatchImages.ImagesInMem_Pairing[BaseImageList][1].FirstImage
-            Base_Image_Histo=MatchImages.ImagesInMem_to_Process[Base_Image_name].Histogram
-            Base_Image_FMatches=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Keypoints
-            Base_Image_Descrips=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Descriptors
+            UnsortedMatches=_3DVisLabLib.Orb_FeatureMatch(Base_Image_FMatches,Base_Image_Descrips,Test_Image_FMatches,Test_Image_Descrips,99999)
+            AverageMatchDistance=GetAverageOfMatches(UnsortedMatches,MatchImages.AverageDistanceFM)
+            CheckImages_InfoSheet.All_FM_results.append(AverageMatchDistance)
 
-            for TestImageList in MatchImages.ImagesInMem_Pairing:
-                print(HM_indexX,HM_indexY)
-                HM_indexY=HM_indexY+1
-                if HM_indexY<HM_indexX:
-                    #data is diagonally symterical
-                    #continue
-                    pass
-                if MatchImages.ImagesInMem_Pairing[TestImageList][1].InUse==False:
-                    pass
-                    #continue
-                #check not testing itself
-                if BaseImageList==TestImageList:
-                    pass
-                    #set this to checked - warning will set base image to checked as well
-                    #continue#skip iteration
-                #test images - this is where different strategies may come in
-                #get first image, can also use the list for this
-                #get info for test images
-                Test_Image_name=MatchImages.ImagesInMem_Pairing[TestImageList][1].FirstImage
-                Test_Image_Histo=MatchImages.ImagesInMem_to_Process[Test_Image_name].Histogram
-                Test_Image_FMatches=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Keypoints
-                Test_Image_Descrips=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Descriptors
-                HistogramSimilarity=CompareHistograms(Base_Image_Histo,Test_Image_Histo)
-                CheckImages_InfoSheet.AllHisto_results.append(HistogramSimilarity)
+            HM_data_histo[BaseImageList,TestImageList]=HistogramSimilarity
+            HM_data_FM[BaseImageList,TestImageList]=AverageMatchDistance
+            #data is symmetrical - fill it in to help with visualisation
+            HM_data_histo[TestImageList,BaseImageList]=HistogramSimilarity
+            HM_data_FM[TestImageList,BaseImageList]=AverageMatchDistance
+            #HM_data_Both[HM_indexX,HM_indexY]=HistogramSimilarity+AverageMatchDistance
+            
 
-                UnsortedMatches=_3DVisLabLib.Orb_FeatureMatch(Base_Image_FMatches,Base_Image_Descrips,Test_Image_FMatches,Test_Image_Descrips,99999)
-                AverageMatchDistance=GetAverageOfMatches(UnsortedMatches,30)
-                CheckImages_InfoSheet.All_FM_results.append(AverageMatchDistance)
+            if HistogramSimilarity<CheckImages_InfoSheet.BestMatch_Histo:
+                CheckImages_InfoSheet.BestMatch_Histo=HistogramSimilarity
+                CheckImages_InfoSheet.BestMatch_Histo_listIndex=TestImageList
 
-                HM_data_histo[HM_indexX,HM_indexY]=HistogramSimilarity
-                HM_data_FM[HM_indexX,HM_indexY]=AverageMatchDistance
-                #HM_data_Both[HM_indexX,HM_indexY]=HistogramSimilarity+AverageMatchDistance
-                
+            if AverageMatchDistance<CheckImages_InfoSheet.BestMatch_FeatureMatch:
+                CheckImages_InfoSheet.BestMatch_FeatureMatch=AverageMatchDistance
+                CheckImages_InfoSheet.BestMatch_FeatureMatch_listIndex=TestImageList
 
-                if HistogramSimilarity<CheckImages_InfoSheet.BestMatch_Histo:
-                    CheckImages_InfoSheet.BestMatch_Histo=HistogramSimilarity
-                    CheckImages_InfoSheet.BestMatch_Histo_listIndex=TestImageList
+        #after check all images, if a result then copy that list into the first list so combine the sets of images
+        if (len(CheckImages_InfoSheet.AllHisto_results)>0) and (True==False):
+            #list of images now inactive as will be copied to another
+            #[0] here is the list of images, while [1] is the info card
+            #TempUpdatedList=MatchImages.ImagesInMem_Pairing[BaseImageList]
+            #del MatchImages.ImagesInMem_Pairing[BaseImageList]
+            MatchImages.ImagesInMem_Pairing[BaseImageList]=(MatchImages.ImagesInMem_Pairing[BaseImageList][0]+MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_Histo_listIndex][0],MatchImages.ImagesInMem_Pairing[BaseImageList][1])
+            MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_Histo_listIndex][1].InUse=False
+            OutOfUse=OutOfUse+1
+            #MatchImages.ImagesInMem_Pairing[BaseImageList][0]=MatchImages.ImagesInMem_Pairing[BaseImageList][0]+MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_Histo_listIndex][0]
+        if len(CheckImages_InfoSheet.All_FM_results)>0 and (True==False):
+            MatchImages.ImagesInMem_Pairing[BaseImageList]=(MatchImages.ImagesInMem_Pairing[BaseImageList][0]+MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_FeatureMatch_listIndex][0],MatchImages.ImagesInMem_Pairing[BaseImageList][1])
+            MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_FeatureMatch_listIndex][1].InUse=False
+            OutOfUse=OutOfUse+1
 
-                if AverageMatchDistance<CheckImages_InfoSheet.BestMatch_FeatureMatch:
-                    CheckImages_InfoSheet.BestMatch_FeatureMatch=AverageMatchDistance
-                    CheckImages_InfoSheet.BestMatch_FeatureMatch_listIndex=TestImageList
+    #normalise matrices
+    HM_data_FM=normalize_2d(HM_data_FM)
+    HM_data_histo=normalize_2d(HM_data_histo)
+    HM_data_Both=normalize_2d(HM_data_histo+HM_data_FM)
+    #if have equal length for both results, asssume they are aligned - can examine response
+    if len(CheckImages_InfoSheet.All_FM_results)==len(CheckImages_InfoSheet.AllHisto_results):
+        FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_Both") +".jpg"
+        PlotAndSave_2datas("HM_data_Both",FilePath,HM_data_Both)
+        FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_FM") +".jpg"
+        PlotAndSave_2datas("HM_data_FM",FilePath,HM_data_FM)
+        FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_histo") +".jpg"
+        PlotAndSave_2datas("HM_data_histo",FilePath,HM_data_histo)
+    
+        #for every image or subsets of images, roll through heatmap finding nearest best match then
+        #cross referencing it
+        OrderedImages=dict()
+        BaseImageList=random.choice(list(MatchImages.ImagesInMem_Pairing.keys()))
 
-            #after check all images, if a result then copy that list into the first list so combine the sets of images
-            if (len(CheckImages_InfoSheet.AllHisto_results)>0) and (True==False):
-                #list of images now inactive as will be copied to another
-                #[0] here is the list of images, while [1] is the info card
-                #TempUpdatedList=MatchImages.ImagesInMem_Pairing[BaseImageList]
-                #del MatchImages.ImagesInMem_Pairing[BaseImageList]
-                MatchImages.ImagesInMem_Pairing[BaseImageList]=(MatchImages.ImagesInMem_Pairing[BaseImageList][0]+MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_Histo_listIndex][0],MatchImages.ImagesInMem_Pairing[BaseImageList][1])
-                MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_Histo_listIndex][1].InUse=False
-                OutOfUse=OutOfUse+1
-                #MatchImages.ImagesInMem_Pairing[BaseImageList][0]=MatchImages.ImagesInMem_Pairing[BaseImageList][0]+MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_Histo_listIndex][0]
-            if len(CheckImages_InfoSheet.All_FM_results)>0:
-                MatchImages.ImagesInMem_Pairing[BaseImageList]=(MatchImages.ImagesInMem_Pairing[BaseImageList][0]+MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_FeatureMatch_listIndex][0],MatchImages.ImagesInMem_Pairing[BaseImageList][1])
-                MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_FeatureMatch_listIndex][1].InUse=False
-                OutOfUse=OutOfUse+1
+        #get minimum 
+        result = np.where(HM_data_Both == np.amin(HM_data_Both))
+        Element=random.choice(result[0])#incase we have two identical results
 
-        #normalise matrices
-        HM_data_FM=normalize_2d(HM_data_FM)
-        HM_data_histo=normalize_2d(HM_data_histo)
-        HM_data_Both=HM_data_FM+HM_data_histo
-        #if have equal length for both results, asssume they are aligned - can examine response
-        if len(CheckImages_InfoSheet.All_FM_results)==len(CheckImages_InfoSheet.AllHisto_results):
-            FilePath=MatchImages.OutputPairs +"\\" + str(looper) +  str(OutOfUse) +("HM_data_Both") +".jpg"
-            PlotAndSave_2datas("HM_data_Both",FilePath,HM_data_Both)
-            FilePath=MatchImages.OutputPairs +"\\" + str(looper) +  str(OutOfUse) +("HM_data_FM") +".jpg"
-            PlotAndSave_2datas("HM_data_FM",FilePath,HM_data_FM)
-            FilePath=MatchImages.OutputPairs +"\\" + str(looper) +  str(OutOfUse) +("HM_data_histo") +".jpg"
-            PlotAndSave_2datas("HM_data_histo",FilePath,HM_data_histo)
 
+        BlankOut=HM_data_Both.max()+1
+        #blank out the self test
+        for item in MatchImages.ImagesInMem_Pairing:
+            HM_data_Both[item,item]=BlankOut
+
+        print(HM_data_Both)
+        print("-----")
+        BaseImageList=random.choice(list(MatchImages.ImagesInMem_Pairing.keys()))
+        Counter=0
+        MatchMetric=[]
+        while len(OrderedImages)+1<len(MatchImages.ImagesInMem_Pairing):
+
+            Counter=Counter+1
+            print("looking at row",BaseImageList,"for match for for")
+            #HM_data_Both[BaseImageList,BaseImageList]=BlankOut
+            Row=HM_data_Both[0:len(MatchImages.ImagesInMem_Pairing),BaseImageList]
+            #print(Row)
+            #get minimum value
+            result = np.where(Row == np.amin(Row))
+            Element=random.choice(result[0])#incase we have two identical results
+            print("nearest matching is element",Element)
+            print("nearest value",HM_data_Both[Element,BaseImageList])
+            MatchMetric.append(HM_data_Both[Element,BaseImageList])
+            #add to output images
+            
+
+            for imgIndex, Images in enumerate (MatchImages.ImagesInMem_Pairing[Element][0]):
+                #if len(Images)>1:
+                    #raise Exception("too many images")
+                SplitImagePath=Images.split("\\")[-1]
+                FilePath=MatchImages.OutputPairs +"\\00" +str(Counter)+ "_ImgNo_" + str(BaseImageList) + "_" + SplitImagePath
+                cv2.imwrite(FilePath,MatchImages.ImagesInMem_to_Process[Images].ImageColour)
+                if Images in OrderedImages:
+                    raise Exception("output images file already exists!!! logic error")
+                else:
+                    OrderedImages[Images]=BaseImageList
+            #blank out element in both places
+            HM_data_Both[0:len(MatchImages.ImagesInMem_Pairing),BaseImageList]=BlankOut
+            HM_data_Both[BaseImageList,0:len(MatchImages.ImagesInMem_Pairing)]=BlankOut
+            if Counter==1:
+                HM_data_Both[0:len(MatchImages.ImagesInMem_Pairing),Element]=BlankOut
+                HM_data_Both[Element,0:len(MatchImages.ImagesInMem_Pairing)]=BlankOut
+            #baseimage should be an integer
+            #work in columns to find nearest match, data should be mirrored diagonally to make it easier to visualise#
+            
+            
+            #print(HM_data_Both)
+            #print("-----")
+            
+            
+            
+            BaseImageList=Element
+
+            
+            
+            
+        PlotAndSave("MatchMetrics",MatchImages.OutputPairs +"\\MatchMetrics.jpg",MatchMetric,0.1)
+
+
+            
 
     MatchImages.Endtime= time.time()
     print("time taken (hrs):",round((MatchImages.Endtime- MatchImages.startTime)/60/60,2))
