@@ -44,7 +44,7 @@ class MatchImagesObject():
     """Class to hold information for image sorting & match process"""
     def __init__(self):
         #self.InputFolder=r"E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen"
-        self.InputFolder=r"E:\NCR\TestImages\TinyTest"
+        self.InputFolder=r"E:\NCR\TestImages\UK\Output"
         self.Outputfolder=r"C:\Working\FindIMage_In_Dat\MatchImages"
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
@@ -124,11 +124,7 @@ def CompareHistograms(histo_Img1,histo_Img2):
     return similarity_metric
 
 def normalize_2d(matrix):
-    # Only this is changed to use 2-norm put 2 instead of 1
-    norm = np.linalg.norm(matrix, 1)
-    # normalized matrix
-    matrix = matrix/norm  
-    return matrix
+    return (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
 
 def main():
     #create resource manager
@@ -176,19 +172,23 @@ def main():
 
         Pod1Image_Grayscale = cv2.imread(ImagePath,0)
         Pod1Image_col = cv2.imread(ImagePath)
-        Pod1Image_col_adjusted=Pod1Image_col[0:int(Pod1Image_col.shape[0]/1.6),0:int(Pod1Image_col.shape[1]/3),:]
+
+        #Pod1Image_Grayscale=cv2.resize(Pod1Image_Grayscale.copy(),(100,100))
+        #Pod1Image_col=cv2.resize(Pod1Image_col.copy(),(100,100))
+
+        Pod1Image_col_adjusted=Pod1Image_col[0:int(Pod1Image_col.shape[0]/1.6),0:int(Pod1Image_col.shape[1]),:]
         Pod1Image_col=Pod1Image_col[0:int(Pod1Image_col.shape[0]/1.6),0:int(Pod1Image_col.shape[1]),:]
         #get feature match keypoints
         keypoints,descriptor=_3DVisLabLib.OrbKeyPointsOnly(Pod1Image_col_adjusted,MatchImages.FeatureMatch_Dict_Common.ORB_default)
         #get histogram for comparing colours
         hist = cv2.calcHist([Pod1Image_col], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
         hist = cv2.normalize(hist, hist).flatten()
+
         #get fourier transform
         #dft = cv2.dft(np.float32(Pod1Image_Grayscale),flags = cv2.DFT_COMPLEX_OUTPUT)
         #dft_shift = np.fft.fftshift(dft)
         #magnitude = cv2.magnitude(dft_shift[:,:,0],dft_shift[:,:,1])
         #product = 20*np.log(magnitude)
-
         f = np.fft.fft2(Pod1Image_Grayscale)
         fshift = np.fft.fftshift(f)
         magnitude_spectrum = 20*np.log(np.abs(fshift))
@@ -344,12 +344,18 @@ def main():
             MatchImages.ImagesInMem_Pairing[CheckImages_InfoSheet.BestMatch_FeatureMatch_listIndex][1].InUse=False
             OutOfUse=OutOfUse+1
 
+
+    BlankOut=HM_data_FourierDifference.max()
+    #blank out the self test
+    for item in MatchImages.ImagesInMem_Pairing:
+        HM_data_FourierDifference[item,item]=BlankOut
+
     #normalise matrices
     HM_data_FM=normalize_2d(HM_data_FM)
     HM_data_histo=normalize_2d(HM_data_histo)
     HM_data_FourierDifference=normalize_2d(HM_data_FourierDifference)
     HM_data_Both=normalize_2d(HM_data_histo+HM_data_FM+HM_data_FourierDifference)
-    
+    #HM_data_Both=normalize_2d(HM_data_FourierDifference)
 
     #if have equal length for both results, asssume they are aligned - can examine response
     if len(CheckImages_InfoSheet.All_FM_results)==len(CheckImages_InfoSheet.AllHisto_results):
@@ -382,7 +388,10 @@ def main():
         print("-----")
         BaseImageList=random.choice(list(MatchImages.ImagesInMem_Pairing.keys()))
         Counter=0
-        MatchMetric=[]
+        MatchMetric_all=[]
+        MatchMetric_Histo=[]
+        MatchMetric_Fourier=[]
+        MatchMetric_FM=[]
         while len(OrderedImages)+1<len(MatchImages.ImagesInMem_Pairing):
 
             Counter=Counter+1
@@ -395,7 +404,10 @@ def main():
             Element=random.choice(result[0])#incase we have two identical results
             print("nearest matching is element",Element)
             print("nearest value",HM_data_Both[Element,BaseImageList])
-            MatchMetric.append(HM_data_Both[Element,BaseImageList])
+            MatchMetric_all.append(HM_data_Both[Element,BaseImageList])
+            MatchMetric_Histo.append(HM_data_histo[Element,BaseImageList])
+            MatchMetric_Fourier.append(HM_data_FourierDifference[Element,BaseImageList])
+            MatchMetric_FM.append(HM_data_FM[Element,BaseImageList])
             #add to output images
             
 
@@ -429,7 +441,10 @@ def main():
             
             
             
-        PlotAndSave("MatchMetrics",MatchImages.OutputPairs +"\\MatchMetrics.jpg",MatchMetric,0.1)
+        PlotAndSave("MatchMetric_all",MatchImages.OutputPairs +"\\MatchMetric_all.jpg",MatchMetric_all,1)
+        PlotAndSave("MatchMetric_Fourier",MatchImages.OutputPairs +"\\MatchMetric_Fourier.jpg",MatchMetric_Fourier,1)
+        PlotAndSave("MatchMetric_FM",MatchImages.OutputPairs +"\\MatchMetric_FM.jpg",MatchMetric_FM,1)
+        PlotAndSave("MatchMetric_Histo",MatchImages.OutputPairs +"\\MatchMetric_Histo.jpg",MatchMetric_Histo,1)
 
 
             

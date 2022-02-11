@@ -1,12 +1,14 @@
 """spin through simulation results and collate all 4A and 4B scoring"""
 import os
 import win32clipboard
-
+import copy
 class InfoStrings():
     List_known_4Asuffix=["_Genuine"]
     List_known_4Bsuffix=["Clearly","_Damage"]
     list_known_countries=["Belarus","Brazil","Czech","Hungary","Malaysia","Poland","Mexico","Russia","Turkey","UK"]
     list_known_GenerationTypes=["Minimum","Standard"]
+    list_FinalCategories=["CIRCULATIONFIT","COUNTERFEIT","GEN","NEW","TELLERFIT","UNFIT","UNKNOWN","UNKNOWN2"]
+
 def yesno(question):
     """Simple Yes/No Function."""
     prompt = f'{question} ? (y/n): '
@@ -65,6 +67,10 @@ class SingleSimRes_Breakdown():
 
         self.Country=None
         self.GenerationType=None
+        
+        self.FinalCat=None
+        self.AttemptName=None
+        self.DictKey=None
 
     def GetPercentages(self):
         self.TotalNotes_PC=self.GetPercentageOfCat(self.TotalNotes)
@@ -77,7 +83,9 @@ class SingleSimRes_Breakdown():
 
 if __name__ == "__main__":
     #user input
-    ResultFolder = input("Please enter folder with sim results:")
+    #ResultFolder = input("Please enter folder with sim results:")
+    ResultFolder=r"E:\NCR\DEL_CheckSprint\SR_GEN_Sprint"
+    input("analysing: " + ResultFolder)
     AllFiles=GetAllFilesInFolder_Recursive(ResultFolder)
     #simulation results end with this suffix
     TxtFiles=GetList_Of_ImagesInList(AllFiles,[".dat.txt"])
@@ -93,11 +101,28 @@ if __name__ == "__main__":
     Str_Totalpcs=""
     #populate skipped files
     SkippedFile=[]
+    #collate all results for test
+    All_results_Dictionary=dict()
     #roll through files
     for Item in TxtFiles:
         if not "Sim_" in Item:
             SkippedFile.append(Item)
             continue
+
+        #get final category - assume is in correct folder structure
+        FinalCAt=None
+        AttemptName=None
+        for FinCatName in InfoStrings.list_FinalCategories:
+            if FinCatName.lower() in Item.lower():
+                if FinCatName.lower() in Item.split("\\")[-3].lower():
+                    FinalCAt=FinCatName
+                    AttemptName=Item.split("\\")[-2]
+        if FinalCAt==None:
+            continue
+            pass
+            #raise Exception("FinalCAt name not found or using wrong root folder" + Item)
+
+
         #ignore weird chars 
         my_file = open(Item,   errors="ignore")
         content = my_file.read()
@@ -168,19 +193,26 @@ if __name__ == "__main__":
             totalNote_check=totalNote_check+int(CategoryBreakdown_dict[Cats][0])
 
 
-        
+
 
         #get country - assume is in correct folder structure
         Country=None
         for CountryName in InfoStrings.list_known_countries:
             if CountryName.lower() in Item.lower():
-                Country=CountryName
-        
+                if CountryName.lower() in Item.split("\\")[-4].lower():
+                    Country=CountryName
+        if Country==None:
+            raise Exception("Country name not found or using wrong root folder" + Item)
+
+
         #get type of generation
         GenerationType=None
         for GenName in InfoStrings.list_known_GenerationTypes:
             if GenName.lower() in Item.lower():
-                GenerationType=GenName
+                if GenName.lower() in Item.split("\\")[-5].lower():
+                    GenerationType=GenName
+        if GenerationType==None:
+            raise Exception("GenerationType name not found or using wrong root folder" + Item)
         
         #build info object
         ResultInfo_singleFile=SingleSimRes_Breakdown()
@@ -193,12 +225,15 @@ if __name__ == "__main__":
         ResultInfo_singleFile.GetPercentages()
         ResultInfo_singleFile.Country=Country
         ResultInfo_singleFile.GenerationType=GenerationType
+        ResultInfo_singleFile.AttemptName=AttemptName
+        ResultInfo_singleFile.FinalCat=FinalCAt
+        ResultInfo_singleFile.Dictkey=(ResultInfo_singleFile.Country+ "_"+ResultInfo_singleFile.GenerationType+"_"+ResultInfo_singleFile.FinalCat+"_"+ResultInfo_singleFile.AttemptName)
+        
+        #print("\n\n")
+        #print(ResultInfo_singleFile.Total4A_notes_PC,ResultInfo_singleFile.Total4B_notes_PC,ResultInfo_singleFile.Total_NotCat4_notes_PC)
+        #print(vars(ResultInfo_singleFile))
 
-        print("\n\n")
-        print(ResultInfo_singleFile.Total4A_notes_PC,ResultInfo_singleFile.Total4B_notes_PC,ResultInfo_singleFile.Total_NotCat4_notes_PC)
-        print(vars(ResultInfo_singleFile))
-
-        print("Checking last result")
+        print("Checking",Item)
         if Total_Notes!=str(totalNote_check):
             DoNothing=True
             
@@ -211,14 +246,30 @@ if __name__ == "__main__":
             DoNothing=True
             raise Exception("ERROR self check not .dat in dat filename")
 
-        
 
+        #load into dictionary
+        
+        if not ResultInfo_singleFile.Dictkey in All_results_Dictionary:
+            All_results_Dictionary[ResultInfo_singleFile.Dictkey]=[]
+        All_results_Dictionary[ResultInfo_singleFile.Dictkey].append(copy.deepcopy(ResultInfo_singleFile))
+
+        #create companion text file for someone to verify results
+        #Companion_file=Item.lower().replace(".dat.txt",".dat.chk")
+        #datfileused, simtestpath, notcat4a, cat4a, cat4b
+        Delimiter=","
+
+        f = open(r"E:\NCR\Test.txt", "a")
+        f.write((str(ResultInfo_singleFile.DatFileUsed) +Delimiter + str(ResultInfo_singleFile.NameOfSimFile) + Delimiter +str(ResultInfo_singleFile.Total_NotCat4_notes) + Delimiter+ str(ResultInfo_singleFile.Total4A_notes)+ Delimiter +str(ResultInfo_singleFile.Total4B_notes) +"\n"))
+        f.close()
+
+    for ResultItem in ResultInfo_singleFile:
+        print (ResultItem.Dictkey)
 
     Str_Totalpcs=Str_Totalpcs.replace("%","")
     copyToClipboard(Str_Totalpcs)
     print("Skipped files:",str(SkippedFile))
 if len(list_datnames)!=len(List_Totalpcs):
     raise Exception("total % vs total dat names dont match")
-yesno("scores in clipboard, press y to populate with dat file names")
+#yesno("scores in clipboard, press y to populate with dat file names")
 
     
