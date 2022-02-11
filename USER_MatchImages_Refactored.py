@@ -44,7 +44,7 @@ class MatchImagesObject():
     """Class to hold information for image sorting & match process"""
     def __init__(self):
         #self.InputFolder=r"E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen"
-        self.InputFolder=r"E:\NCR\TestImages\UK\Output"
+        self.InputFolder=r"E:\NCR\TestImages\UK_verysmall"
         self.Outputfolder=r"C:\Working\FindIMage_In_Dat\MatchImages"
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
@@ -415,7 +415,7 @@ def main():
                 #if len(Images)>1:
                     #raise Exception("too many images")
                 SplitImagePath=Images.split("\\")[-1]
-                FilePath=MatchImages.OutputPairs +"\\00" +str(Counter)+ "_ImgNo_" + str(BaseImageList) + "_" + SplitImagePath
+                FilePath=MatchImages.OutputPairs +"\\00" +str(Counter)+ "_ImgNo_" + str(BaseImageList) + "_" + str(round(HM_data_Both[Element,BaseImageList]),4)+ "_" + SplitImagePath
                 cv2.imwrite(FilePath,MatchImages.ImagesInMem_to_Process[Images].ImageColour)
                 if Images in OrderedImages:
                     raise Exception("output images file already exists!!! logic error")
