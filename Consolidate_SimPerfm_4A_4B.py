@@ -2,9 +2,10 @@
 import os
 import win32clipboard
 import copy
+import _3DVisLabLib
 class InfoStrings():
     List_known_4Asuffix=["_Genuine"]
-    List_known_4Bsuffix=["Clearly","_Damage"]
+    List_known_4Bsuffix=["_Damage"]#["Clearly","_Damage"]
     list_known_countries=["Belarus","Brazil","Czech","Hungary","Malaysia","Poland","Mexico","Russia","Turkey","UK"]
     list_known_GenerationTypes=["Minimum","Standard"]
     list_FinalCategories=["CIRCULATIONFIT","COUNTERFEIT","GEN","NEW","TELLERFIT","UNFIT","UNKNOWN","UNKNOWN2"]
@@ -71,6 +72,7 @@ class SingleSimRes_Breakdown():
         self.FinalCat=None
         self.AttemptName=None
         self.DictKey=None
+        self.FinalCatDictKey=None
 
     def GetPercentages(self):
         self.TotalNotes_PC=self.GetPercentageOfCat(self.TotalNotes)
@@ -83,8 +85,11 @@ class SingleSimRes_Breakdown():
 
 if __name__ == "__main__":
     #user input
+    OutputFOlder=r"E:\NCR\TEMP_SPRINT_OUTPUT\\"
+    _3DVisLabLib.yesno("press y to delete output folder :  " + OutputFOlder)
+    _3DVisLabLib.DeleteFiles_RecreateFolder(OutputFOlder)
     #ResultFolder = input("Please enter folder with sim results:")
-    ResultFolder=r"E:\NCR\DEL_CheckSprint\SR_GEN_Sprint"
+    ResultFolder=r"C:\Users\LP185123\OneDrive - NCR Corporation\Desktop\SR_GEN_Sprint"
     input("analysing: " + ResultFolder)
     AllFiles=GetAllFilesInFolder_Recursive(ResultFolder)
     #simulation results end with this suffix
@@ -227,8 +232,8 @@ if __name__ == "__main__":
         ResultInfo_singleFile.GenerationType=GenerationType
         ResultInfo_singleFile.AttemptName=AttemptName
         ResultInfo_singleFile.FinalCat=FinalCAt
-        ResultInfo_singleFile.Dictkey=(ResultInfo_singleFile.Country+ "_"+ResultInfo_singleFile.GenerationType+"_"+ResultInfo_singleFile.FinalCat+"_"+ResultInfo_singleFile.AttemptName)
-        
+        ResultInfo_singleFile.DictKey=(ResultInfo_singleFile.Country+ "_"+ResultInfo_singleFile.GenerationType+"_"+ResultInfo_singleFile.FinalCat+"_"+ResultInfo_singleFile.AttemptName)
+        ResultInfo_singleFile.FinalCatDictKey=(ResultInfo_singleFile.Country+ "_"+ResultInfo_singleFile.GenerationType+"_"+ResultInfo_singleFile.FinalCat)
         #print("\n\n")
         #print(ResultInfo_singleFile.Total4A_notes_PC,ResultInfo_singleFile.Total4B_notes_PC,ResultInfo_singleFile.Total_NotCat4_notes_PC)
         #print(vars(ResultInfo_singleFile))
@@ -249,21 +254,63 @@ if __name__ == "__main__":
 
         #load into dictionary
         
-        if not ResultInfo_singleFile.Dictkey in All_results_Dictionary:
-            All_results_Dictionary[ResultInfo_singleFile.Dictkey]=[]
-        All_results_Dictionary[ResultInfo_singleFile.Dictkey].append(copy.deepcopy(ResultInfo_singleFile))
+        if not ResultInfo_singleFile.DictKey in All_results_Dictionary:
+            All_results_Dictionary[ResultInfo_singleFile.DictKey]=[]
+        All_results_Dictionary[ResultInfo_singleFile.DictKey].append(copy.deepcopy(ResultInfo_singleFile))
+
+        
+    #check people not doubled up
+    #for ResultItem in All_results_Dictionary:
+    #    All_results_Dictionary[]
+
+
+    for ResultItem in All_results_Dictionary:
+        #each resultitem will be of this format: 
+        # COuntry - gentype, final cat, attempt name: eg
+        #Malaysia_Minimum_GEN_attempt 1 - Automatic
 
         #create companion text file for someone to verify results
         #Companion_file=Item.lower().replace(".dat.txt",".dat.chk")
         #datfileused, simtestpath, notcat4a, cat4a, cat4b
+        Total_4a=0
+        Total_4b=0
+        Total_Not4aNot4B=0
+        TotalNotes=0
         Delimiter=","
-
-        f = open(r"E:\NCR\Test.txt", "a")
-        f.write((str(ResultInfo_singleFile.DatFileUsed) +Delimiter + str(ResultInfo_singleFile.NameOfSimFile) + Delimiter +str(ResultInfo_singleFile.Total_NotCat4_notes) + Delimiter+ str(ResultInfo_singleFile.Total4A_notes)+ Delimiter +str(ResultInfo_singleFile.Total4B_notes) +"\n"))
+        f = open(OutputFOlder + str(ResultItem) +".txt", "a")
+        ResultInfo_singleFile=All_results_Dictionary[ResultItem][0]
+        ResultInfo_singleFile_testID=ResultInfo_singleFile.Country+ Delimiter+ResultInfo_singleFile.GenerationType+Delimiter+ResultInfo_singleFile.FinalCat+Delimiter+ResultInfo_singleFile.AttemptName
+        f.write(ResultInfo_singleFile_testID +"\n")
+        for Indv_SimResultFIle in All_results_Dictionary[ResultItem]:
+            Total_4a=Total_4a+Indv_SimResultFIle.Total4A_notes
+            Total_4b=Total_4b+Indv_SimResultFIle.Total4B_notes
+            Total_Not4aNot4B=Total_Not4aNot4B+Indv_SimResultFIle.Total_NotCat4_notes
+            TotalNotes=TotalNotes+Indv_SimResultFIle.TotalNotes
+            TestID=Indv_SimResultFIle.Country+ Delimiter+Indv_SimResultFIle.GenerationType+Delimiter+Indv_SimResultFIle.FinalCat+Delimiter+Indv_SimResultFIle.AttemptName
+            if TestID!=ResultInfo_singleFile_testID:
+                raise Exception(TestID + " is not equal to " + ResultInfo_singleFile_testID)
+            f.write((str(Indv_SimResultFIle.DatFileUsed) +Delimiter + str(Indv_SimResultFIle.NameOfSimFile) + Delimiter +str(Indv_SimResultFIle.Total_NotCat4_notes) + Delimiter+ str(Indv_SimResultFIle.Total4A_notes)+ Delimiter +str(Indv_SimResultFIle.Total4B_notes) +"\n"))
         f.close()
 
-    for ResultItem in ResultInfo_singleFile:
-        print (ResultItem.Dictkey)
+        Total_4a_PC=round((Total_4a/TotalNotes)*100,2)
+        Total_4b_PC=round((Total_4b/TotalNotes)*100,2)
+        Total_Not4aNot4B_PC=round((Total_Not4aNot4B/TotalNotes)*100,2)
+
+        if (Total_4a_PC + Total_4b_PC + Total_Not4aNot4B_PC) < 99.9:
+            raise Exception("Bad summation")
+        if (Total_4a_PC + Total_4b_PC + Total_Not4aNot4B_PC) > 100.1:
+            raise Exception("Bad summation")
+
+        print(TestID + Delimiter + str(Total_4a_PC) + Delimiter + str(Total_4b_PC) + Delimiter )
+
+
+        f = open(OutputFOlder + str(ResultItem) +"    _4A_"+ str (Total_4a_PC) + "_4B_"+ str (Total_4b_PC) + "_UNKNOWN_"+ str (Total_Not4aNot4B_PC) + "__of_" + str(TotalNotes) + ".txt", "a")
+
+        #check
+        if TotalNotes!=(Total_4a+Total_4b+Total_Not4aNot4B):
+            raise Exception("count not valid")
+
+        #print (All_results_Dictionary[ResultItem][0].DictKey)
 
     Str_Totalpcs=Str_Totalpcs.replace("%","")
     copyToClipboard(Str_Totalpcs)
