@@ -407,6 +407,19 @@ def draw_keypoints(vis, keypoints, color = (255, 0, 0)):
             cv2.circle(vis, (int(x), int(y)), int(2), color,2)
     return vis
 
+def draw_keypoints_v2(vis, keypoints, color = (255, 0, 0)):
+    #v1
+    #this function in cv2 keeps breaking
+    #we need to make our own
+    
+    #vis=cv2.cvtColor(vis,cv2.COLOR_GRAY2BGR)
+    for kp in keypoints:
+            x, y = kp.pt
+            size=kp.size
+            cv2.circle(vis, (int(x), int(y)), int(2), color,2)
+    return vis
+
+
 def GetAllFilesInFolder_Recursive(root):
     ListOfFiles=[]
     for path, subdirs, files in os.walk(root):
@@ -682,12 +695,66 @@ def OrbKeyPointsOnly(imageA,Input_ParameterDictionary):
     ORB=cv2.ORB_create(**Input_ParameterDictionary)
     kp1, des1 = ORB.detectAndCompute(imageA,None)
     return kp1, des1
-    
-def Orb_FeatureMatch(kp1, des1,kp2, des2,MaxDistance):
+
+def AkazeKeyPointsOnly(imageA):
+    """only get feature matching keypoints"""
+    detector = cv2.AKAZE_create()
+    (kp1, des1) = detector.detectAndCompute(imageA, None)
+    return kp1, des1
+
+def Akaze_FeatureMatch(kp1, descs1,kp2, descs2,MaxDistance,image1,image2):
+    # Match the features
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING)
+    matches = bf.knnMatch(descs1,descs2, k=2)    # typo fixed
+
+    # Apply ratio test
+    good = []
+    for m,n in matches:
+        if m.distance < 0.9*n.distance:
+            good.append([m])
+
+    OutputMatchImage=None
+    if image1 is not None and image2 is not None:
+    # Draw only "good" matches
+        OutputMatchImage = cv2.drawMatches(img1 = image1,
+                                keypoints1 = kp1,
+                                img2 = image2,
+                                keypoints2 = kp2,
+                                matches1to2 = good,
+                                outImg = None,
+                                flags = cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+                                
+def Orb_FeatureMatch(kp1, des1,kp2, des2,MaxDistance,Image1,Image2,MatchRatio):
+    #ratio recommmended by Lowe is 0.75
     l_good = [] 
     l_pts1 = []
     l_pts2 = []
     # create Brute-force Matcher object
+    # If ORB is using WTA_K == 3 or 4, cv2.NORM_HAMMING2 should be used.
+    #bf = cv2.BFMatcher()#we can sort out matches ourself
+
+    bf = cv2.DescriptorMatcher_create(cv2.DescriptorMatcher_BRUTEFORCE_HAMMING)
+    matches = bf.knnMatch(des1,des2, k=2)
+    # Apply ratio test
+    #lowe_ratio = 0.7
+    for match1,match2 in matches:
+        if match1.distance < MatchRatio*match2.distance:
+            l_good.append([match2])
+            l_pts2.append(kp2[match1.trainIdx].pt)
+            l_pts1.append(kp1[match1.queryIdx].pt)
+
+    #https://docs.opencv.org/3.4/db/d70/tutorial_akaze_matching.html
+
+
+    OutputMatchImage=None
+    if Image1 is not None and Image2 is not None:
+        OutputMatchImage=cv2.drawMatchesKnn(Image1,kp1,Image2,kp2,l_good,None,flags=2)
+        
+    return l_good,OutputMatchImage,l_pts1,l_pts2
+
+
+
+
     # If ORB is using WTA_K == 3 or 4, cv2.NORM_HAMMING2 should be used.
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)#we can sort out matches ourself
     # Match descriptors.
@@ -695,18 +762,24 @@ def Orb_FeatureMatch(kp1, des1,kp2, des2,MaxDistance):
     # Sort them in the order of their distance.
     matches = sorted(matches, key = lambda x:x.distance)
     #filtered matches
+    
     matches_filtered=[]
     for matchobject in matches:
         if matchobject.distance<MaxDistance:
             matches_filtered.append(matchobject)
+
     matches = sorted(matches_filtered, key = lambda x:x.distance)
     # pop out matches into our point array
     for (match1) in (matches[:]):
         l_good.append([match1])
         l_pts2.append(kp2[match1.trainIdx].pt)
         l_pts1.append(kp1[match1.queryIdx].pt)
-    
-    return matches
+
+    OutputMatchImage=None
+    if Image1 is not None and Image2 is not None:
+        OutputMatchImage=cv2.drawMatches(Image1,kp1,Image2,kp2,matches[:30],OutputMatchImage,flags=2)
+        
+    return matches,OutputMatchImage
 
 def ORB_Feature_and_Match_SortImg(imageA, imageB,Input_ParameterDictionary,Use_Brute_Force):
     ImageLog=[]

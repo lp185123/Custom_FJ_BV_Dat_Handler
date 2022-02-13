@@ -1,6 +1,8 @@
 
 from logging import raiseExceptions
 from tkinter import Y
+
+from cv2 import sqrt
 import _3DVisLabLib
 import json
 import cv2
@@ -11,7 +13,9 @@ import random
 import time
 import statistics
 import scipy
+import math
 import numpy as np
+from scipy.stats import skew
 import gc
 #gc.disable()
 
@@ -41,22 +45,32 @@ def PlotAndSave_2datas(Title,Filepath,Data1):
         print("Error with matpyplot",e)
 
 class MatchImagesObject():
+
+    def USERFunction_CropForFM(self,image):
+            return image[0:int(image.shape[0]/1.5),0:int(image.shape[1]/1),:]
+    def USERFunction_CropForHistogram(self,image):
+            return image[0:int(image.shape[0]/1.5),0:int(image.shape[1]),:]
+    def USERFunction_Resize(self,image):
+        #this is pixels not percentage!
+        return image
+        return cv2.resize(image.copy(),(100,100))
+
     """Class to hold information for image sorting & match process"""
     def __init__(self):
-        #self.InputFolder=r"E:\NCR\SR_Generations\Sprint\Russia\DC\ForStd_Gen\ForGen"
-        self.InputFolder=r"E:\NCR\TestImages\UK_verysmall"
+        self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         self.Outputfolder=r"C:\Working\FindIMage_In_Dat\MatchImages"
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
         self.OutputDuplicates=self.Outputfolder + "\\Duplicates\\"
-        self.AverageDistanceFM=20
-        self.Std_dv_Cutoff=0.5#set this to cut off how close notes can be in similarity
+        self.AverageDistanceFM=100
+        #self.Std_dv_Cutoff=0.5#set this to cut off how close notes can be in similarity
         self.TraceExtractedImg_to_DatRecordObj=None
         self.ImagesInMem_to_Process=dict()
         self.DuplicatesToCheck=dict()
         self.DuplicatesFound=[]
         self.Mean_Std_Per_cyclelist=None
         self.HistogramSelfSimilarityThreshold=0.005
+        
         #self.ImagesInMem_to_Process_Orphans=dict()#cant deepcopy feature match keypoints
         self.ImagesInMem_Pairing=dict()
         self.ImagesInMem_Pairing_orphans=dict()
@@ -104,6 +118,20 @@ def PlotAndSave(Title,Filepath,Data,maximumvalue):
         plt.close()
     except Exception as e:
         print("Error with matpyplot",e)
+
+def PlotAndSaveHistogram(Title,Filepath,Data,maximumvalue,bins):
+    #(skew(x))
+    try:
+        plt.hist(Data, bins = bins)
+        #plt.ylabel(Title)
+        plt.xlim([0, 2])
+        plt.savefig(Filepath)
+        plt.cla()
+        plt.clf()
+        plt.close()
+    except Exception as e:
+        print("Error with matpyplot",e)
+
 
 
 def GetAverageOfMatches(List,Span):
@@ -163,10 +191,20 @@ def main():
     #start timer
     MatchImages.startTime=time.time()
 
-            
+    #load images in random order for testing
+    randomdict=dict()
+    for Index, ImagePath in enumerate(ListAllImages):
+        randomdict[ImagePath]=Index
+
+    RandomOrder=[]
+    while len(randomdict)>0:
+        randomchoice_img=random.choice(list(randomdict.keys()))
+        RandomOrder.append(randomchoice_img)
+        del randomdict[randomchoice_img]
+
     #populate images 
     #load images into memory
-    for Index, ImagePath in enumerate(ListAllImages):
+    for Index, ImagePath in enumerate(RandomOrder):
         print("Loading in image",ImagePath )
         ImageInfo=MatchImages.ImageInfo()
 
@@ -175,14 +213,28 @@ def main():
 
         #Pod1Image_Grayscale=cv2.resize(Pod1Image_Grayscale.copy(),(100,100))
         #Pod1Image_col=cv2.resize(Pod1Image_col.copy(),(100,100))
-
-        Pod1Image_col_adjusted=Pod1Image_col[0:int(Pod1Image_col.shape[0]/1.6),0:int(Pod1Image_col.shape[1]),:]
-        Pod1Image_col=Pod1Image_col[0:int(Pod1Image_col.shape[0]/1.6),0:int(Pod1Image_col.shape[1]),:]
+        Pod1Image_col=MatchImages.USERFunction_Resize(Pod1Image_col)
+        Pod1Image_col_cropped_FM=MatchImages.USERFunction_CropForFM(Pod1Image_col)
+        Pod1Image_col_cropped_Histogram=MatchImages.USERFunction_CropForHistogram(Pod1Image_col)
         #get feature match keypoints
-        keypoints,descriptor=_3DVisLabLib.OrbKeyPointsOnly(Pod1Image_col_adjusted,MatchImages.FeatureMatch_Dict_Common.ORB_default)
+        keypoints,descriptor=_3DVisLabLib.OrbKeyPointsOnly(Pod1Image_col_cropped_FM,MatchImages.FeatureMatch_Dict_Common.ORB_default)
+        #keypoints,descriptor=_3DVisLabLib.AkazeKeyPointsOnly(Pod1Image_col_cropped_FM)
+
         #get histogram for comparing colours
-        hist = cv2.calcHist([Pod1Image_col], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
+        hist = cv2.calcHist([Pod1Image_col_cropped_Histogram], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
         hist = cv2.normalize(hist, hist).flatten()
+
+        if Index==0:
+            #on first loop show image to user
+            DrawnKeypoints=_3DVisLabLib.draw_keypoints_v2(Pod1Image_col_cropped_FM.copy(),keypoints)
+            print("original image")
+            #_3DVisLabLib.ImageViewer_Quick_no_resize(Pod1Image_col,0,True,True)
+            print("cropped for feature matching")
+            #_3DVisLabLib.ImageViewer_Quick_no_resize(Pod1Image_col_cropped_FM,0,True,True)
+            print("feature match sample")
+            #_3DVisLabLib.ImageViewer_Quick_no_resize(DrawnKeypoints,0,True,True)
+            print("Crop for histogram")
+            #_3DVisLabLib.ImageViewer_Quick_no_resize(Pod1Image_col_cropped_Histogram,0,True,True)
 
         #get fourier transform
         #dft = cv2.dft(np.float32(Pod1Image_Grayscale),flags = cv2.DFT_COMPLEX_OUTPUT)
@@ -197,7 +249,7 @@ def main():
         ImageInfo.Histogram=hist
         ImageInfo.ImageGrayscale=Pod1Image_Grayscale
         ImageInfo.ImageColour=Pod1Image_col
-        ImageInfo.ImageAdjusted=Pod1Image_col_adjusted
+        ImageInfo.ImageAdjusted=Pod1Image_col_cropped_FM
         ImageInfo.FM_Keypoints=keypoints
         ImageInfo.FM_Descriptors=descriptor
         ImageInfo.FourierTransform_mag=magnitude_spectrum
@@ -259,8 +311,9 @@ def main():
 
     HM_data_histo = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     HM_data_FM = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
-    HM_data_Both = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+    HM_data_All = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     HM_data_FourierDifference = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+    HM_data_MetricDistances = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     #for looper in range (0,1):
     
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
@@ -278,11 +331,12 @@ def main():
         Base_Image_FMatches=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Keypoints
         Base_Image_Descrips=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Descriptors
         Base_Image_FourierMag=MatchImages.ImagesInMem_to_Process[Base_Image_name].FourierTransform_mag
+        Base_Image_FM=MatchImages.ImagesInMem_to_Process[Base_Image_name].ImageAdjusted
 
         for TestImageList in MatchImages.ImagesInMem_Pairing:
-            print(BaseImageList,TestImageList)
+            if TestImageList%100==0:print(BaseImageList,TestImageList)
             if TestImageList<BaseImageList:
-                #data is diagonally symmeterical
+                #data is diagonally symmetrical
                 continue
                 
             if MatchImages.ImagesInMem_Pairing[TestImageList][1].InUse==False:
@@ -301,26 +355,33 @@ def main():
             Test_Image_FMatches=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Keypoints
             Test_Image_Descrips=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Descriptors
             Test_Image_FourierMag=MatchImages.ImagesInMem_to_Process[Test_Image_name].FourierTransform_mag
+            Test_Image_FM=MatchImages.ImagesInMem_to_Process[Test_Image_name].ImageAdjusted
 
             HistogramSimilarity=CompareHistograms(Base_Image_Histo,Test_Image_Histo)
             CheckImages_InfoSheet.AllHisto_results.append(HistogramSimilarity)
 
-            UnsortedMatches=_3DVisLabLib.Orb_FeatureMatch(Base_Image_FMatches,Base_Image_Descrips,Test_Image_FMatches,Test_Image_Descrips,99999)
-            AverageMatchDistance=GetAverageOfMatches(UnsortedMatches,MatchImages.AverageDistanceFM)
+            MatchedPoints,OutputImage,PointsA,PointsB=_3DVisLabLib.Orb_FeatureMatch(Base_Image_FMatches,Base_Image_Descrips,Test_Image_FMatches,Test_Image_Descrips,99999,Base_Image_FM,Test_Image_FM,0.75)
+            AverageMatchDistance=len(MatchedPoints)*-1#smaller the better
+            #print("AverageMatchDistance",AverageMatchDistance)
+            #_3DVisLabLib.ImageViewer_Quick_no_resize(OutputImage,0,True,False)
             CheckImages_InfoSheet.All_FM_results.append(AverageMatchDistance)
 
             #get differnce between fourier magnitudes of image
+            #not the best solution as fourier magnitude will rotate with image 
+            #generally this performs well on its own as matches similar notes with similar skew
             FourierDifference=(abs(Base_Image_FourierMag-Test_Image_FourierMag)).sum()
 
+            #populate output metric comparison matrices
             HM_data_histo[BaseImageList,TestImageList]=HistogramSimilarity
             HM_data_FM[BaseImageList,TestImageList]=AverageMatchDistance
             HM_data_FourierDifference[BaseImageList,TestImageList]=FourierDifference
+            
             #data is symmetrical - fill it in to help with visualisation
             HM_data_histo[TestImageList,BaseImageList]=HistogramSimilarity
             HM_data_FM[TestImageList,BaseImageList]=AverageMatchDistance
             HM_data_FourierDifference[TestImageList,BaseImageList]=FourierDifference
             
-
+            #old code for sorting images in place
             if HistogramSimilarity<CheckImages_InfoSheet.BestMatch_Histo:
                 CheckImages_InfoSheet.BestMatch_Histo=HistogramSimilarity
                 CheckImages_InfoSheet.BestMatch_Histo_listIndex=TestImageList
@@ -345,28 +406,60 @@ def main():
             OutOfUse=OutOfUse+1
 
 
-    BlankOut=HM_data_FourierDifference.max()
-    #blank out the self test
-    for item in MatchImages.ImagesInMem_Pairing:
-        HM_data_FourierDifference[item,item]=BlankOut
+
+    #BlankOut=HM_data_FourierDifference.max()+0.1
+    ##blank out the self test
+    #for item in MatchImages.ImagesInMem_Pairing:
+    #    HM_data_FourierDifference[item,item]=BlankOut
 
     #normalise matrices
     HM_data_FM=normalize_2d(HM_data_FM)
     HM_data_histo=normalize_2d(HM_data_histo)
     HM_data_FourierDifference=normalize_2d(HM_data_FourierDifference)
-    HM_data_Both=normalize_2d(HM_data_histo+HM_data_FM+HM_data_FourierDifference)
-    #HM_data_Both=normalize_2d(HM_data_FourierDifference)
+
+    
+
+    for BaseImageList in MatchImages.ImagesInMem_Pairing:
+        for TestImageList in MatchImages.ImagesInMem_Pairing:
+            if TestImageList<BaseImageList:
+                #data is diagonally symmetrical
+                continue
+            
+            HistogramSimilarity=HM_data_FM[BaseImageList,TestImageList]
+            AverageMatchDistance=HM_data_histo[BaseImageList,TestImageList]
+            FourierDifference=HM_data_FourierDifference[BaseImageList,TestImageList]
+            #experiment with metric distance
+            HM_data_MetricDistances[BaseImageList,TestImageList]=math.sqrt((HistogramSimilarity**2)+(AverageMatchDistance**2)+(FourierDifference**2))
+            #mirror data for visualisation
+            HM_data_MetricDistances[TestImageList,BaseImageList]=HM_data_MetricDistances[BaseImageList,TestImageList]
+            
+
+    HM_data_MetricDistances=normalize_2d(HM_data_MetricDistances)
+    HM_data_All=HM_data_MetricDistances#normalize_2d(HM_data_histo+HM_data_FM+HM_data_FourierDifference)
+
+
+
+    #HM_data_All=HM_data_FM
+    HM_data_All_Copy=copy.deepcopy(HM_data_All)
+
+    #create eucledian distance comparison matrix
+
+
+    #debug final data
+    #HM_data_All=HM_data_FourierDifference
 
     #if have equal length for both results, asssume they are aligned - can examine response
     if len(CheckImages_InfoSheet.All_FM_results)==len(CheckImages_InfoSheet.AllHisto_results):
-        FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_Both") +".jpg"
-        PlotAndSave_2datas("HM_data_Both",FilePath,HM_data_Both)
+        FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_All") +".jpg"
+        PlotAndSave_2datas("HM_data_All",FilePath,HM_data_All)
         FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_FM") +".jpg"
         PlotAndSave_2datas("HM_data_FM",FilePath,HM_data_FM)
         FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_histo") +".jpg"
         PlotAndSave_2datas("HM_data_histo",FilePath,HM_data_histo)
         FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_FourierDifference") +".jpg"
         PlotAndSave_2datas("HM_data_FourierDifference",FilePath,HM_data_FourierDifference)
+        FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_MetricDistances") +".jpg"
+        PlotAndSave_2datas("HM_data_MetricDistances",FilePath,HM_data_MetricDistances)
 
     
         #for every image or subsets of images, roll through heatmap finding nearest best match then
@@ -375,17 +468,17 @@ def main():
         BaseImageList=random.choice(list(MatchImages.ImagesInMem_Pairing.keys()))
 
         #get minimum 
-        result = np.where(HM_data_Both == np.amin(HM_data_Both))
+        result = np.where(HM_data_All == np.amin(HM_data_All))
         Element=random.choice(result[0])#incase we have two identical results
 
 
-        BlankOut=HM_data_Both.max()+1
         #blank out the self test
+        BlankOut=HM_data_All.max()+0.01
         for item in MatchImages.ImagesInMem_Pairing:
-            HM_data_Both[item,item]=BlankOut
+            HM_data_All[item,item]=BlankOut
 
-        print(HM_data_Both)
-        print("-----")
+        #print(HM_data_All)
+        #print("-----")
         BaseImageList=random.choice(list(MatchImages.ImagesInMem_Pairing.keys()))
         Counter=0
         MatchMetric_all=[]
@@ -395,16 +488,16 @@ def main():
         while len(OrderedImages)+1<len(MatchImages.ImagesInMem_Pairing):
 
             Counter=Counter+1
-            print("looking at row",BaseImageList,"for match for for")
-            #HM_data_Both[BaseImageList,BaseImageList]=BlankOut
-            Row=HM_data_Both[0:len(MatchImages.ImagesInMem_Pairing),BaseImageList]
+            #print("looking at row",BaseImageList,"for match for for")
+            #HM_data_All[BaseImageList,BaseImageList]=BlankOut
+            Row=HM_data_All[0:len(MatchImages.ImagesInMem_Pairing),BaseImageList]
             #print(Row)
             #get minimum value
             result = np.where(Row == np.amin(Row))
             Element=random.choice(result[0])#incase we have two identical results
-            print("nearest matching is element",Element)
-            print("nearest value",HM_data_Both[Element,BaseImageList])
-            MatchMetric_all.append(HM_data_Both[Element,BaseImageList])
+            #print("nearest matching is element",Element)
+            #print("nearest value",HM_data_All[Element,BaseImageList])
+            MatchMetric_all.append(HM_data_All[Element,BaseImageList])
             MatchMetric_Histo.append(HM_data_histo[Element,BaseImageList])
             MatchMetric_Fourier.append(HM_data_FourierDifference[Element,BaseImageList])
             MatchMetric_FM.append(HM_data_FM[Element,BaseImageList])
@@ -412,27 +505,28 @@ def main():
             
 
             for imgIndex, Images in enumerate (MatchImages.ImagesInMem_Pairing[Element][0]):
-                #if len(Images)>1:
+                #if len(Images)>1:y
                     #raise Exception("too many images")
                 SplitImagePath=Images.split("\\")[-1]
-                FilePath=MatchImages.OutputPairs +"\\00" +str(Counter)+ "_ImgNo_" + str(BaseImageList) + "_" + str(round(HM_data_Both[Element,BaseImageList]),4)+ "_" + SplitImagePath
+                FilePath=MatchImages.OutputPairs +"\\00" +str(Counter)+ "_ImgNo_" + str(BaseImageList) + "_" + str(round(HM_data_All[Element,BaseImageList],3))+ "_" + SplitImagePath
                 cv2.imwrite(FilePath,MatchImages.ImagesInMem_to_Process[Images].ImageColour)
                 if Images in OrderedImages:
                     raise Exception("output images file already exists!!! logic error")
                 else:
                     OrderedImages[Images]=BaseImageList
-            #blank out element in both places
-            HM_data_Both[0:len(MatchImages.ImagesInMem_Pairing),BaseImageList]=BlankOut
-            HM_data_Both[BaseImageList,0:len(MatchImages.ImagesInMem_Pairing)]=BlankOut
+            #now print out histogram with skew?
+            #FilePath=MatchImages.OutputPairs +"\\00" +str(Counter)+ "_ImgNo_" + str(BaseImageList) + "_" + str(round(HM_data_All[Element,BaseImageList],3))+ "_HISTO_" + SplitImagePath
+            #PlotAndSaveHistogram("self similar histogram",FilePath,HM_data_All_Copy[0:len(MatchImages.ImagesInMem_Pairing),BaseImageList],0,30)
+
+
+            #blank out element in All places
+            HM_data_All[0:len(MatchImages.ImagesInMem_Pairing),BaseImageList]=BlankOut
+            HM_data_All[BaseImageList,0:len(MatchImages.ImagesInMem_Pairing)]=BlankOut
             if Counter==1:
-                HM_data_Both[0:len(MatchImages.ImagesInMem_Pairing),Element]=BlankOut
-                HM_data_Both[Element,0:len(MatchImages.ImagesInMem_Pairing)]=BlankOut
+                HM_data_All[0:len(MatchImages.ImagesInMem_Pairing),Element]=BlankOut
+                HM_data_All[Element,0:len(MatchImages.ImagesInMem_Pairing)]=BlankOut
             #baseimage should be an integer
             #work in columns to find nearest match, data should be mirrored diagonally to make it easier to visualise#
-            
-            
-            #print(HM_data_Both)
-            #print("-----")
             
             
             

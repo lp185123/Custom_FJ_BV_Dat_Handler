@@ -301,7 +301,7 @@ if __name__ == "__main__":
         if (Total_4a_PC + Total_4b_PC + Total_Not4aNot4B_PC) > 100.1:
             raise Exception("Bad summation")
 
-        print(TestID + Delimiter + str(Total_4a_PC) + Delimiter + str(Total_4b_PC) + Delimiter )
+        print(TestID + Delimiter + str(Total_4a) + Delimiter + str(Total_4b) + Delimiter+ str(TotalNotes))
 
 
         f = open(OutputFOlder + str(ResultItem) +"    _4A_"+ str (Total_4a_PC) + "_4B_"+ str (Total_4b_PC) + "_UNKNOWN_"+ str (Total_Not4aNot4B_PC) + "__of_" + str(TotalNotes) + ".txt", "a")
