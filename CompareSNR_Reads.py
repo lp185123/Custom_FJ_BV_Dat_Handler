@@ -9,6 +9,14 @@ import os
 import json
 import shutil
 
+class TracetoSource_Class():
+    def __init__(self):
+        SourceDat=None
+        SourceDat_Record=None
+        SourceExtractedImage=None
+        ProcessedImage=None
+
+
 def CleanUpExternalOCR(InputOCR):
     #clean up external OCR which could contain non alphanumeric characters and spaces etc
     CleanedUpSnr=""
@@ -62,10 +70,10 @@ class CheckSN_Answers():
             print("Efficiency:",round((TotalPass/(TotalPass+TotalFail))*100),"% match")
 
             #this is not quite the right place for this function - but for the upcoming report we can also try and find the file which links back to the source DAT records;
-            self.Find_Sources_Dats_images(self.CollimatedImageVsImageLink_dict)
+            self.SourceTraceDict=self.Find_Sources_Dats_images(self.CollimatedImageVsImageLink_dict)
             #build report - pass in matchresults but if using collimated images wwe need self.CollimatedImageVsImageLink_dict as well
             #so we can trace where images came from 
-            self.BuildReport(MatchResults_dict,self.CollimatedImageVsImageLink_dict)
+            self.BuildReport(MatchResults_dict,self.CollimatedImageVsImageLink_dict,self.SourceTraceDict)
 
 
     def Find_Sources_Dats_images(self,CollimatedImageVsImageLink_dict):
@@ -115,12 +123,37 @@ class CheckSN_Answers():
                 raise Exception("user declined to continue")
 
         #should now have full traceability!!
-        
-            
+        #create a dictionary that links up 
+        SourceTraceDict=dict()
+        for SourceImage in Link_Img2SourceImg_data:
+            TracetoSource=TracetoSource_Class()
+            #can get source image linked to processed image straight away
+            TracetoSource.SourceExtractedImage=SourceImage
+            TracetoSource.ProcessedImage=Link_Img2SourceImg_data[SourceImage]
+            #now need to get dat & record
+            if TracetoSource.SourceExtractedImage in Link_Img2DatRecord_data:
+                TracetoSource.SourceDat=Link_Img2DatRecord_data[TracetoSource.SourceExtractedImage][0]
+                TracetoSource.SourceDat_Record=Link_Img2DatRecord_data[TracetoSource.SourceExtractedImage][1]
+            else:
+                print("ERROR!! Could not find", TracetoSource.SourceExtractedImage,"in source linking dictionary!!!")
+                
+            #we will use the processed image as the key as that is the working data in this module
+            SourceTraceDict[TracetoSource.ProcessedImage]=TracetoSource
+
+        #check same length - if they are not then the results will be invalid if providing a subset of records 
+        if len(SourceTraceDict)!=len(Link_Img2SourceImg_data):
+            print("WARNING!! SourceTraceDict and Link_Img2SourceImg_data different sizes",len(SourceTraceDict),len(Link_Img2SourceImg_data))
+            if _3DVisLabLib.yesno("Continue? Will not be able to link back to Dat records")==True:
+                return None
+            else:
+                raise Exception("user declined to continue")
+       
+       #return the populated dictionary to trace images
+        return SourceTraceDict
         
 
 
-    def BuildReport(self,MatchResults_dict,CollimatedImageVsImageLink_dict):
+    def BuildReport(self,MatchResults_dict,CollimatedImageVsImageLink_dict,SourceTraceDict):
         #build html report
         buildhtml=[]
         #header of html
@@ -145,7 +178,14 @@ class CheckSN_Answers():
                 if SingleResult.Pass==True:
                     TotalPass=TotalPass+1
                 else:
-                    
+                     #we might have a dictionary to link back to source dats and images - if so use that
+                    TraceObject=None
+                    if SourceTraceDict is not None:
+                        if SingleResult_ColImgTrace[IntIndexer] in SourceTraceDict:
+                            TraceObject=SourceTraceDict[SingleResult_ColImgTrace[IntIndexer]]
+                        else:
+                            raise Exception("Error!! Cannot find file in source dictionary json file which was found - delete this file as it is invalid or corrupt")
+
                     #add to html
                     #if an image - embed it into HTML
                     #if we have collimated images we have extra complexity to trace the image provenace
@@ -155,7 +195,14 @@ class CheckSN_Answers():
                         #copy failed image?
                         ImageDelimiter=SingleResult_ColImgTrace[IntIndexer].split("\\")
                         ImageFileNameOnly=ImageDelimiter[-1]
-                        shutil.copyfile(SingleResult_ColImgTrace[IntIndexer], self.AnswersFolder + "\\" + ImageFileNameOnly)
+
+                        #use tracer object if we have it to get original extracted image
+                        if TraceObject is not None:
+                            shutil.copyfile(TraceObject.SourceExtractedImage, self.AnswersFolder + "\\" + ImageFileNameOnly)
+                        #otherwise use the single processed files
+                        else:
+                            shutil.copyfile(SingleResult_ColImgTrace[IntIndexer], self.AnswersFolder + "\\" + ImageFileNameOnly)
+
                     else:
 
                         if ".jpg" in MatchResult.lower():
@@ -170,7 +217,10 @@ class CheckSN_Answers():
                     buildhtml.append("<h3>" + "     Details:" + SingleResult.InfoString +  "</h2>")
                     buildhtml.append("<h3>" + "       Error:" + SingleResult.Error +  "</h2>")
                     buildhtml.append("<h3>" + "Raw CloudOCR:" + SingleResult.ExternalSNR +  "</h2>")
-                    
+                    #if we have trace object - can get dat file and record number as well
+                    if TraceObject is not None:
+                        buildhtml.append("<h3>" + "Source Trace (warning:may be offset by 1 in viewer): " + str(TraceObject.SourceDat) + " record " + str(TraceObject.SourceDat_Record) +  "</h2>")
+                    #sum fails
                     TotalFail=TotalFail+1
 
         #put this stuff at the top
