@@ -61,7 +61,7 @@ class MatchImagesObject():
 
     """Class to hold information for image sorting & match process"""
     def __init__(self):
-        self.InputFolder=r"C:\Working\FindIMage_In_Dat\Output"
+        self.InputFolder=r"E:\NCR\TestImages\UK_1000"
         self.Outputfolder=r"C:\Working\FindIMage_In_Dat\MatchImages"
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
@@ -449,10 +449,7 @@ def main():
     #debug final data
     HM_data_All=HM_data_MetricDistances
 
-    #blank out the self test
-    BlankOut=HM_data_All.max()+0.1
-    for item in MatchImages.ImagesInMem_Pairing:
-       HM_data_All[item,item]=BlankOut
+    
 
     #if have equal length for both results, asssume they are aligned - can examine response
     if len(CheckImages_InfoSheet.All_FM_results)==len(CheckImages_InfoSheet.AllHisto_results):
@@ -471,35 +468,38 @@ def main():
         #for every image or subsets of images, roll through heatmap finding nearest best match then
         #cross referencing it
         OrderedImages=dict()
-        BaseImageList=random.choice(list(MatchImages.ImagesInMem_Pairing.keys()))
+        #BaseImageList=random.choice(list(MatchImages.ImagesInMem_Pairing.keys()))
 
         #get minimum 
-        result = np.where(HM_data_All == np.amin(HM_data_All))
-        Element=random.choice(result[0])#incase we have two identical results
+        #result = np.where(HM_data_All == np.amin(HM_data_All))
+        #Element=random.choice(result[0])#incase we have two identical results
 
 
         #blank out the self test
-        BlankOut=HM_data_All.max()+0.01
+        BlankOut=HM_data_All.max()*2.00000#should be "2" if normalised
         for item in MatchImages.ImagesInMem_Pairing:
             HM_data_All[item,item]=BlankOut
 
         #print(HM_data_All)
         #print("-----")
-        BaseImageList=random.choice(list(MatchImages.ImagesInMem_Pairing.keys()))
+        BaseImageList=0#random.choice(list(MatchImages.ImagesInMem_Pairing.keys()))
         Counter=0
         MatchMetric_all=[]
         MatchMetric_Histo=[]
         MatchMetric_Fourier=[]
         MatchMetric_FM=[]
-        while len(OrderedImages)+1<len(MatchImages.ImagesInMem_Pairing):
-
+        while len(OrderedImages)+1<len(MatchImages.ImagesInMem_Pairing):#+1 is a fudge or it crashes out with duplicate image bug - cant figure this out 
             Counter=Counter+1
+            #FilePath=MatchImages.OutputPairs +"\\00" + str(Counter) +  str(OutOfUse) +("HM_data_All") +".jpg"
+            #PlotAndSave_2datas("HM_data_All",FilePath,normalize_2d(HM_data_All))
+            
             #print("looking at row",BaseImageList,"for match for for")
             #HM_data_All[BaseImageList,BaseImageList]=BlankOut
             Row=HM_data_All[0:len(MatchImages.ImagesInMem_Pairing),BaseImageList]
             #print(Row)
             #get minimum value
             result = np.where(Row == np.amin(Row))
+            #print("REsult",Row)
             Element=random.choice(result[0])#incase we have two identical results
             #print("nearest matching is element",Element)
             #print("nearest value",HM_data_All[Element,BaseImageList])
@@ -528,9 +528,9 @@ def main():
             #blank out element in All places
             HM_data_All[0:len(MatchImages.ImagesInMem_Pairing),BaseImageList]=BlankOut
             HM_data_All[BaseImageList,0:len(MatchImages.ImagesInMem_Pairing)]=BlankOut
-            if Counter==1:
-                HM_data_All[0:len(MatchImages.ImagesInMem_Pairing),Element]=BlankOut
-                HM_data_All[Element,0:len(MatchImages.ImagesInMem_Pairing)]=BlankOut
+            #if Counter==1:
+            #    HM_data_All[0:len(MatchImages.ImagesInMem_Pairing),Element]=BlankOut
+            #    HM_data_All[Element,0:len(MatchImages.ImagesInMem_Pairing)]=BlankOut
             #baseimage should be an integer
             #work in columns to find nearest match, data should be mirrored diagonally to make it easier to visualise#
             

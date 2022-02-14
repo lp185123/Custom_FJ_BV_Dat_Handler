@@ -20,24 +20,37 @@ class GA_Parameters():
     def __init__(self):
         self.FitnessRecord=dict()
         self.SelfCheck=False
-        self.No_of_First_gen=10
-        #number of top candidates must always be smaller than first gen!
-        self.No_TopCandidates=8
-        self.NewIndividualsPerGen=1
-        self.TestImageBatchSize=30
-        self.ImageColumnSize=30#dont want to go more than 40 as performance breaks down
-        self.NewImageCycle=4
-        self.ImageTapOut=3#terminate anything that has poor performance out the box
-        self.GradientDescentCycle=10
+
+        #****************
+        #remember to check "Individual" class for the parameters and the parameter ranges!!
+        #****************
+
+        self.No_of_First_gen=100#first generation are the randomly generated cycle, this usually gives the biggest gains, balance with 
+        #time commitment, which depeneds on test image batch size
+
+        self.No_TopCandidates=10#how many genomes do we skim off the crop before cross breeding them
+
+        self.NewIndividualsPerGen=1#add a random genome each generation- generally doesnt make much difference so is pot luck 
+        #worth activating a couple for long running times as theoretically can help if stuck in local minima
+
+        self.TestImageBatchSize=3907#how many images do we test per iteration. For best results use entire dataset, this is tested to work up
+        #to 400 images then after that you dont get enough generations to refine solution due to time per evaluation. If you can use entire dataset then
+        #set NewImageCycle to 99999 as all it will do is reshuffle the images which isnt necessary
+
+        self.ImageColumnSize=30#how many images we send at a time to external OCR dont want to go more than 40 as performance breaks down
+
+        self.NewImageCycle=4#how many iterations of same image set before choosing another random subset of main images
+
+        self.ImageTapOut=99#terminate anything that has poor performance out the box - with collimated tests this doesnt work effectively
+
+        self.GradientDescentCycle=10#loops before we start a gradient descent - this is generally not so critical for images
+        # but if commiting to long process time anyway its worth putting it on
+        
         self.UseCloudOCR=True
-        self.MirrorImage=True
-        self.DictFilename_V_Images=dict()#load this with fitness check images
-        #load fitness checking images into memory - #TODO make dynamic
-        #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\FitnessTest"
-        #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
-        #self.FilePath=r"C:\Working\FindIMage_In_Dat\TestSNs"
-        #self.FilePath=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR"
-        self.FilePath=r"C:\Working\FindIMage_In_Dat\Examples\Brazil_set_3"
+        self.MirrorImage=True#double up image so one is upside down - can have upside down s39 images
+
+        self.DictFilename_V_Images=dict()#load this with fitness check images (automatic)
+        self.FilePath=r"C:\Working\FindIMage_In_Dat\Examples\Brazil_set_4\All"#point to folder of extracted images
         #save out parameter converging image
         self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"
         self.DefaultError=5#if fitness checking breaks what do we set error too - currently cannot handle Null value
@@ -65,7 +78,9 @@ class GA_Parameters():
         ListAllImages=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
 
         if len(ListAllImages)<TotalNoImages:
-            raise Exception("ERROR: GetCollimatedTestSet_AndFielding length: User requested illegal",TotalNoImages,"image batch size from dataset of",len(ListAllImages) )
+            print("WARNING: GetCollimatedTestSet_AndFielding length: User requested ",TotalNoImages,"image batch size from dataset of",len(ListAllImages) )
+            print("can continue")
+            TotalNoImages=len(ListAllImages)
         if (ColSize)>TotalNoImages:
             raise Exception("ERROR: GetCollimatedTestSet_AndFielding length: User requested",ColSize,"col size from",TotalNoImages, " total images" )
 
@@ -474,8 +489,6 @@ def GA_Round(number,decimalpoints):
     tempint=int(temp)
     tempfloat=tempint/(10 **decimalpoints)
     return tempfloat
-
-    #return round(number,decimalpoints)
 
 def BuildSNR_Parameters(InputParameters,SNR_fitnessTest,GenParams):
     #use input parameters to drive SNR parameters
