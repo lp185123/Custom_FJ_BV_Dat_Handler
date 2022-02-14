@@ -183,6 +183,8 @@ def AutomaticExtraction(UserParameters):
     for elem in InputFiles:
         if ((".dat") in elem.lower()):
             InputFiles_cleaned.append(elem)
+    #skipped files
+    SkippedFiles=dict()
     for FileIndex, DatFile in enumerate(InputFiles_cleaned):
         #get all images from first .dat file in input folder(s) (nested)
         #create subfolder from name of dat file
@@ -199,7 +201,11 @@ def AutomaticExtraction(UserParameters):
         filteredImages = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.BlockTypeWave)
         #check filtered images
         if len(filteredImages)==0 or filteredImages is None:
-            raise Exception(DatFile, "Automatic image extraction",UserParameters.BlockType_ImageFormat,UserParameters.BlockTypeWave,"not found")
+            SkippedFiles[DatFile]="Automatic image extraction",UserParameters.BlockType_ImageFormat,UserParameters.BlockTypeWave,"not found"
+            print(SkippedFiles[DatFile])
+            #skip this iteration
+            continue
+            #raise Exception(DatFile, "Automatic image extraction",UserParameters.BlockType_ImageFormat,UserParameters.BlockTypeWave,"not found")
         #if user has requested colour channel combination - superimpose RGB channels
         #first channel is assumed to be C/D channel (feed topside and feed underside)
         if UserParameters.GetRGBImage==True:
@@ -209,7 +215,11 @@ def AutomaticExtraction(UserParameters):
             filteredImagesR = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[2])
             filteredImagesB = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[1])
             if ((len(filteredImages) +len(filteredImagesR) +len(filteredImagesB))/3)!=len(filteredImagesB):
-                raise Exception(DatFile,"Automatic image extraction RGB channels: extracted channel sizes do not match!")
+                SkippedFiles[DatFile]="Automatic image extraction RGB channels: extracted channel sizes do not match!"
+                print(SkippedFiles[DatFile])
+                #skip this iteration
+                continue
+                #raise Exception(DatFile,"Automatic image extraction RGB channels: extracted channel sizes do not match!")
 
         #load in dat file as hex
         data_hex=Load_Hex_File(DatFile)
@@ -275,6 +285,13 @@ def AutomaticExtraction(UserParameters):
     with open(Savestring, 'w') as outfile:
         json.dump(ImgVDatFile_andRecord, outfile)
 
+    #if any skipped file exist, print them out
+    if len(SkippedFiles)>0:
+        print("START OF SKIPPED FILES")
+        for SkippedFIle in SkippedFiles:
+            print(SkippedFIle,SkippedFiles[SkippedFIle])
+        print("END OF SKIPPED FILES")
+
         #if user requests Serial number read alongside images
         #TODO are we even using this?
         # #return
@@ -311,8 +328,8 @@ def Load_Hex_File(Filepath):
     print("Attempting to open ", Filepath)
     with open(Filepath, 'rb') as f:
         hexdata = f.read().hex()
-        print(len(hexdata)/2)#length in hex 
-        print("Opened")
+        #print(len(hexdata)/2)#length in hex 
+        #print("Opened")
         return hexdata
 
 def ConvertHex_to_decimal(InputHex):

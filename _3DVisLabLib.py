@@ -737,20 +737,31 @@ def Orb_FeatureMatch(kp1, des1,kp2, des2,MaxDistance,Image1,Image2,MatchRatio):
     matches = bf.knnMatch(des1,des2, k=2)
     # Apply ratio test
     #lowe_ratio = 0.7
+
+    Count=0
+    Distance=0
     for match1,match2 in matches:
         if match1.distance < MatchRatio*match2.distance:
             l_good.append([match2])
             l_pts2.append(kp2[match1.trainIdx].pt)
             l_pts1.append(kp1[match1.queryIdx].pt)
+            Count=Count+1
+            Distance=Distance+match1.distance
 
     #https://docs.opencv.org/3.4/db/d70/tutorial_akaze_matching.html
+    #TODO this needs thinking about a bit more
+    if Count>0:
+        FinalMatchMetric=Distance/Count
+    else:
+        FinalMatchMetric=999
 
+    FinalMatchMetric=min(FinalMatchMetric,999)
 
     OutputMatchImage=None
     if Image1 is not None and Image2 is not None:
         OutputMatchImage=cv2.drawMatchesKnn(Image1,kp1,Image2,kp2,l_good,None,flags=2)
         
-    return l_good,OutputMatchImage,l_pts1,l_pts2
+    return l_good,OutputMatchImage,l_pts1,l_pts2,FinalMatchMetric
 
 
 

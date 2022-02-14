@@ -13,6 +13,7 @@ import CompareSNR_Reads
 import copy
 import TileImages_for_OCR
 import pickle
+import json
 #tips
 #https://nanonets.com/blog/ocr-with-tesseract/
 #tesseract ocr how to install
@@ -670,15 +671,20 @@ class TestSNR_Fitness():
             cv2.imwrite(SavePath ,TestImage)
             #add to dictionary
             ProcessedImgVsOriginalPath_dict[ImgFile]=SavePath
-            _3DVisLabLib.ImageViewer_Quick_no_resize(TestImage,0,False,False)
+            if Index%30==0:_3DVisLabLib.ImageViewer_Quick_no_resize(TestImage,0,False,False)
 
         #save out list of image tracing info
-        SaveList=[ProcessedImgVsOriginalPath_dict]
+        SaveList=ProcessedImgVsOriginalPath_dict
         #make sure we can save and load state
-        filepath=OutputFolder +"\\" + "SingleImg_to_ExtractionLinker" + ".lnk"
-        file_pi = open(filepath, 'wb') 
-        pickle.dump((SaveList), file_pi)
-        file_pi.close()
+        #filepath=OutputFolder +"\\" + "SingleImg_to_ExtractionLinker" + ".lnk"
+        #file_pi = open(filepath, 'wb') 
+        #pickle.dump((SaveList), file_pi)
+        #file_pi.close()
+
+        filepath=OutputFolder +"\\" + "SingleImg_to_ExtractionLinker" + ".json"
+        with open(filepath, 'w') as outfile:
+            json.dump(SaveList, outfile)
+            
 
         return
         

@@ -35,7 +35,7 @@ def GetList_Of_ImagesInList(ListOfFiles, ImageTypes=(".jPg", ".Png",".gif")):
 if __name__ == "__main__":
     #user input
     ResultFolder = input("Please enter folder with sim results:")
-    ResultFolder=r"C:\Users\LP185123\OneDrive - NCR Corporation\Desktop\SR_GEN_Sprint\StandardDC\Malaysia\Unprocessed_SimResults\attempt 4 Unfit"
+    #ResultFolder=r"C:\Users\LP185123\OneDrive - NCR Corporation\Desktop\SR_GEN_Sprint\StandardDC\Russia\UNFIT\Attempt5_UNFIT"
     AllFiles=GetAllFilesInFolder_Recursive(ResultFolder)
     #simulation results end with this suffix
     TxtFiles=GetList_Of_ImagesInList(AllFiles,[".dat.txt"])

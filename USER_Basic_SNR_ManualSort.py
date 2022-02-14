@@ -14,7 +14,7 @@ OutputGoodSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ManualCheck_Goo
 OutputBadSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ManualCheck_BadSNR"
 SaveStateFile=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\\ManCheckSaveState" + ".json"
 #ask user for input folder
-DefaultFolder=r"C:\Working\FindIMage_In_Dat\Examples\Brazil_set_3\ManualCheck_BadSNR"
+DefaultFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR"
 InputFolder = input("Please enter images folder: Default is:   " + DefaultFolder)
 if len(InputFolder)==0:
     InputFolder = DefaultFolder

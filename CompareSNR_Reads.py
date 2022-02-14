@@ -35,6 +35,7 @@ class CheckSN_Answers():
         #self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\SNR_Answers_Collimated"
         #self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\SNR_Answers_Single"
 
+
         self.Collimated=None#set boolean to single images or collimated images which handle answers differently
         self.SingleImages=None#set this boolean correctly after asserting if working on single or collimated images
         self.ImageVS_TemplateSNR_dict=None#each image (whether single or collimated) will have list of SNR
@@ -52,7 +53,6 @@ class CheckSN_Answers():
             TotalPass=0
             TotalFail=0
             for MatchResult in MatchResults_dict:
-                
                 for SingleResult in MatchResults_dict[MatchResult][0]:
                     if SingleResult.Pass==True:
                         TotalPass=TotalPass+1
@@ -60,9 +60,64 @@ class CheckSN_Answers():
                         TotalFail=TotalFail+1
 
             print("Efficiency:",round((TotalPass/(TotalPass+TotalFail))*100),"% match")
+
+            #this is not quite the right place for this function - but for the upcoming report we can also try and find the file which links back to the source DAT records;
+            self.Find_Sources_Dats_images(self.CollimatedImageVsImageLink_dict)
             #build report - pass in matchresults but if using collimated images wwe need self.CollimatedImageVsImageLink_dict as well
             #so we can trace where images came from 
             self.BuildReport(MatchResults_dict,self.CollimatedImageVsImageLink_dict)
+
+
+    def Find_Sources_Dats_images(self,CollimatedImageVsImageLink_dict):
+        ##Try and find the source dat records of the images, and also the unprocessed images
+        ImagesBaseFilePath_dict=dict()
+        #churn through our link back to processed images (which can also be unprocessed - but a copy of the original)
+        #if all is in order, these should all be in the same place - if they are not then something weird is going on or
+        #user has copied and pasted stuff incorrectly
+        #if one filepath test is true, find the file there which links those images back to the source images, and from there we can
+        #trace back to the dat records
+        #this is a labourious way to go about tracing the source but will do for now
+        for Item in CollimatedImageVsImageLink_dict:
+            for ImgItem in CollimatedImageVsImageLink_dict[Item]:
+                SplitFilePath=ImgItem.split("\\")[0:-1]
+                ReJoinFilePath=""
+                for FilePathSection in SplitFilePath:
+                    ReJoinFilePath=ReJoinFilePath+FilePathSection +"\\"
+                ImagesBaseFilePath_dict[ReJoinFilePath]=ReJoinFilePath
+        if len(ImagesBaseFilePath_dict)!=1:
+            print("ERROR!!! ImagesBaseFilePath_dict:")
+            print(ImagesBaseFilePath_dict)
+            print("ERROR! Two filepaths found when tracing back to source images & dats\n can continue but with reduced utility")
+            if _3DVisLabLib.yesno("Continue?")==True:
+                return None
+            else:
+                raise Exception("User declined to continue process")
+        #at this point we have a valid filepath - lets try and get the tracing json files
+         #load file which links images back to DAT files and record
+        FilePath=next(iter(ImagesBaseFilePath_dict))#gte first key in dictionary - there should only be one
+        Link_Img2DatRecord_data=None
+        Link_Img2SourceImg_data=None
+        Link_Img2DatRecord_file=FilePath + "TraceImg_to_DatRecord.json"#TODO magic numbers - need to have these as variables pointing to one source
+        Link_Img2SourceImg_file=FilePath + "SingleImg_to_ExtractionLinker.json"
+        if os.path.exists(Link_Img2DatRecord_file):
+            print("Reading file which links images back to DAT records",Link_Img2DatRecord_file)
+            with open(Link_Img2DatRecord_file) as json_file:
+                Link_Img2DatRecord_data = json.load(json_file)
+
+        if os.path.exists(Link_Img2SourceImg_file):
+            print("Reading file which links images back to DAT records",Link_Img2SourceImg_file)
+            with open(Link_Img2SourceImg_file) as json_file:
+                Link_Img2SourceImg_data = json.load(json_file)
+
+        if Link_Img2DatRecord_data is None or Link_Img2SourceImg_data is None:
+            print("Cannot find files which trace images back to source dat records - tool utility will be reduced")
+            if _3DVisLabLib.yesno("Continue?")==False:
+                raise Exception("user declined to continue")
+
+        #should now have full traceability!!
+        
+            
+        
 
 
     def BuildReport(self,MatchResults_dict,CollimatedImageVsImageLink_dict):
@@ -148,11 +203,19 @@ class CheckSN_Answers():
         if len(ListAllImageFiles)==0:
             raise Exception("no images found in folder", self.BaseSNR_Folder)
 
+        #check that each Json is valid
+        #we could check by image partner but that could introduce error if we skip over files for string handling logic fault - just grab all JSONs except for 
+        #one special case and let the program crash out otherwise
+        ListAllTextFiles_Cleaned=[]
+        for Json in ListAllTextFiles:#TODO this is basically a magic number - make this a centralised variable rather than hardcoding it everywhere
+            if (not "TraceImg_to_DatRecord.json" in Json) and (not "SingleImg_to_ExtractionLinker.json" in Json):
+                ListAllTextFiles_Cleaned.append(Json)
+
         #if text files are in folders - may be collimated answers
-        if len(ListAllTextFiles)>0:# text files found
+        if len(ListAllTextFiles_Cleaned)>0:# text files found
             print("json files found in target folder",self.BaseSNR_Folder)
             TemplateSNRs=[]
-            for TemplateCollimatedSNRs in ListAllTextFiles:
+            for TemplateCollimatedSNRs in ListAllTextFiles_Cleaned:
                 print("Reading",TemplateCollimatedSNRs)
                 with open(TemplateCollimatedSNRs) as json_file:
                     data = json.load(json_file)
@@ -191,59 +254,7 @@ class CheckSN_Answers():
         #shouldnt get here 
         raise Exception("BuildTemplate_SNR_Info incomplete logic")
 
-    # def BuildTemplate_SNR_Info_txt(self):
-    #     #fielding can come in two modes - SNR is embedded in single SNR image or can be in text files with multiple instaces
-    #     #of snr for collimated images
-    #     InputFiles_fielding=_3DVisLabLib.GetAllFilesInFolder_Recursive(self.BaseSNR_Folder)
-    #     ListAllTextFiles=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles_fielding,(".txt"))#name of function misnomer
-    #     ListAllImageFiles=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles_fielding)#get all images
-
-    #     #create dictionary of image key vs list of snr value(s) (even if single answer)
-    #     OutputDictionary=dict()
-
-    #     print("automatic fielding for SNR - using folder (nested)",self.BaseSNR_Folder)
-    #     #if no images - nothing can proceed
-    #     if len(ListAllImageFiles)==0:
-    #         raise Exception("no images found in folder", self.BaseSNR_Folder)
-
-    #     #if text files are in folders - may be collimated answers
-    #     if len(ListAllTextFiles)>0:# text files found
-    #         print("json files found in target folder",self.BaseSNR_Folder)
-    #         TemplateSNRs=[]
-    #         for TemplateCollimatedSNRs in ListAllTextFiles:
-    #             print("Reading",TemplateCollimatedSNRs)
-    #             #with open('json_data.json') as json_file:
-    #             #    data = json.load(json_file)
-    #             with open(TemplateCollimatedSNRs) as f:
-    #                 lines = f.readlines()
-    #                 OutputDictionary[TemplateCollimatedSNRs]=lines
-    #                 for Snr in lines:
-    #                     TemplateSNRs.append(Snr)
-    #         print(len(TemplateSNRs),"template SNR found within text files")
-    #         if len(TemplateSNRs)==0:
-    #             print("No text files with template SNR found, defaulting to embedded SNR in single images")
-    #         else:
-    #             #return collimated images = true with fielding found
-    #             return(OutputDictionary,True,SNRTools.GenerateSN_Fielding(TemplateSNRs))
-        
-    #     #if not collimated answers - template SNR may be embedded in image filenames
-    #     ListEmbeddedFormatSNR=[]
-    #     for imgfilepath in ListAllImageFiles:
-    #         print("Reading",imgfilepath)
-    #         if ("[" in imgfilepath) and ("[" in imgfilepath):#bookends for embedded SNR#TODO warning magic letter!! make this a common variable or function
-    #             ListEmbeddedFormatSNR.append(imgfilepath)
-    #             OutputDictionary[imgfilepath]=[imgfilepath]
-
-    #     print(len(ListEmbeddedFormatSNR),"possible template SNR found embedded in images")
-    #     if len(ListEmbeddedFormatSNR)==0:
-    #         raise Exception("no embedded SNR in images found (format = xx[SNR]xx", self.BaseSNR_Folder)
-    #     #return collimated images = false with fielding found 
-    #     return(OutputDictionary,False,SNRTools.GenerateSN_Fielding(ListEmbeddedFormatSNR))
-
-    #     #shouldnt get here 
-    #     return None, None, None
-
-
+  
 
     def GetExternalOCR_Answers(self):
         #answers folder from external OCR service should have same filename as 
@@ -345,6 +356,7 @@ class CheckSN_Answers():
         #create dictionaries to hold matching results using snr match class
         MatchResults_dict=dict()
         for filename in ImageVS_TemplateSNR_dict:
+            print("Checking template VS external SNR:\n",filename)
             #get last part of filename so will be "0_SNR_Answers.txt"
             ExternalOCR_key=self.GenerateAligned_Filepath(filename,ExternalOCR_PathString,".txt")
             InternalImage_key=self.GenerateAligned_Filepath(filename,InternalImage_PathString,".jpg")
@@ -353,7 +365,6 @@ class CheckSN_Answers():
             #Should have two lists of SNR/OCR results - can now loop through and check the SNRs match
             ResultsObjectList=[]
             for Index,Item in enumerate(TemplateSNR_list):
-                print("Checking template VS external SNR:\n",filename,"\n",ExternalOCR_key)
                 ResultsObjectList.append(CheckSNR_Reads(TemplateSNR_list[Index],ExternalSNR_list[Index],self.Fielding))
             #pack results into the dictionary alongside the image, template SNR and external SNR files for later analysis
 
