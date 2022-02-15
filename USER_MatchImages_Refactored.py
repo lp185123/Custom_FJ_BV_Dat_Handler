@@ -47,8 +47,8 @@ def PlotAndSave_2datas(Title,Filepath,Data1):
 class MatchImagesObject():
 
     def USERFunction_CropForFM(self,image):
-        return image
-        return image[80:150,60:140,:]
+        #return image
+        return image[0:50,0:100,:]
         #return image[0:int(image.shape[0]/1.1),0:int(image.shape[1]/1),:]
     def USERFunction_CropForHistogram(self,image):
         return image
@@ -61,7 +61,7 @@ class MatchImagesObject():
 
     """Class to hold information for image sorting & match process"""
     def __init__(self):
-        self.InputFolder=r"E:\NCR\TestImages\UK_1000"
+        self.InputFolder=r"E:\NCR\TestImages\TinyTest"
         self.Outputfolder=r"C:\Working\FindIMage_In_Dat\MatchImages"
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
@@ -74,13 +74,18 @@ class MatchImagesObject():
         self.DuplicatesFound=[]
         self.Mean_Std_Per_cyclelist=None
         self.HistogramSelfSimilarityThreshold=0.005
-        self.SubSetOfData=int(200)#subset of data
+        self.SubSetOfData=int(400)#subset of data
         #self.ImagesInMem_to_Process_Orphans=dict()#cant deepcopy feature match keypoints
         self.ImagesInMem_Pairing=dict()
         self.ImagesInMem_Pairing_orphans=dict()
         self.GetDuplicates=False
         self.startTime =None
         self.Endtime =None
+        self.HM_data_MetricDistances=None
+        self.HM_data_FM=normalize_2d=None
+        self.HM_data_histo=normalize_2d=None
+        self.HM_data_FourierDifference=None
+        
     class FeatureMatch_Dict_Common:
 
         SIFT_default=dict(nfeatures=0,nOctaveLayers=3,contrastThreshold=0.04,edgeThreshold=10)
@@ -107,6 +112,9 @@ class MatchImagesObject():
             self.FM_Descriptors=None
             self.FourierTransform_mag=None
             self.ImageGrayscale=None
+            self.EigenValues=None
+            self.EigenVectors=None
+            self.PrincpleComponents=None
             
 def PlotAndSave(Title,Filepath,Data,maximumvalue):
     
@@ -218,7 +226,7 @@ def main():
         print("Loading in image",ImagePath )
         ImageInfo=MatchImages.ImageInfo()
 
-        Pod1Image_Grayscale = cv2.imread(ImagePath,0)
+        Pod1Image_Grayscale = cv2.imread(ImagePath, cv2.IMREAD_GRAYSCALE)
         Pod1Image_col = cv2.imread(ImagePath)
 
         Pod1Image_Grayscale=MatchImages.USERFunction_Resize(Pod1Image_Grayscale)
@@ -254,6 +262,84 @@ def main():
         f = np.fft.fft2(Pod1Image_Grayscale)
         fshift = np.fft.fftshift(f)
         magnitude_spectrum = 20*np.log(np.abs(fshift))
+
+        #get eigenvectors and values for image
+        #have to use grayscale at the moment
+        #convert using opencv converter to comply with example code
+        #https://docs.opencv.org/3.4/d1/dee/tutorial_introduction_to_pca.html
+        #ImageforPCA=cv2.cvtColor(Pod1Image_col, cv2.COLOR_BGR2GRAY)
+        # Convert image to binary
+        #_, bw = cv2.threshold(ImageforPCA, 50, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+        #adaptive threshold
+        #bw = cv2.adaptiveThreshold(ImageforPCA,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,11,2)
+        # Find all the contours in the thresholded image
+        # _, contours = cv2.findContours(bw, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        # for i, c in enumerate(contours):
+        #     # Calculate the area of each contour
+        #     area = cv2.contourArea(c)
+        #     # Ignore contours that are too small or too large
+        #     if area < 1e2 or 1e5 < area:
+        #         continue
+        #     # Draw each contour only for visualisation purposes
+        #     cv2.drawContours(ImageforPCA, contours, i, (0, 0, 255), 2)
+        #     # Find the orientation of each shape
+        #     _3DVisLabLib.Get_PCA_getOrientation(c, ImageforPCA)
+
+        #_3DVisLabLib.ImageViewer_Quick_no_resize(bw,0,True,True)
+        # Find the orientation of each shape
+        #_3DVisLabLib.Get_PCA_getOrientation(bw, ImageforPCA)
+        #_3DVisLabLib.ImageViewer_Quick_no_resize(ImageforPCA,0,True,True)
+        #https://towardsdatascience.com/principal-component-analysis-in-depth-understanding-through-image-visualization-892922f77d9f
+        #in_matrix = None 
+        #vec = Pod1Image_Grayscale.reshape(Pod1Image_Grayscale.shape[0] * Pod1Image_Grayscale.shape[1])
+        #in_matrix = vec
+        #can also stack images if we want
+        #n_matrix = np.vstack((in_matrix, vec))'
+        #mean, eigenvectors = cv2.PCACompute(in_matrix, np.mean(in_matrix, axis=0).reshape(1,-1))
+        #np.set_printoptions(precision=3)
+        #cov = np.cov(MB_matrix.transpose())
+
+        #https://towardsdatascience.com/principal-component-analysis-in-depth-understanding-through-image-visualization-892922f77d9f
+        #n_bands=Pod1Image_col.shape[2]-1
+        # 3 dimensional dummy array with zeros
+
+        PCA_image=Pod1Image_col_cropped_FM.copy()
+        MB_img = np.zeros((PCA_image.shape[0],PCA_image.shape[1],PCA_image.shape[2]))
+        # stacking up images (channels?) into the array
+        #this is unncessary but leave here in case we want to do something later on by laying up images
+        for i in range(PCA_image.shape[2]):
+            MB_img[:,:,i] =PCA_image[:,:,i]
+
+
+        # Convert 2d band array in 1-d to make them as feature vectors and Standardization
+        MB_matrix = np.zeros((MB_img[:,:,0].size,PCA_image.shape[2]))
+
+        for i in range(PCA_image.shape[2]):
+            MB_array = MB_img[:,:,i].flatten()  # covert 2d to 1d array 
+            MB_arrayStd = (MB_array - MB_array.mean())/MB_array.std()  
+            MB_matrix[:,i] = MB_arrayStd
+
+        # Covariance
+        np.set_printoptions(precision=3)
+        cov = np.cov(MB_matrix.transpose())
+        # Eigen Values
+        EigVal,EigVec = np.linalg.eig(cov)
+        # Ordering Eigen values and vectors
+        order = EigVal.argsort()[::-1]
+        EigVal = EigVal[order]
+        EigVec = EigVec[:,order]
+        #Projecting data on Eigen vector directions resulting to Principal Components 
+        PC = np.matmul(MB_matrix,EigVec)   #cross product
+
+
+        #save PCA into image info object
+        ImageInfo.EigenValues=EigVal
+        print((EigVec[0],EigVec[1]))
+        ImageInfo.EigenVectors=EigVec
+        ImageInfo.PrincpleComponents=PC
+
+
+
 
         #load into tuple for object
         ImageInfo.Histogram=hist
@@ -319,11 +405,11 @@ def main():
 
 
 
-    HM_data_histo = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
-    HM_data_FM = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+    MatchImages.HM_data_histo = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+    MatchImages.HM_data_FM = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     HM_data_All = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
-    HM_data_FourierDifference = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
-    HM_data_MetricDistances = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+    MatchImages.HM_data_FourierDifference = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+    MatchImages.HM_data_MetricDistances = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     #for looper in range (0,1):
     
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
@@ -384,14 +470,14 @@ def main():
             FourierDifference=(abs(Base_Image_FourierMag-Test_Image_FourierMag)).sum()
 
             #populate output metric comparison matrices
-            HM_data_histo[BaseImageList,TestImageList]=HistogramSimilarity
-            HM_data_FM[BaseImageList,TestImageList]=AverageMatchDistance
-            HM_data_FourierDifference[BaseImageList,TestImageList]=FourierDifference
+            MatchImages.HM_data_histo[BaseImageList,TestImageList]=HistogramSimilarity
+            MatchImages.HM_data_FM[BaseImageList,TestImageList]=AverageMatchDistance
+            MatchImages.HM_data_FourierDifference[BaseImageList,TestImageList]=FourierDifference
             
             #data is symmetrical - fill it in to help with visualisation
-            HM_data_histo[TestImageList,BaseImageList]=HistogramSimilarity
-            HM_data_FM[TestImageList,BaseImageList]=AverageMatchDistance
-            HM_data_FourierDifference[TestImageList,BaseImageList]=FourierDifference
+            MatchImages.HM_data_histo[TestImageList,BaseImageList]=HistogramSimilarity
+            MatchImages.HM_data_FM[TestImageList,BaseImageList]=AverageMatchDistance
+            MatchImages.HM_data_FourierDifference[TestImageList,BaseImageList]=FourierDifference
             
             #old code for sorting images in place
             if HistogramSimilarity<CheckImages_InfoSheet.BestMatch_Histo:
@@ -420,34 +506,36 @@ def main():
 
 
     
-
     #sort out results and populate final metric
-    HM_data_FM=normalize_2d(HM_data_FM)
-    HM_data_histo=normalize_2d(HM_data_histo)
-    HM_data_FourierDifference=normalize_2d(HM_data_FourierDifference)
+    MatchImages.HM_data_FM=normalize_2d(MatchImages.HM_data_FM)
+    MatchImages.HM_data_histo=normalize_2d(MatchImages.HM_data_histo)
+    MatchImages.HM_data_FourierDifference=normalize_2d(MatchImages.HM_data_FourierDifference)
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
         for TestImageList in MatchImages.ImagesInMem_Pairing:
             if TestImageList<BaseImageList:
                 #data is diagonally symmetrical
                 continue
-            HistogramSimilarity=HM_data_histo[BaseImageList,TestImageList]
-            AverageMatchDistance=0#HM_data_FM[BaseImageList,TestImageList]
-            FourierDifference=HM_data_FourierDifference[BaseImageList,TestImageList]
+            HistogramSimilarity=MatchImages.HM_data_histo[BaseImageList,TestImageList]
+            AverageMatchDistance=0#MatchImages.HM_data_FM[BaseImageList,TestImageList]
+            FourierDifference=MatchImages.HM_data_FourierDifference[BaseImageList,TestImageList]
             #experiment with metric distance
-            HM_data_MetricDistances[BaseImageList,TestImageList]=math.sqrt((HistogramSimilarity**2)+(AverageMatchDistance**2)+(FourierDifference**2))
+            MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]=math.sqrt((HistogramSimilarity**2)+(AverageMatchDistance**2)+(FourierDifference**2))
             #mirror data for visualisation
-            HM_data_MetricDistances[TestImageList,BaseImageList]=HM_data_MetricDistances[BaseImageList,TestImageList]
+            MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]=MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]
             if TestImageList==BaseImageList:
                 plop=1
 
-    HM_data_MetricDistances=normalize_2d(HM_data_MetricDistances)
-    #HM_data_All=normalize_2d(HM_data_histo+HM_data_FM+HM_data_FourierDifference)
+
+
+
+    MatchImages.HM_data_MetricDistances=normalize_2d(MatchImages.HM_data_MetricDistances)
+    #HM_data_All=normalize_2d(MatchImages.HM_data_histo+MatchImages.HM_data_FM+MatchImages.HM_data_FourierDifference)
    
-    #HM_data_All=HM_data_FM
+    #HM_data_All=MatchImages.HM_data_FM
     HM_data_All_Copy=copy.deepcopy(HM_data_All)
 
     #debug final data
-    HM_data_All=HM_data_MetricDistances
+    HM_data_All=MatchImages.HM_data_MetricDistances
 
     
 
@@ -456,13 +544,13 @@ def main():
         FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_All") +".jpg"
         PlotAndSave_2datas("HM_data_All",FilePath,HM_data_All)
         FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_FM") +".jpg"
-        PlotAndSave_2datas("HM_data_FM",FilePath,HM_data_FM)
+        PlotAndSave_2datas("HM_data_FM",FilePath,MatchImages.HM_data_FM)
         FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_histo") +".jpg"
-        PlotAndSave_2datas("HM_data_histo",FilePath,HM_data_histo)
+        PlotAndSave_2datas("HM_data_histo",FilePath,MatchImages.HM_data_histo)
         FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_FourierDifference") +".jpg"
-        PlotAndSave_2datas("HM_data_FourierDifference",FilePath,HM_data_FourierDifference)
-        FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_MetricDistances") +".jpg"
-        PlotAndSave_2datas("HM_data_MetricDistances",FilePath,HM_data_MetricDistances)
+        PlotAndSave_2datas("HM_data_FourierDifference",FilePath,MatchImages.HM_data_FourierDifference)
+        FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("MatchImages.HM_data_MetricDistances") +".jpg"
+        PlotAndSave_2datas("MatchImages.HM_data_MetricDistances",FilePath,MatchImages.HM_data_MetricDistances)
 
     
         #for every image or subsets of images, roll through heatmap finding nearest best match then
@@ -504,9 +592,9 @@ def main():
             #print("nearest matching is element",Element)
             #print("nearest value",HM_data_All[Element,BaseImageList])
             MatchMetric_all.append(HM_data_All[Element,BaseImageList])
-            MatchMetric_Histo.append(HM_data_histo[Element,BaseImageList])
-            MatchMetric_Fourier.append(HM_data_FourierDifference[Element,BaseImageList])
-            MatchMetric_FM.append(HM_data_FM[Element,BaseImageList])
+            MatchMetric_Histo.append(MatchImages.HM_data_histo[Element,BaseImageList])
+            MatchMetric_Fourier.append(MatchImages.HM_data_FourierDifference[Element,BaseImageList])
+            MatchMetric_FM.append(MatchImages.HM_data_FM[Element,BaseImageList])
             #add to output images
             
 

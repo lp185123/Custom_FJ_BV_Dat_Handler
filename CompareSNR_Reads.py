@@ -11,10 +11,10 @@ import shutil
 
 class TracetoSource_Class():
     def __init__(self):
-        SourceDat=None
-        SourceDat_Record=None
-        SourceExtractedImage=None
-        ProcessedImage=None
+        self.SourceDat=None
+        self.SourceDat_Record=None
+        self.SourceExtractedImage=None
+        self.ProcessedImage=None
 
 
 def CleanUpExternalOCR(InputOCR):
@@ -121,6 +121,8 @@ class CheckSN_Answers():
             print("Cannot find files which trace images back to source dat records - tool utility will be reduced")
             if _3DVisLabLib.yesno("Continue?")==False:
                 raise Exception("user declined to continue")
+            else:
+                return None
 
         #should now have full traceability!!
         #create a dictionary that links up 
@@ -136,6 +138,7 @@ class CheckSN_Answers():
                 TracetoSource.SourceDat_Record=Link_Img2DatRecord_data[TracetoSource.SourceExtractedImage][1]
             else:
                 print("ERROR!! Could not find", TracetoSource.SourceExtractedImage,"in source linking dictionary!!!")
+                raise Exception("cannot proceed incase files have been mixed up",Link_Img2DatRecord_file,"Delete this file to proceed without\nbeing able to link back to dat")
                 
             #we will use the processed image as the key as that is the working data in this module
             SourceTraceDict[TracetoSource.ProcessedImage]=TracetoSource
