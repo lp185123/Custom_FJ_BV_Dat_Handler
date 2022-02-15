@@ -1,5 +1,6 @@
 
 from logging import raiseExceptions
+from ssl import SSL_ERROR_SSL
 from tkinter import Y
 
 from cv2 import sqrt
@@ -17,6 +18,7 @@ import math
 import numpy as np
 from scipy.stats import skew
 import gc
+import MatchImages_lib
 #gc.disable()
 
 import matplotlib
@@ -48,7 +50,7 @@ class MatchImagesObject():
 
     def USERFunction_CropForFM(self,image):
         #return image
-        return image[0:50,0:100,:]
+        return image[0:106,0:189,:]
         #return image[0:int(image.shape[0]/1.1),0:int(image.shape[1]/1),:]
     def USERFunction_CropForHistogram(self,image):
         return image
@@ -74,7 +76,7 @@ class MatchImagesObject():
         self.DuplicatesFound=[]
         self.Mean_Std_Per_cyclelist=None
         self.HistogramSelfSimilarityThreshold=0.005
-        self.SubSetOfData=int(400)#subset of data
+        self.SubSetOfData=int(100)#subset of data
         #self.ImagesInMem_to_Process_Orphans=dict()#cant deepcopy feature match keypoints
         self.ImagesInMem_Pairing=dict()
         self.ImagesInMem_Pairing_orphans=dict()
@@ -82,9 +84,11 @@ class MatchImagesObject():
         self.startTime =None
         self.Endtime =None
         self.HM_data_MetricDistances=None
-        self.HM_data_FM=normalize_2d=None
-        self.HM_data_histo=normalize_2d=None
+        self.HM_data_FM=None
+        self.HM_data_histo=None
         self.HM_data_FourierDifference=None
+        self.HM_data_EigenVectorDotProd=None
+        self.HM_data_All=None
         
     class FeatureMatch_Dict_Common:
 
@@ -234,6 +238,8 @@ def main():
 
         Pod1Image_col_cropped_FM=MatchImages.USERFunction_CropForFM(Pod1Image_col)
         Pod1Image_col_cropped_Histogram=MatchImages.USERFunction_CropForHistogram(Pod1Image_col)
+
+        Pod1Image_col_cropped_PCA=Pod1Image_col_cropped_FM.copy()
         #get feature match keypoints
         keypoints,descriptor=_3DVisLabLib.OrbKeyPointsOnly(Pod1Image_col_cropped_FM,MatchImages.FeatureMatch_Dict_Common.ORB_default)
         #keypoints,descriptor=_3DVisLabLib.AkazeKeyPointsOnly(Pod1Image_col_cropped_FM)
@@ -303,13 +309,13 @@ def main():
         #n_bands=Pod1Image_col.shape[2]-1
         # 3 dimensional dummy array with zeros
 
-        PCA_image=Pod1Image_col_cropped_FM.copy()
+        #multi channel PCA
+        PCA_image=Pod1Image_col_cropped_PCA
         MB_img = np.zeros((PCA_image.shape[0],PCA_image.shape[1],PCA_image.shape[2]))
         # stacking up images (channels?) into the array
         #this is unncessary but leave here in case we want to do something later on by laying up images
         for i in range(PCA_image.shape[2]):
             MB_img[:,:,i] =PCA_image[:,:,i]
-
 
         # Convert 2d band array in 1-d to make them as feature vectors and Standardization
         MB_matrix = np.zeros((MB_img[:,:,0].size,PCA_image.shape[2]))
@@ -319,7 +325,6 @@ def main():
             MB_arrayStd = (MB_array - MB_array.mean())/MB_array.std()  
             MB_matrix[:,i] = MB_arrayStd
 
-        # Covariance
         np.set_printoptions(precision=3)
         cov = np.cov(MB_matrix.transpose())
         # Eigen Values
@@ -396,22 +401,20 @@ def main():
         ImgCol_InfoSheet=ImgCol_InfoSheet_Class()
         ImgCol_InfoSheet.FirstImage=img
         MatchImages.ImagesInMem_Pairing[Index]=([img],ImgCol_InfoSheet)
-    #match images loop
-    #while True:
-    #    pass
 
-    #couple up images
+
     OutOfUse=0
 
 
-
+    #initialise metric matrices
     MatchImages.HM_data_histo = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     MatchImages.HM_data_FM = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
-    HM_data_All = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+    MatchImages.HM_data_All = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     MatchImages.HM_data_FourierDifference = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     MatchImages.HM_data_MetricDistances = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
-    #for looper in range (0,1):
-    
+    MatchImages.HM_data_EigenVectorDotProd = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+
+
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
         print(BaseImageList,"/",len(MatchImages.ImagesInMem_Pairing))
         #print(OutOfUse,"removed from", len(MatchImages.ImagesInMem_Pairing),looper)
@@ -428,7 +431,8 @@ def main():
         Base_Image_Descrips=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Descriptors
         Base_Image_FourierMag=MatchImages.ImagesInMem_to_Process[Base_Image_name].FourierTransform_mag
         Base_Image_FM=MatchImages.ImagesInMem_to_Process[Base_Image_name].ImageAdjusted
-
+        Base_Image_EigenVectors=MatchImages.ImagesInMem_to_Process[Base_Image_name].EigenVectors
+        Base_Image_EigenValues=MatchImages.ImagesInMem_to_Process[Base_Image_name].EigenValues
         for TestImageList in MatchImages.ImagesInMem_Pairing:
             #if TestImageList%300==0:
             #    print(BaseImageList,"/",len(MatchImages.ImagesInMem_Pairing),"--testimg--",TestImageList)
@@ -453,17 +457,28 @@ def main():
             Test_Image_Descrips=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Descriptors
             Test_Image_FourierMag=MatchImages.ImagesInMem_to_Process[Test_Image_name].FourierTransform_mag
             Test_Image_FM=MatchImages.ImagesInMem_to_Process[Test_Image_name].ImageAdjusted
+            Test_Image_EigenVectors=MatchImages.ImagesInMem_to_Process[Test_Image_name].EigenVectors
+            Test_Image_EigenValues=MatchImages.ImagesInMem_to_Process[Test_Image_name].EigenValues
 
+            #eigenvector metric
+            #get dot product of top eigenvector (should be sorted for most significant set to [0])
+            EigenDotProduct=1-(Base_Image_EigenVectors[0] @ Test_Image_EigenVectors[0])
+            
+            EigenValue_diff=abs((Base_Image_EigenValues[0] )-(Test_Image_EigenValues[0] ))
+            #print(EigenValue_diff)
+            CheckImages_InfoSheet.All_EigenDotProd_result.append(EigenValue_diff)
+
+            #histogram metric
             HistogramSimilarity=CompareHistograms(Base_Image_Histo,Test_Image_Histo)
             CheckImages_InfoSheet.AllHisto_results.append(HistogramSimilarity)
 
+            #feature match metric
             MatchedPoints,OutputImage,PointsA,PointsB,FinalMatchMetric=_3DVisLabLib.Orb_FeatureMatch(Base_Image_FMatches,Base_Image_Descrips,Test_Image_FMatches,Test_Image_Descrips,99999,Base_Image_FM,Test_Image_FM,0.2)
-            #print(FinalMatchMetric)
             AverageMatchDistance=FinalMatchMetric#smaller the better
-            #print("AverageMatchDistance",AverageMatchDistance)
             #_3DVisLabLib.ImageViewer_Quick_no_resize(OutputImage,0,True,False)
             CheckImages_InfoSheet.All_FM_results.append(AverageMatchDistance)
 
+            #fourier difference metric
             #get differnce between fourier magnitudes of image
             #not the best solution as fourier magnitude will rotate with image 
             #generally this performs well on its own as matches similar notes with similar skew
@@ -473,11 +488,12 @@ def main():
             MatchImages.HM_data_histo[BaseImageList,TestImageList]=HistogramSimilarity
             MatchImages.HM_data_FM[BaseImageList,TestImageList]=AverageMatchDistance
             MatchImages.HM_data_FourierDifference[BaseImageList,TestImageList]=FourierDifference
-            
+            MatchImages.HM_data_EigenVectorDotProd[BaseImageList,TestImageList]=EigenValue_diff
             #data is symmetrical - fill it in to help with visualisation
             MatchImages.HM_data_histo[TestImageList,BaseImageList]=HistogramSimilarity
             MatchImages.HM_data_FM[TestImageList,BaseImageList]=AverageMatchDistance
             MatchImages.HM_data_FourierDifference[TestImageList,BaseImageList]=FourierDifference
+            MatchImages.HM_data_EigenVectorDotProd[TestImageList,BaseImageList]=EigenValue_diff
             
             #old code for sorting images in place
             if HistogramSimilarity<CheckImages_InfoSheet.BestMatch_Histo:
@@ -489,6 +505,7 @@ def main():
                 CheckImages_InfoSheet.BestMatch_FeatureMatch_listIndex=TestImageList
 
         #after check all images, if a result then copy that list into the first list so combine the sets of images
+        #THIS HAS BEEN DISABLED!
         if (len(CheckImages_InfoSheet.AllHisto_results)>0) and (True==False):
             #list of images now inactive as will be copied to another
             #[0] here is the list of images, while [1] is the info card
@@ -510,27 +527,52 @@ def main():
     MatchImages.HM_data_FM=normalize_2d(MatchImages.HM_data_FM)
     MatchImages.HM_data_histo=normalize_2d(MatchImages.HM_data_histo)
     MatchImages.HM_data_FourierDifference=normalize_2d(MatchImages.HM_data_FourierDifference)
+    MatchImages.HM_data_EigenVectorDotProd=normalize_2d(MatchImages.HM_data_EigenVectorDotProd)
+    
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
         for TestImageList in MatchImages.ImagesInMem_Pairing:
             if TestImageList<BaseImageList:
                 #data is diagonally symmetrical
                 continue
+            EigenVectorDotProd=0#MatchImages.HM_data_EigenVectorDotProd[BaseImageList,TestImageList]
             HistogramSimilarity=MatchImages.HM_data_histo[BaseImageList,TestImageList]
             AverageMatchDistance=0#MatchImages.HM_data_FM[BaseImageList,TestImageList]
             FourierDifference=MatchImages.HM_data_FourierDifference[BaseImageList,TestImageList]
+
+
             #experiment with metric distance
-            MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]=math.sqrt((HistogramSimilarity**2)+(AverageMatchDistance**2)+(FourierDifference**2))
+            MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]=math.sqrt((HistogramSimilarity**2)+(AverageMatchDistance**2)+(FourierDifference**2)+(EigenVectorDotProd**2))
             #mirror data for visualisation
             MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]=MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]
             if TestImageList==BaseImageList:
                 plop=1
-
-
-
-
     MatchImages.HM_data_MetricDistances=normalize_2d(MatchImages.HM_data_MetricDistances)
     #HM_data_All=normalize_2d(MatchImages.HM_data_histo+MatchImages.HM_data_FM+MatchImages.HM_data_FourierDifference)
    
+
+
+
+    MatchImages_lib.PrintResults(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotAndSave)
+
+
+
+
+    #pairwise matching
+    MatchImages_lib.PairWise_Matching(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotAndSave,ImgCol_InfoSheet_Class)
+
+
+
+
+
+
+
+    #sequential matching
+    MatchImages_lib.SequentialMatchingPerImage(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotAndSave)
+
+    SSL_ERROR_SSL
+
+
+
     #HM_data_All=MatchImages.HM_data_FM
     HM_data_All_Copy=copy.deepcopy(HM_data_All)
 
@@ -659,6 +701,7 @@ class CheckImages_Class():
     def __init__(self):
         self.AllHisto_results=[]
         self.All_FM_results=[]
+        self.All_EigenDotProd_result=[]
         self.MatchingImgLists=[]
         self.BestMatch_Histo=99999999
         self.BestMatch_Histo_listIndex=None
