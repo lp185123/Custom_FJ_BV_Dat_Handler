@@ -63,7 +63,7 @@ class MatchImagesObject():
 
     """Class to hold information for image sorting & match process"""
     def __init__(self):
-        self.InputFolder=r"E:\NCR\TestImages\TinyTest"
+        self.InputFolder=r"E:\NCR\TestImages\UK_1000"
         self.Outputfolder=r"C:\Working\FindIMage_In_Dat\MatchImages"
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
@@ -76,7 +76,7 @@ class MatchImagesObject():
         self.DuplicatesFound=[]
         self.Mean_Std_Per_cyclelist=None
         self.HistogramSelfSimilarityThreshold=0.005
-        self.SubSetOfData=int(100)#subset of data
+        self.SubSetOfData=int(300)#subset of data
         #self.ImagesInMem_to_Process_Orphans=dict()#cant deepcopy feature match keypoints
         self.ImagesInMem_Pairing=dict()
         self.ImagesInMem_Pairing_orphans=dict()

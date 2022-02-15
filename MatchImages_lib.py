@@ -3,7 +3,8 @@ import numpy as np
 import time
 import random
 import cv2
-
+import _3DVisLabLib
+import statistics
 def PairWise_Matching(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotAndSave,ImgCol_InfoSheet_Class):
 
     #create reference object of filename VS ID
@@ -13,7 +14,7 @@ def PairWise_Matching(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotA
         if len(MatchImages.ImagesInMem_Pairing[BaseImageList][0])!=1:
             raise Exception("MatchImages.ImagesInMem_Pairing",BaseImageList," error, not correct number of images (1)")
         FileName=MatchImages.ImagesInMem_Pairing[BaseImageList][0][0]
-        ImgNameV_ID[FileName]=BaseImageList
+        ImgNameV_ID[BaseImageList]=FileName
 
 
     #copy input object which should only have 1 image per ID
@@ -22,47 +23,85 @@ def PairWise_Matching(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotA
     #create indexed dictionary of images referenced by ID so we can start combining lists of images
     #dictionary key has no relevance - only image IDs which are the ID of the result matrices
     Pairings_Indexes=dict()
-    for Index, img in enumerate(MatchImages.ImagesInMem_to_Process):
+    for OuterIndex, img in enumerate(MatchImages.ImagesInMem_to_Process):
         ImgCol_InfoSheet=ImgCol_InfoSheet_Class()
-        Pairings_Indexes["NOTIMG"+ str(Index) + "NOTIMG"]=([Index],ImgCol_InfoSheet)
+        Pairings_Indexes["NOTIMG"+ str(OuterIndex) + "NOTIMG"]=([OuterIndex],ImgCol_InfoSheet)
 
 
-    MatchImages.HM_data_MetricDistances
-    #roll through all list of images
-    for BaseImgList in Pairings_Indexes:
-        print(BaseImgList,"/",len(Pairings_Indexes))
-        
-        #if images have been disabled (consumed by another list)
-        if Pairings_Indexes[BaseImgList][1].InUse==False:
-            continue
-        
-        
-        TestImgLists_Similarities=dict()
+
+
+    try:
+        for Looper in range (0,5):
         #roll through all list of images
-        for TestImgList in Pairings_Indexes:
-            #if images have been disabled (consumed by another list)
-            if Pairings_Indexes[TestImgList][1].InUse==False:
-                continue
-            #dont test yourself
-            if BaseImgList==TestImgList:
-                continue
+            for OuterIndex,BaseImgList in enumerate(Pairings_Indexes):
+                
+                print(BaseImgList,"/",len(Pairings_Indexes))
+                
+                #if images have been disabled (consumed by another list)
+                if Pairings_Indexes[BaseImgList][1].InUse==False:
+                    continue
+                
+                
+                TestImgLists_Similarities=dict()
+                #roll through all list of images
+                for InnerIndex,TestImgList in enumerate(Pairings_Indexes):
+                    if InnerIndex<OuterIndex:
+                        continue
+                    #if images have been disabled (consumed by another list)
+                    if Pairings_Indexes[TestImgList][1].InUse==False:
+                        continue
+                    #dont test yourself
+                    if BaseImgList==TestImgList:
+                        continue
 
-            #have to test first list of images against second list of images
-            Similarity_List=[]
-            #get similarity between all images in base list and all images in test list
-            #as we start with one image per list this should work out
-            for SingleBaseImg in Pairings_Indexes[BaseImgList][0]:
-                for SingleTestImg in Pairings_Indexes[TestImgList][0]:
-                    print(MatchImages.HM_data_MetricDistances[SingleBaseImg,SingleTestImg])
-                    Similarity_List.append(MatchImages.HM_data_MetricDistances[SingleBaseImg,SingleTestImg])
+                    #have to test first list of images against second list of images
+                    Similarity_List=[]
+                    #get similarity between all images in base list and all images in test list
+                    #as we start with one image per list this should work out
+                    for SingleBaseImg in Pairings_Indexes[BaseImgList][0]:
+                        for SingleTestImg in Pairings_Indexes[TestImgList][0]:
+                            #print(MatchImages.HM_data_MetricDistances[SingleBaseImg,SingleTestImg])
+                            Similarity_List.append(round(MatchImages.HM_data_MetricDistances[SingleBaseImg,SingleTestImg],6))
 
-            TestImgLists_Similarities[TestImgList]=Similarity_List
+                    TestImgLists_Similarities[TestImgList]=Similarity_List
 
-        plop=1
-            
-                    
+                #now get standard deviation and mean
+                TestImgLists_Similarities_Stats=dict()
+                LowestMean=9999999
+                Lowest_meanID=None
+                for ListSimilarities in TestImgLists_Similarities:
+                    #pstdevdev used for entire population which might be true in this case
+                    #otherwise use stddev
+                    std_d=statistics.pstdev(TestImgLists_Similarities[ListSimilarities])
+                    mean=statistics.mean(TestImgLists_Similarities[ListSimilarities])
+                    TestImgLists_Similarities_Stats[ListSimilarities]=(std_d,mean)
+                    if mean<LowestMean:
+                        Lowest_meanID=ListSimilarities
+                        LowestMean=mean
+                
+                #now choose the list with the lowest mean - so must in theory be closest match for the batch
+                #might want to do some stats here to filter out matches beyond a certain std deviation
+                BaseList_info=Pairings_Indexes[BaseImgList]
+                TestList_info=Pairings_Indexes[Lowest_meanID]
+                #modifiy dictionaries
+                Pairings_Indexes[BaseImgList]=(BaseList_info[0]+TestList_info[0],Pairings_Indexes[BaseImgList][1])
+                Pairings_Indexes[Lowest_meanID][1].InUse=False
+    except Exception as e:
+        print(e)
 
+                        
 
+            #lets write out pairing
+    for ListIndex, ListOfImages in enumerate(Pairings_Indexes):
+        #make folder for each set of images
+        if Pairings_Indexes[ListOfImages][1].InUse==True:
+            SetMatchImages_folder=MatchImages.OutputPairs +"\\" + str(ListIndex) +"\\"
+            _3DVisLabLib. MakeFolder(SetMatchImages_folder)
+            for imgIndex, Images in enumerate (Pairings_Indexes[ListOfImages][0]):
+                #MatchDistance=str(MatchImages.ImagesInMem_Pairing[ListOfImages][1])
+                FileName=ImgNameV_ID[Images]
+                TempFfilename=SetMatchImages_folder  + "00" + str(ListIndex) + "_" +str(imgIndex)  + ".jpg"
+                cv2.imwrite(TempFfilename,MatchImages.ImagesInMem_to_Process[FileName].ImageColour)
 
 
 
