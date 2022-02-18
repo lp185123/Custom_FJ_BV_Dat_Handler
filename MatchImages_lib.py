@@ -33,7 +33,7 @@ def PairWise_Matching(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotA
     MatchMetric_Std_PerList=[]
     MatchMetric_mean_PerList=[]
     
-    for Looper in range (0,6):
+    for Looper in range (0,2):
         #lame way of marking refinement loops
         MatchMetric_Std_PerList.append(3)
         MatchMetric_mean_PerList.append(3)
@@ -87,7 +87,8 @@ def PairWise_Matching(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotA
 
             #now get standard deviation and mean
             TestImgLists_Similarities_Stats=dict()
-            LowestMean=9999999
+            DefaultFail=999999
+            LowestMean=DefaultFail
             Lowest_meanID=None
             for ListSimilarities in TestImgLists_Similarities:
                 #pstdevdev used for entire population which might be true in this case
@@ -100,7 +101,7 @@ def PairWise_Matching(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotA
                     LowestMean=mean
 
             #no matches left
-            if LowestMean==9999999:
+            if LowestMean==DefaultFail:
                 continue
 
             MatchMetric_all.append(LowestMean)
@@ -137,7 +138,7 @@ def PairWise_Matching(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotA
                 #MatchDistance=str(MatchImages.ImagesInMem_Pairing[ListOfImages][1])
                 FileName=ImgNameV_ID[Images]
                 TempFfilename=SetMatchImages_folder  + "00" + str(ListIndex) + "_" +str(imgIndex)  + ".jpg"
-                cv2.imwrite(TempFfilename,MatchImages.ImagesInMem_to_Process[FileName].ImageColour)
+                cv2.imwrite(TempFfilename,MatchImages.ImagesInMem_to_Process[FileName].OriginalImage)
 
 
     PlotAndSave("MatchMetric_all",MatchImages.OutputPairs +"\\MatchMetric_all.jpg",MatchMetric_all,1)
@@ -164,8 +165,10 @@ def PrintResults(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotAndSav
     PlotAndSave_2datas("HM_data_FourierDifference",FilePath,MatchImages.HM_data_FourierDifference)
     FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_EigenVectorDotProd") +".jpg"
     PlotAndSave_2datas("HM_data_EigenVectorDotProd",FilePath,MatchImages.HM_data_EigenVectorDotProd)
-    FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("MatchImages.HM_data_MetricDistances") +".jpg"
-    PlotAndSave_2datas("MatchImages.HM_data_MetricDistances",FilePath,MatchImages.HM_data_MetricDistances)
+    FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_MetricDistances") +".jpg"
+    PlotAndSave_2datas("HM_data_MetricDistances",FilePath,MatchImages.HM_data_MetricDistances)
+    FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_HOG_Dist") +".jpg"
+    PlotAndSave_2datas("HM_data_HOG_Dist",FilePath,MatchImages.HM_data_HOG_Dist)
 
 def SequentialMatchingPerImage(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotAndSave):
     OutOfUse="OutOfUse"
@@ -201,6 +204,7 @@ def SequentialMatchingPerImage(MatchImages,CheckImages_InfoSheet,PlotAndSave_2da
     MatchMetric_Fourier=[]
     MatchMetric_FM=[]
     MatchMetric_EigenVectorDotProd=[]
+    MatchMetric_HOG_Distance=[]
     while len(OrderedImages)+1<len(MatchImages.ImagesInMem_Pairing):#+1 is a fudge or it crashes out with duplicate image bug - cant figure this out 
         Counter=Counter+1
         #FilePath=MatchImages.OutputPairs +"\\00" + str(Counter) +  str(OutOfUse) +("HM_data_All") +".jpg"
@@ -221,6 +225,7 @@ def SequentialMatchingPerImage(MatchImages,CheckImages_InfoSheet,PlotAndSave_2da
         MatchMetric_Fourier.append(MatchImages.HM_data_FourierDifference[Element,BaseImageList])
         MatchMetric_FM.append(MatchImages.HM_data_FM[Element,BaseImageList])
         MatchMetric_EigenVectorDotProd.append(MatchImages.HM_data_EigenVectorDotProd[Element,BaseImageList])
+        MatchMetric_HOG_Distance.append(MatchImages.HM_data_HOG_Dist[Element,BaseImageList])
         #add to output images
         
 
@@ -229,7 +234,7 @@ def SequentialMatchingPerImage(MatchImages,CheckImages_InfoSheet,PlotAndSave_2da
                 #raise Exception("too many images")
             SplitImagePath=Images.split("\\")[-1]
             FilePath=MatchImages.OutputPairs +"\\00" +str(Counter)+ "_ImgNo_" + str(BaseImageList) + "_score_" + str(round(MatchImages.HM_data_All[Element,BaseImageList],3))+ "_" + SplitImagePath
-            cv2.imwrite(FilePath,MatchImages.ImagesInMem_to_Process[Images].ImageColour)
+            cv2.imwrite(FilePath,MatchImages.ImagesInMem_to_Process[Images].OriginalImage)
             if Images in OrderedImages:
                 raise Exception("output images file already exists!!! logic error " + FilePath)
             else:
@@ -259,7 +264,7 @@ def SequentialMatchingPerImage(MatchImages,CheckImages_InfoSheet,PlotAndSave_2da
     PlotAndSave("MatchMetric_FM",MatchImages.OutputPairs +"\\MatchMetric_FM.jpg",MatchMetric_FM,1)
     PlotAndSave("MatchMetric_Histo",MatchImages.OutputPairs +"\\MatchMetric_Histo.jpg",MatchMetric_Histo,1)
     PlotAndSave("MatchMetric_FM_EigenVectorDotProd",MatchImages.OutputPairs +"\\MatchMetric_FM_EigenVectorDotProd.jpg",MatchMetric_EigenVectorDotProd,1)
-
+    PlotAndSave("HM_data_HOG_Dist",MatchImages.OutputPairs +"\\HM_data_HOG_Dist.jpg",MatchMetric_HOG_Distance,1)
 
             
 

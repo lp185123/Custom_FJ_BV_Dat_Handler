@@ -6,7 +6,7 @@ import _3DVisLabLib
 class InfoStrings():
     List_known_4Asuffix=["_Genuine"]
     List_known_4Bsuffix=["_Damage"]#["Clearly","_Damage"]
-    list_known_countries=["Belarus","Brazil","Czech","Hungary","Malaysia","Poland","Mexico","Russia","Turkey","UK"]
+    list_known_countries=["Belarus","Brazil","Czech","Hungary","Malaysia","Poland","Mexico","Russia","Turkey","UK","INDIA","USD","EUR"]
     list_known_GenerationTypes=["Minimum","Standard"]
     list_FinalCategories=["CIRCULATIONFIT","COUNTERFEIT","GEN","NEW","TELLERFIT","UNFIT","UNKNOWN","UNKNOWN2"]
 

@@ -159,7 +159,7 @@ class UserInputParameters():
 
 
 
-def Image_from_Automatic_mode(filteredImages,Notefound,data_hex):
+def Image_from_Automatic_mode(filteredImages,Notefound,data_hex,Is_mm8=False):
     #for automatic extraction mode, input filtered data from dat scraper tool (such as MM1, C)
     #instance memory object used by manual data skimmer for cross compatibility
     UserManualMemoryScan=UserManualMemoryScan_helper()
@@ -169,7 +169,12 @@ def Image_from_Automatic_mode(filteredImages,Notefound,data_hex):
     UserManualMemoryScan.Width=int(filteredImages[Notefound].width)
     UserManualMemoryScan.Height=int(filteredImages[Notefound].height)
     #interpret hex as image - WARNING will fail with MM8 data #TODO fix this and keep it compatible with manual extraction
-    (gray_image,DataVerify_image)=GetImage_fromHex(data_hex,UserManualMemoryScan,UserManualMemoryScan.Offset)
+    #different extraction process potentially
+    if Is_mm8==True:
+        (gray_image,DataVerify_image)=GetImage_fromHex_MM8(data_hex,UserManualMemoryScan,UserManualMemoryScan.Offset)
+    else:
+        (gray_image,DataVerify_image)=GetImage_fromHex(data_hex,UserManualMemoryScan,UserManualMemoryScan.Offset)
+
     return (gray_image,DataVerify_image)
 
 
@@ -223,16 +228,20 @@ def AutomaticExtraction(UserParameters):
 
         #load in dat file as hex
         data_hex=Load_Hex_File(DatFile)
+        #check if MM8 image wanted
+        IsMM8_Image=False
+        if "MM8" in UserParameters.BlockType_ImageFormat:
+            IsMM8_Image=True
         #roll through filtered images and extract from datamass
         NoteCount=0
         for Index,Notefound in enumerate(filteredImages):
-            (OutputImage,dummy)=Image_from_Automatic_mode(filteredImages,Notefound,data_hex)
+            (OutputImage,dummy)=Image_from_Automatic_mode(filteredImages,Notefound,data_hex,IsMM8_Image)
             SNR_ReadResult=""
             #if request for all colour channels is true - combine images
             #this will have been checked earlier for alignment
             if UserParameters.GetRGBImage==True:
-                (red_image,dummy)=Image_from_Automatic_mode(filteredImagesR,Notefound,data_hex)
-                (blue_image,dummy)=Image_from_Automatic_mode(filteredImagesB,Notefound,data_hex)
+                (red_image,dummy)=Image_from_Automatic_mode(filteredImagesR,Notefound,data_hex,IsMM8_Image)
+                (blue_image,dummy)=Image_from_Automatic_mode(filteredImagesB,Notefound,data_hex,IsMM8_Image)
                 #create empty 3 channel (RGB) image
                 #all images should be same dimensions so arbitary which one we take dims from
                 RGB_Image = np.zeros((int(filteredImages[Notefound].height),int(filteredImages[Notefound].width),3), np.uint8)
@@ -538,7 +547,6 @@ def GetImage_fromHex(Data_hex,UserManualMemoryScan,OverRide_StartOffset):
     ListOfHex_Subset=Return_SubSet_of_Memory(Data_hex,hex(OverRide_StartOffset*2),EndHex,0)
 
     #convert to grayscale
-    #ListOfGrayScale_Subset=ConvertListHex_to_integers(ListOfHex_Subset)
     ListOfGrayScale_Subset=ConvertListHex_to_GrayScale_bitdepth(ListOfHex_Subset,2,255)
 
     #ReplaceHexStrings(ListOfGrayScale_Subset,DatFileInfos)
@@ -546,6 +554,24 @@ def GetImage_fromHex(Data_hex,UserManualMemoryScan,OverRide_StartOffset):
     (gray_image,DataVerify_image)=CreateGrayImage_from_memory(ListOfGrayScale_Subset,UserManualMemoryScan.Width,UserManualMemoryScan.Height)
 
     return (gray_image,DataVerify_image)
+
+def GetImage_fromHex_MM8(Data_hex,UserManualMemoryScan,OverRide_StartOffset):
+    print("MM8 extraction function")
+    #Cut out subset of memory for specific datacc
+    UserManualMemoryScan.OffsetEnd=hex((OverRide_StartOffset)+(UserManualMemoryScan.Width*2*UserManualMemoryScan.Height))
+
+    #calculate offsets
+    EndHex=hex((ConvertHex_to_decimal(UserManualMemoryScan.OffsetEnd))*2)
+    ListOfHex_Subset=Return_SubSet_of_Memory(Data_hex,hex(OverRide_StartOffset*2),EndHex,0)
+
+    #convert to grayscale
+    ListOfGrayScale_Subset=ConvertListHex_to_GrayScale_bitdepth(ListOfHex_Subset,2,255)
+
+    #interpret area of memory as image
+    (gray_image,DataVerify_image)=CreateGrayImage_from_memory(ListOfGrayScale_Subset,UserManualMemoryScan.Width,UserManualMemoryScan.Height)
+
+    return (gray_image,DataVerify_image)
+
 
 def UpdateSkimmer(data_hex,UserManualMemoryScan):
     #update tasks for skimming datamass
