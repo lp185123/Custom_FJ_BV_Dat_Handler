@@ -1374,7 +1374,12 @@ def TestOrientation(InputArrayOfXY,ExpectedIndexOfMax_SUMXY):#v1
     return Match
 
 def MakeFolder(FolderPath):
+    #single tier folder
     os.mkdir(FolderPath)
+
+def MakeFolders(FolderPath):
+    #nested folders
+    os.makedirs(FolderPath)
 
 
 def DeleteFiles_RecreateFolder(FolderPath):

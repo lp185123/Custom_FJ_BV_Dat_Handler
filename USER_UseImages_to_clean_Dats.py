@@ -17,11 +17,12 @@ ListAllJpg_files=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles,ImageTypes=[".j
 
 RecordToRemove_dict=dict()
 RecordToKeep_dict=dict()
+#filenames have to match EXACTLY or this will cause issues
 for imgfilename in ImgVDatFile_andRecord:
-    if imgfilename in InputFiles:
+    if imgfilename in ListAllJpg_files:
         DatFilename=ImgVDatFile_andRecord[imgfilename][0]
         DatRecord=ImgVDatFile_andRecord[imgfilename][1]
-        if DatFilename in RecordToRemove_dict:
+        if DatFilename in RecordToKeep_dict:
             RecordToKeep_dict[DatFilename].append(int(DatRecord)+RecordOffset)
         else:
             RecordToKeep_dict[DatFilename]=[int(DatRecord)+RecordOffset]
@@ -34,6 +35,7 @@ for imgfilename in ImgVDatFile_andRecord:
             RecordToRemove_dict[DatFilename]=[int(DatRecord)+RecordOffset]
 
 print("Dat files operated upon:",len(RecordToKeep_dict))
+print("WARNING! If filenames are not identical this process will fail\nyou will be able to review actions before commiting")
 #should have a dictionary with the missing images aligned with dat files and list
 #we can now spin through the dictionary and pass the list to the dat scraper library
 
@@ -44,8 +46,18 @@ if (_3DVisLabLib.yesno("WIP - is this single record MM8 data and only record ima
         OriginalFile=datfiletoclean
         FileName=OriginalFile.split("\\")[-1]
         dst=OutputFolder +"\\" + FileName
-        print("Copying",OriginalFile,"to",dst)
-        shutil.copyfile(datfiletoclean, dst)
+        print("\nWill copy:    ",OriginalFile,"\nto:     ",dst)
+    exit
+    if (_3DVisLabLib.yesno("do you wish to proceed?")):
+        for datfiletoclean in RecordToKeep_dict:
+            OriginalFile=datfiletoclean
+            FileName=OriginalFile.split("\\")[-1]
+            dst=OutputFolder +"\\" + FileName
+            print("Copying",OriginalFile,"to",dst)
+            shutil.copyfile(datfiletoclean, dst)
+    else:
+        raise Exception("User declined to continue")
+
 
 if (_3DVisLabLib.yesno("WIP - is this multiple record data and records to be excluded have been deleted from image proxy?")):
 #otherwise use this if lots of records per dat
@@ -53,3 +65,10 @@ if (_3DVisLabLib.yesno("WIP - is this multiple record data and records to be exc
         print("will remove",RecordToRemove_dict[datfiletoclean] , "from",datfiletoclean)
         imageExtractor = DatScraper_broken_onlyExtract.ImageExtractor(datfiletoclean)
         imageExtractor.clean(RecordToRemove_dict[datfiletoclean])
+    exit
+
+    if (_3DVisLabLib.yesno("do you wish to proceed?")):
+        for datfiletoclean in RecordToRemove_dict:
+            print("will remove",RecordToRemove_dict[datfiletoclean] , "from",datfiletoclean)
+    else:
+        raise Exception("User declined to continue")

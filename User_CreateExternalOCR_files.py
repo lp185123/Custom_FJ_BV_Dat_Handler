@@ -20,9 +20,9 @@ OutputFolderTiledImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOu
 #column size of tiled images - if a ML saved state is available this will be overridden
 ColumnSize=30
 #Preprocessing on/off - if ML optimisation has been used
-PreProcessing=True
+PreProcessing=False
 #can force mirroring or it can be found in genparameters
-MirrorImage=False # turn this on if preprocessing is false
+MirrorImage=True # turn this on if preprocessing is false
 
 
 

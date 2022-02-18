@@ -49,14 +49,14 @@ class UserOperationStrings(enum.Enum):
 class UserInputParameters():
 
     def __init__(self):
-        self.InputFilePath=""
+        self.InputFilePath=r"C:\Working\FindIMage_In_Dat\Input"
         self.OutputFilePath=""
         self.FirstImageOnly=True
         self.AutomaticMode=True
-        self.BlockType_ImageFormat=""
-        self.BlockTypeWave=""
-        self.GetSNR=False
-        self.GetRGBImage=False#if user selects "C" - automatically superimpose with other channels to complete an RGB image
+        self.BlockType_ImageFormat=None
+        self.BlockTypeWave=None
+        self.GetSNR=None
+        self.GetRGBImage=None#if user selects "C" - automatically superimpose with other channels to complete an RGB image
         self.FolderPerDat=False
         self.HardCodedSnr_BlockType="SRU SNR image1"
         self.HardCodedSnr_Wave="None"
@@ -97,8 +97,13 @@ class UserInputParameters():
         #get all files in input folder
         while True:
             #ask what is input folder
-            Result = input("Please enter folder for analysis:")
-            InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(Result)
+            Result = input("Please enter folder for analysis: Default is " + str(self.InputFilePath))
+            if Result!="":#user just presses enter
+                InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(Result)
+            else:
+                InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(self.InputFilePath)
+                Result=self.InputFilePath
+
             #clean files
             InputFiles_cleaned=[]
             for elem in InputFiles:
@@ -131,29 +136,35 @@ class UserInputParameters():
             numeric_string = "".join(numeric_filter)
             if int(numeric_string) in DatScraper_tool.ImageExtractor.IMAGE_TYPES:#TODO this will crash if user puts in non numeric chars probably
                 self.BlockType_ImageFormat=DatScraper_tool.ImageExtractor.BLOCK_TYPES[int(numeric_string)]
+                #if snr - autocomplete the rest of the things
+                if self.BlockType_ImageFormat==self.HardCodedSnr_BlockType:
+                    self.BlockTypeWave=self.HardCodedSnr_Wave#hardcode this in
+                    self.GetRGBImage=False
                 break
             else:
                 print("\n \n \n \n \n")
                 print(Result, "is an invalid choice - please try again")
 
-        while True:
-            #ask user what block type (format of image)
-            print("\n \n \n \n \n")
-            for Elem in DatScraper_tool.ImageExtractor.WAVE_DICTIONARY:
-                print(DatScraper_tool.ImageExtractor.WAVE_DICTIONARY[Elem])
-            Result = input("Please enter wave type: - press C if you want to enable colour images")
-            if Result in DatScraper_tool.ImageExtractor.WAVE_DICTIONARY.values():
-                self.BlockTypeWave=Result
-                break
-            else:
+        if (self.BlockTypeWave) is None or (self.BlockTypeWave==""):
+            while True:
+                #ask user what block type (format of image)
                 print("\n \n \n \n \n")
-                print(Result, "is an invalid choice - please try again")
+                for Elem in DatScraper_tool.ImageExtractor.WAVE_DICTIONARY:
+                    print(DatScraper_tool.ImageExtractor.WAVE_DICTIONARY[Elem])
+                Result = input("Please enter wave type: - press C if you want to enable colour images")
+                if Result in DatScraper_tool.ImageExtractor.WAVE_DICTIONARY.values():
+                    self.BlockTypeWave=Result
+                    break
+                else:
+                    print("\n \n \n \n \n")
+                    print(Result, "is an invalid choice - please try again")
         
             #ask user if they want the colour image
-        print("\n \n \n \n \n")
-        print("**WARNING*** extract RGB channels sometimes does not work as intended and channels get swapped - WIP")
-        self.GetRGBImage=_3DVisLabLib.yesno("Extract RGB channels into one image?")
-        
+        if self.GetRGBImage is None or self.GetRGBImage=="":
+            print("\n \n \n \n \n")
+            print("**WARNING*** extract RGB channels sometimes does not work as intended and channels get swapped - WIP")
+            self.GetRGBImage=_3DVisLabLib.yesno("Extract RGB channels into one image?")
+            
         #does user want SNR values associated with extracted data
         self.GetSNR=_3DVisLabLib.yesno("Get Serial Number if available? y/n")
 
@@ -194,10 +205,16 @@ def AutomaticExtraction(UserParameters):
         #get all images from first .dat file in input folder(s) (nested)
         #create subfolder from name of dat file
 
-        Subfolder=((DatFile.lower().split("\\"))[-1]).replace(".dat","")
-        DatFolder=UserParameters.OutputFilePath +"\\FileIndex_" +str(FileIndex)+ "__DatName_"+ Subfolder
+        #for nested folder, chop off the top file path string
+        NestedFolder=DatFile.replace(UserParameters.InputFilePath,"")
+
+        DatName_as_Subfolder=((DatFile.split("\\"))[-1])
+
+        DatFolder=UserParameters.OutputFilePath +NestedFolder 
+
+        #DatFolder=UserParameters.OutputFilePath +"\\FileIndex_" +str(FileIndex)+ "__DatName_"+ Subfolder
         #first image usually previewed alongside dats, dont create folders in default output
-        if UserParameters.FirstImageOnly==False and UserParameters.FolderPerDat==True:_3DVisLabLib. MakeFolder(DatFolder)
+        if UserParameters.FirstImageOnly==False and UserParameters.FolderPerDat==True:_3DVisLabLib. MakeFolders(DatFolder)
         
         print("Processing",DatFile)
         #get all images found in file
