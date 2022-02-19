@@ -169,6 +169,8 @@ def PrintResults(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotAndSav
     PlotAndSave_2datas("HM_data_MetricDistances",FilePath,MatchImages.HM_data_MetricDistances)
     FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_HOG_Dist") +".jpg"
     PlotAndSave_2datas("HM_data_HOG_Dist",FilePath,MatchImages.HM_data_HOG_Dist)
+    FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_PhaseCorrelation") +".jpg"
+    PlotAndSave_2datas("HM_data_PhaseCorrelation",FilePath,MatchImages.HM_data_PhaseCorrelation)
 
 def SequentialMatchingPerImage(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotAndSave):
     OutOfUse="OutOfUse"
@@ -205,8 +207,10 @@ def SequentialMatchingPerImage(MatchImages,CheckImages_InfoSheet,PlotAndSave_2da
     MatchMetric_FM=[]
     MatchMetric_EigenVectorDotProd=[]
     MatchMetric_HOG_Distance=[]
+    MatchMetric_data_PhaseCorrelation=[]
     while len(OrderedImages)+1<len(MatchImages.ImagesInMem_Pairing):#+1 is a fudge or it crashes out with duplicate image bug - cant figure this out 
         Counter=Counter+1
+        print(len(OrderedImages),"/",len(MatchImages.ImagesInMem_Pairing))
         #FilePath=MatchImages.OutputPairs +"\\00" + str(Counter) +  str(OutOfUse) +("HM_data_All") +".jpg"
         #PlotAndSave_2datas("HM_data_All",FilePath,normalize_2d(HM_data_All))
         
@@ -226,6 +230,7 @@ def SequentialMatchingPerImage(MatchImages,CheckImages_InfoSheet,PlotAndSave_2da
         MatchMetric_FM.append(MatchImages.HM_data_FM[Element,BaseImageList])
         MatchMetric_EigenVectorDotProd.append(MatchImages.HM_data_EigenVectorDotProd[Element,BaseImageList])
         MatchMetric_HOG_Distance.append(MatchImages.HM_data_HOG_Dist[Element,BaseImageList])
+        MatchMetric_data_PhaseCorrelation.append(MatchImages.HM_data_PhaseCorrelation[Element,BaseImageList])
         #add to output images
         
 
@@ -265,6 +270,7 @@ def SequentialMatchingPerImage(MatchImages,CheckImages_InfoSheet,PlotAndSave_2da
     PlotAndSave("MatchMetric_Histo",MatchImages.OutputPairs +"\\MatchMetric_Histo.jpg",MatchMetric_Histo,1)
     PlotAndSave("MatchMetric_FM_EigenVectorDotProd",MatchImages.OutputPairs +"\\MatchMetric_FM_EigenVectorDotProd.jpg",MatchMetric_EigenVectorDotProd,1)
     PlotAndSave("HM_data_HOG_Dist",MatchImages.OutputPairs +"\\HM_data_HOG_Dist.jpg",MatchMetric_HOG_Distance,1)
+    PlotAndSave("MatchMetric_data_PhaseCorrelation",MatchImages.OutputPairs +"\\MatchMetric_data_PhaseCorrelation.jpg",MatchMetric_data_PhaseCorrelation,1)
 
             
 

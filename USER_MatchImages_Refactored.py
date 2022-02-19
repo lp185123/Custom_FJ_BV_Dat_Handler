@@ -1,4 +1,5 @@
 
+from cmath import nan
 from logging import raiseExceptions
 from ssl import SSL_ERROR_SSL
 from tkinter import Y
@@ -33,8 +34,46 @@ import matplotlib
 matplotlib.use('Agg')#can get "Tcl_AsyncDelete: async handler deleted by the wrong thread" crashes otherwise
 import matplotlib.pyplot as plt
 
+def GetPhaseCorrelationReadyImage(Image):
+    #experiment with using rotational cross correlation type approach to the fourier magnitude
+    #similiarity, must be an easier way to reinterpret fourier as 1D - like using fourier cofficients
+    #https://stackoverflow.com/questions/57801071/get-rotational-shift-using-phase-correlation-and-log-polar-transform
+    base_img = Image
+    (h, w) = base_img.shape
+    (cX, cY) = (w // 2, h // 2)
+    base_polar = cv2.linearPolar(base_img,(cX, cY), min(cX, cY), 0)
+    return base_polar
 
+def TestImagePhaseCorr(Image):
+    #experiment with using rotational cross correlation type approach to the fourier magnitude
+    #similiarity, must be an easier way to reinterpret fourier as 1D - like using fourier cofficients
+    #https://stackoverflow.com/questions/57801071/get-rotational-shift-using-phase-correlation-and-log-polar-transform
+    base_img = Image
+    base_img = np.float32(cv2.cvtColor(base_img, cv2.COLOR_BGR2GRAY)) / 255.0
 
+    (h, w) = base_img.shape
+    (cX, cY) = (w // 2, h // 2)
+
+    angle = 38
+    M = cv2.getRotationMatrix2D((cX, cY), angle, 1.0)
+    curr_img = cv2.warpAffine(base_img, M, (w, h))
+
+    cv2.imshow("base_img", base_img)
+    cv2.imshow("curr_img", curr_img)
+
+    base_polar = cv2.linearPolar(base_img,(cX, cY), min(cX, cY), 0)
+    curr_polar = cv2.linearPolar(curr_img,(cX, cY), min(cX, cY), 0) 
+
+    cv2.imshow("base_polar", base_polar)
+    cv2.imshow("curr_polar", curr_polar)
+
+    (sx, sy), sf = cv2.phaseCorrelate(base_polar, curr_polar)
+
+    rotation = -sy / h * 360
+    print(rotation) 
+
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 def PlotAndSave_2datas(Title,Filepath,Data1):
     
@@ -55,7 +94,7 @@ def PlotAndSave_2datas(Title,Filepath,Data1):
         print("Error with matpyplot",e)
 
 class MatchImagesObject():
-
+    
     def ForceNormalise_forHOG(self,image1):
         #TODO cannot figure out why normal normalising makes this (visibly) normalised
         #while other methods leave it blown out - it may not be significant statistically but
@@ -114,10 +153,10 @@ class MatchImagesObject():
         return image
         #return image[:,0:151,:]
     def USERFunction_Resize(self,image):
-        #return image
+        return image
         #this is pixels not percentage!
         #return image
-        return cv2.resize(image.copy(),(400,300))
+        #return cv2.resize(image.copy(),(400,300))
 
     class ProcessTerms(enum.Enum):
         Sequential="Sequential"
@@ -125,6 +164,9 @@ class MatchImagesObject():
 
     """Class to hold information for image sorting & match process"""
     def __init__(self):
+        #self.InputFolder=r"E:\NCR\TestImages\LightSabreDuel\RandomOrder"
+        #self.InputFolder=r"E:\NCR\TestImages\UK_verysmall"
+        self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
         self.Outputfolder=r"C:\Working\FindIMage_In_Dat\MatchImages"
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
@@ -137,9 +179,8 @@ class MatchImagesObject():
         self.DuplicatesToCheck=dict()
         self.DuplicatesFound=[]
         self.Mean_Std_Per_cyclelist=None
-        self.HistogramSelfSimilarityThreshold=0.005
+        self.HistogramSelfSimilarityThreshold=0.005#should be zero but incase there is image compression noise
         self.SubSetOfData=int(99)#subset of data
-        #self.ImagesInMem_to_Process_Orphans=dict()#cant deepcopy feature match keypoints
         self.ImagesInMem_Pairing=dict()
         self.ImagesInMem_Pairing_orphans=dict()
         self.GetDuplicates=False
@@ -150,9 +191,10 @@ class MatchImagesObject():
         self.HM_data_histo=None
         self.HM_data_FourierDifference=None
         self.HM_data_EigenVectorDotProd=None
+        self.HM_data_PhaseCorrelation=None
         self.HM_data_HOG_Dist=None
         self.HM_data_All=None
-        
+        self.DummyMinValue=-9999923
     class FeatureMatch_Dict_Common:
 
         SIFT_default=dict(nfeatures=0,nOctaveLayers=3,contrastThreshold=0.04,edgeThreshold=10)
@@ -186,6 +228,7 @@ class MatchImagesObject():
             self.HOG_Mag=None
             self.HOG_Angle=None
             self.OPENCV_hog_descriptor=None
+            self.PhaseCorrelate_FourierMagImg=None
             
 def PlotAndSave(Title,Filepath,Data,maximumvalue):
     
@@ -265,6 +308,10 @@ def CompareHistograms(histo_Img1,histo_Img2):
     return similarity_metric
 
 def normalize_2d(matrix):
+    #check the matrix isnt all same number
+    if matrix.min()==0 and matrix.max()==0:
+        print("WARNING, matrix all zeros")
+        return matrix
     return (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
 
 def GetHOG_featureVector(image):
@@ -335,27 +382,39 @@ def main():
     #populate images 
     #load images into memory
 
-    #HOG detector - might want to put this in a function
-    # Create HOG Descriptor object
+    # Create HOG Descriptor object outside of loops
     HOG_extrator = cv2.HOGDescriptor()
+    #record images to allow us to debug code
+    ImageReviewDict=dict()
     for Index, ImagePath in enumerate(RandomOrder):
         print("Loading in image",ImagePath )
+
         #create class object for each image
         ImageInfo=MatchImages.ImageInfo()
 
         #load in original image
         OriginalImage_GrayScale = cv2.imread(ImagePath, cv2.IMREAD_GRAYSCALE)
         OriginalImage_col = cv2.imread(ImagePath)
+        if Index<3: ImageReviewDict["OriginalImage_GrayScale"]=OriginalImage_GrayScale
+        if Index<3: ImageReviewDict["OriginalImage_col"]=OriginalImage_col
+
+
+        
 
         #create resized versions
         GrayScale_Resized=MatchImages.USERFunction_Resize(OriginalImage_GrayScale)
         Colour_Resized=MatchImages.USERFunction_Resize(OriginalImage_col)
+        if Index<3: ImageReviewDict["Colour_Resized"]=Colour_Resized
+
+
 
         #create version for feature matching
         Image_For_FM=MatchImages.USERFunction_CropForFM(Colour_Resized)
+        if Index<3: ImageReviewDict["Image_For_FM"]=Image_For_FM
 
         #create version for histogram matching
         Image_For_Histogram=MatchImages.USERFunction_CropForHistogram(Colour_Resized)
+        if Index<3: ImageReviewDict["Image_For_Histogram"]=Image_For_Histogram
         #get histogram for comparing colours
         hist = cv2.calcHist([Image_For_Histogram], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
         hist = cv2.normalize(hist, hist).flatten()
@@ -363,8 +422,10 @@ def main():
         #prepare image for HOG matching
         #image needs to be a particular size for HOG matching
         For_HOG_FeatureMatch=MatchImages.USERFunction_PrepareForHOG(Colour_Resized.copy())
+        if Index<3: ImageReviewDict["For_HOG_FeatureMatch"]=For_HOG_FeatureMatch
         #this step is for visualisation
         HOG_mag,HOG_angle=GetHOG_featureVector(For_HOG_FeatureMatch)
+        if Index<3: ImageReviewDict["HOG_mag visualised"]=cv2.convertScaleAbs(HOG_mag)
         #ensure input image is correct dimensions for HOG function
         if For_HOG_FeatureMatch.shape[0]!=128 and For_HOG_FeatureMatch.shape[0]!=64:
             raise Exception("Image not correct size for HOG (128 * 64)")
@@ -373,46 +434,52 @@ def main():
             OPENCV_hog_descriptor=HOG_extrator.compute(For_HOG_FeatureMatch)
         
         #create extended image for feature matching to experiment with
-        HOG_Style_Gradient,HOG_angle_temp=GetHOG_featureVector(Image_For_FM.copy())
+        HOG_Style_Gradient_unnormalised,HOG_angle_temp=GetHOG_featureVector(Image_For_FM.copy())
+        if Index<3: ImageReviewDict["HOG_Style_Gradient_unnormalised"]=HOG_Style_Gradient_unnormalised
+        if Index<3: ImageReviewDict["HOG_Style_Gradient_visualised"]=cv2.convertScaleAbs(HOG_Style_Gradient_unnormalised)
         #try and force a normalised visulation for the magnitude image 
         #normal normalisation doesnt seem to work - do not know why yet
-        StackedColour_AndGradient_img=MatchImages.StackTwoimages(Image_For_FM,HOG_Style_Gradient)
-
+        StackedColour_AndGradient_img=MatchImages.StackTwoimages(Image_For_FM,HOG_Style_Gradient_unnormalised)
+        if Index<3: ImageReviewDict["StackedColour_AndGradient_img"]=StackedColour_AndGradient_img
 
         #force image normalisation - not sure why this doesnt work with normal normalisation
-        GradientImage=MatchImages.StackTwoimages(HOG_Style_Gradient,HOG_Style_Gradient)
+        GradientImage=HOG_Style_Gradient_unnormalised.copy()#MatchImages.ForceNormalise_forHOG(HOG_Style_Gradient_unnormalised)
+        if Index<3: ImageReviewDict["GradientImage visualise"]=cv2.convertScaleAbs(GradientImage)
+        GradientImage_gray = cv2.cvtColor(GradientImage, cv2.COLOR_BGR2GRAY)
+        if Index<3: ImageReviewDict["GradientImage_gray visualise"]=cv2.convertScaleAbs(GradientImage_gray)
 
         #for principle component analysis
         Image_For_PCA=GradientImage.copy()
         PC,EigVal,EigVec=Get_PCA_(Image_For_PCA)
-        
+        if Index<3: ImageReviewDict["Image_For_PCA"]=Image_For_PCA
 
         #get feature match keypoints
         keypoints,descriptor=_3DVisLabLib.OrbKeyPointsOnly(StackedColour_AndGradient_img,MatchImages.FeatureMatch_Dict_Common.ORB_default)
 
         #get fourier transform
         #TODO don't we want fourier cofficients here?
-        f = np.fft.fft2(OriginalImage_GrayScale)
+        f = np.fft.fft2(GradientImage_gray)
         fshift = np.fft.fftshift(f)
-        magnitude_spectrum = 20*np.log(np.abs(fshift))#magnitude is what we will use to compare
-
+        FFT_magnitude_spectrum = 20*np.log(np.abs(fshift))#magnitude is what we will use to compare
+        FFT_magnitude_spectrum_visualise=cv2.convertScaleAbs(FFT_magnitude_spectrum)
+        if Index<3: ImageReviewDict["FFT_magnitude_spectrum_visualise"]=FFT_magnitude_spectrum_visualise
         
+        #get a version of the Fourier magnitude that will work with the opencv phase correlation function to get similarity metric
+        #this works with the fourier as it is positioned in the centre of the image - this wouldnt work well with
+        #images that have translation and rotation differences
+        PhaseCorrelate_FourierMagImg=GetPhaseCorrelationReadyImage(FFT_magnitude_spectrum)
+        if Index<3: ImageReviewDict["PhaseCorrelate_Image visualise"]=cv2.convertScaleAbs(PhaseCorrelate_FourierMagImg)
 
         if Index==0:
             #on first loop show image to user
-            DrawnKeypoints=_3DVisLabLib.draw_keypoints_v2(StackedColour_AndGradient_img.copy(),keypoints)
-            print("original image")
-            _3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(Colour_Resized,(Colour_Resized.shape[1]*3,Colour_Resized.shape[0]*3)),0,True,True)
-            print("feature match sample")
-            _3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(DrawnKeypoints,(DrawnKeypoints.shape[1]*2,DrawnKeypoints.shape[0]*2)),0,True,True)
-            print("Crop for histogram")
-            _3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(Image_For_Histogram,(Image_For_Histogram.shape[1]*3,Image_For_Histogram.shape[0]*3)),0,True,True)
-            print("Crop for PCA")
-            _3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(Image_For_PCA,(Image_For_PCA.shape[1]*3,Image_For_PCA.shape[0]*3)),0,True,True)
-            print("Prepare for HOG features")
-            _3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(For_HOG_FeatureMatch,(For_HOG_FeatureMatch.shape[1]*3,For_HOG_FeatureMatch.shape[0]*3)),0,True,True)
-            print("HOG features")
-            _3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(HOG_mag,(HOG_mag.shape[1]*3,HOG_mag.shape[0]*3)),0,True,True)
+            FM_DrawnKeypoints=_3DVisLabLib.draw_keypoints_v2(StackedColour_AndGradient_img.copy(),keypoints)
+            ImageReviewDict["FM_DrawnKeypoints"]=FM_DrawnKeypoints
+
+
+            for imagereviewimg in ImageReviewDict:
+                Img=ImageReviewDict[imagereviewimg]
+                print(imagereviewimg)
+                _3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(Img,(Img.shape[1]*2,Img.shape[0]*2)),0,True,True)
             
 
         #get fourier transform
@@ -481,10 +548,12 @@ def main():
         ImageInfo.ImageAdjusted=Image_For_FM
         ImageInfo.FM_Keypoints=keypoints
         ImageInfo.FM_Descriptors=descriptor
-        ImageInfo.FourierTransform_mag=magnitude_spectrum
+        ImageInfo.FourierTransform_mag=FFT_magnitude_spectrum
         ImageInfo.HOG_Mag=HOG_mag
         ImageInfo.HOG_Angle=HOG_angle
         ImageInfo.OPENCV_hog_descriptor=OPENCV_hog_descriptor
+        ImageInfo.PhaseCorrelate_FourierMagImg=PhaseCorrelate_FourierMagImg
+        #populate dictionary
         MatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
 
     #build dictionary to remove items from
@@ -555,7 +624,7 @@ def main():
     MatchImages.HM_data_MetricDistances = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     MatchImages.HM_data_EigenVectorDotProd = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     MatchImages.HM_data_HOG_Dist = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
-
+    MatchImages.HM_data_PhaseCorrelation = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
 
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
         print(BaseImageList,"/",len(MatchImages.ImagesInMem_Pairing))
@@ -571,6 +640,7 @@ def main():
         Base_Image_EigenVectors=MatchImages.ImagesInMem_to_Process[Base_Image_name].EigenVectors
         Base_Image_EigenValues=MatchImages.ImagesInMem_to_Process[Base_Image_name].EigenValues
         Base_Image_HOG_Descriptor=MatchImages.ImagesInMem_to_Process[Base_Image_name].OPENCV_hog_descriptor
+        Base_Image_Phase_CorImg=MatchImages.ImagesInMem_to_Process[Base_Image_name].PhaseCorrelate_FourierMagImg
         for TestImageList in MatchImages.ImagesInMem_Pairing:
             if TestImageList<BaseImageList:
                 #data is diagonally symmetrical
@@ -587,23 +657,34 @@ def main():
             Test_Image_EigenVectors=MatchImages.ImagesInMem_to_Process[Test_Image_name].EigenVectors
             Test_Image_EigenValues=MatchImages.ImagesInMem_to_Process[Test_Image_name].EigenValues
             Test_Image_HOG_Descriptor=MatchImages.ImagesInMem_to_Process[Test_Image_name].OPENCV_hog_descriptor
+            Test_Image_Phase_CorImg=MatchImages.ImagesInMem_to_Process[Test_Image_name].PhaseCorrelate_FourierMagImg
 
 
 
             #eigenvector metric
             #get dot product of top eigenvector (should be sorted for most significant set to [0])
-            EigenDotProduct=round((Base_Image_EigenVectors[0] @ Test_Image_EigenVectors[0]),5)
-            EigenValue_diff=abs((Base_Image_EigenValues[0] )-(Test_Image_EigenValues[0] ))
+            #if using static scene (like MM1 or a movie rather than freely translateable objects)
+            #the eigenvector dot product will probably just add noise
+            ListEigenDots=[]
+            ListEigenVals=[]
+            for EVector in range (0,min(len(Base_Image_EigenVectors),len(Test_Image_EigenVectors))):
+                ListEigenDots.append(1-round((Base_Image_EigenVectors[EVector] @ Test_Image_EigenVectors[EVector]),8))
+                ListEigenVals.append(abs((Base_Image_EigenValues[EVector] )-(Test_Image_EigenValues[EVector] )))
+
+            EigenDotProduct=mean(ListEigenDots)#round((Base_Image_EigenVectors[0] @ Test_Image_EigenVectors[0]),5)
+            EigenValue_diff=mean(ListEigenVals)#abs((Base_Image_EigenValues[0] )-(Test_Image_EigenValues[0] ))
+            #get distance
+            EigenValue_diff=math.sqrt((EigenDotProduct**2)+(EigenValue_diff**2))
             #print(EigenValue_diff)
             #CheckImages_InfoSheet.All_EigenDotProd_result.append(EigenValue_diff)
 
-
+            #StackTwoimages=MatchImages.StackTwoimages(Base_Image_FM,Test_Image_FM)
+            #_3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(StackTwoimages,(StackTwoimages.shape[1]*1,StackTwoimages.shape[0]*1)),0,True,True)
+           
 
             #histogram metric
             HistogramSimilarity=CompareHistograms(Base_Image_Histo,Test_Image_Histo)
             #CheckImages_InfoSheet.AllHisto_results.append(HistogramSimilarity)
-
-
 
             #feature match metric
             try:
@@ -613,7 +694,7 @@ def main():
             except:
                 print("ERROR with feature match",len(Base_Image_FMatches),len(Test_Image_FMatches))
                 #watch out this might not be a valid maximum!!
-                AverageMatchDistance=-99999
+                AverageMatchDistance=MatchImages.DummyMinValue
             #CheckImages_InfoSheet.All_FM_results.append(AverageMatchDistance)
 
 
@@ -626,8 +707,18 @@ def main():
             #generally this performs well on its own as matches similar notes with similar skew
             FourierDifference=(abs(Base_Image_FourierMag-Test_Image_FourierMag)).sum()
 
+            #phase correlation difference
+            #use a polar wrapped version of the fourier transform magnitude
+            #this is probably a silly way to do this
+            #x and y are translation
+            (sx, sy), PhaseCorrelationMatch_raw = cv2.phaseCorrelate(Base_Image_Phase_CorImg, Test_Image_Phase_CorImg)
+            PhaseCorrelationMatch=1-PhaseCorrelationMatch_raw#signal power so we will reverse it 
+            if np.isnan(PhaseCorrelationMatch):
+                PhaseCorrelationMatch=MatchImages.DummyMinValue
+               
+               
 
-            StackTwoimages=MatchImages.StackTwoimages(Base_Image_FM,Test_Image_FM)
+            #StackTwoimages=MatchImages.StackTwoimages(Base_Image_FM,Test_Image_FM)
             #_3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(StackTwoimages,(StackTwoimages.shape[1]*1,StackTwoimages.shape[0]*1)),0,True,True)
             #populate output metric comparison matrices
             MatchImages.HM_data_histo[BaseImageList,TestImageList]=HistogramSimilarity
@@ -635,50 +726,48 @@ def main():
             MatchImages.HM_data_FourierDifference[BaseImageList,TestImageList]=FourierDifference
             MatchImages.HM_data_EigenVectorDotProd[BaseImageList,TestImageList]=EigenValue_diff
             MatchImages.HM_data_HOG_Dist[BaseImageList,TestImageList]=HOG_distance
+            MatchImages.HM_data_PhaseCorrelation[BaseImageList,TestImageList]=PhaseCorrelationMatch
             #data is symmetrical - fill it in to help with visualisation
             MatchImages.HM_data_histo[TestImageList,BaseImageList]=HistogramSimilarity
             MatchImages.HM_data_FM[TestImageList,BaseImageList]=AverageMatchDistance
             MatchImages.HM_data_FourierDifference[TestImageList,BaseImageList]=FourierDifference
             MatchImages.HM_data_EigenVectorDotProd[TestImageList,BaseImageList]=EigenValue_diff
             MatchImages.HM_data_HOG_Dist[TestImageList,BaseImageList]=HOG_distance
+            MatchImages.HM_data_PhaseCorrelation[TestImageList,BaseImageList]=PhaseCorrelationMatch
             
 
     #sort out results and populate final metric
     
-    
+    #test for NAN arrays
     #we have to repair placeholder for no data by maxing it out over valid max, but just enough so 
     #we can still use the visualisations easily without them being oversaturated with large dynamic rane
-    MatchImages.HM_data_FM=normalize_2d(np.where(MatchImages.HM_data_FM==-99999, MatchImages.HM_data_FM.max()+1, MatchImages.HM_data_FM))
+    MatchImages.HM_data_FM=normalize_2d(np.where(MatchImages.HM_data_FM==MatchImages.DummyMinValue, MatchImages.HM_data_FM.max()+1, MatchImages.HM_data_FM))
     MatchImages.HM_data_histo=normalize_2d(MatchImages.HM_data_histo)
     MatchImages.HM_data_FourierDifference=normalize_2d(MatchImages.HM_data_FourierDifference)
     MatchImages.HM_data_EigenVectorDotProd=normalize_2d(MatchImages.HM_data_EigenVectorDotProd)
     MatchImages.HM_data_HOG_Dist=normalize_2d(MatchImages.HM_data_HOG_Dist)
+    MatchImages.HM_data_PhaseCorrelation=normalize_2d(np.where(MatchImages.HM_data_PhaseCorrelation==MatchImages.DummyMinValue, MatchImages.HM_data_PhaseCorrelation.max()+1, MatchImages.HM_data_PhaseCorrelation))
     
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
         for TestImageList in MatchImages.ImagesInMem_Pairing:
             if TestImageList<BaseImageList:
                 #data is diagonally symmetrical
                 continue
-            EigenVectorDotProd=0#MatchImages.HM_data_EigenVectorDotProd[BaseImageList,TestImageList]
-            HistogramSimilarity=0#MatchImages.HM_data_histo[BaseImageList,TestImageList]
-            AverageMatchDistance=0#MatchImages.HM_data_FM[BaseImageList,TestImageList]
-            FourierDifference=0#MatchImages.HM_data_FourierDifference[BaseImageList,TestImageList]
+            EigenVectorDotProd=MatchImages.HM_data_EigenVectorDotProd[BaseImageList,TestImageList]
+            HistogramSimilarity=MatchImages.HM_data_histo[BaseImageList,TestImageList]
+            AverageMatchDistance=MatchImages.HM_data_FM[BaseImageList,TestImageList]
+            FourierDifference=MatchImages.HM_data_FourierDifference[BaseImageList,TestImageList]
             HOG_Distance=MatchImages.HM_data_HOG_Dist[BaseImageList,TestImageList]
-
+            PhaseCOr_Distance=MatchImages.HM_data_PhaseCorrelation[BaseImageList,TestImageList]
             #experiment with metric distance
-            MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]=math.sqrt((HistogramSimilarity**2)+(AverageMatchDistance**2)+(FourierDifference**2)+(EigenVectorDotProd**2)+HOG_Distance**2)
+            MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]=math.sqrt((HistogramSimilarity**2)+(AverageMatchDistance**2)+(FourierDifference**2)+(EigenVectorDotProd**2)+(HOG_Distance**2)+(PhaseCOr_Distance**2))
             #mirror data for visualisation
             MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]=MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]
-            if TestImageList==BaseImageList:
-                plop=1
+
     MatchImages.HM_data_MetricDistances=normalize_2d(MatchImages.HM_data_MetricDistances)
     #HM_data_All=normalize_2d(MatchImages.HM_data_histo+MatchImages.HM_data_FM+MatchImages.HM_data_FourierDifference)
    
-
-
-
     MatchImages_lib.PrintResults(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotAndSave)
-
 
     #sequential matching
     MatchImages_lib.SequentialMatchingPerImage(MatchImages,CheckImages_InfoSheet,PlotAndSave_2datas,PlotAndSave)
