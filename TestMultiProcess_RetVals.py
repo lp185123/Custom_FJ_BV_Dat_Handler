@@ -2,10 +2,28 @@
 
 import multiprocessing
 import time
+import random
+
+def wake():
+    print("oh no")
 
 def worker(x):
-    time.sleep(1)
+    print("SLeeeping",x.arse)
+    
+    time.sleep(x.arse)
+    wake()
+    x.arse="FUCK OFF" + str(x.arse)
     return x
+class plop():
+    def __init__(self):
+        self.arse=random.random()*10
 
-pool = multiprocessing.Pool()
-print(pool.map(worker, range(10)))
+if __name__ == "__main__":
+    pool = multiprocessing.Pool()
+
+    listJobs=[]
+    for I in range(4):
+        plopplop=plop()
+        listJobs.append(plopplop)
+    results=(pool.map(worker,listJobs))
+    plop=1
