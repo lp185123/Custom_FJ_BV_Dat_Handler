@@ -1,4 +1,4 @@
-
+import datetime
 from cmath import nan
 from logging import raiseExceptions
 from ssl import SSL_ERROR_SSL
@@ -193,7 +193,7 @@ class MatchImagesObject():
         self.DuplicatesFound=[]
         self.Mean_Std_Per_cyclelist=None
         self.HistogramSelfSimilarityThreshold=0.005#should be zero but incase there is image compression noise
-        self.SubSetOfData=int(9999)#subset of data
+        self.SubSetOfData=int(50)#subset of data
         self.ImagesInMem_Pairing=dict()
         self.ImagesInMem_Pairing_orphans=dict()
         self.GetDuplicates=False
@@ -661,7 +661,7 @@ def main():
     PhysicalCores=psutil.cpu_count(logical=False)#number of physical cores
     HyperThreadedCores = int(os.environ['NUMBER_OF_PROCESSORS'])#don't use these
     processes=max(PhysicalCores-2,1)#rule is thumb is to use number of logical cores minus 1, but always make sure this number >0. Its not a good idea to blast CPU at 100% as this can reduce performance as OS tries to balance the load
-    ProcessesPerCycle=processes*3##how many jobs do we build up to pass off to the multiprocess pool
+    ProcessesPerCycle=2#processes*3##how many jobs do we build up to pass off to the multiprocess pool
     chunksize=3#shouldnt have "processes" in here thats a mistake - this determines how many tasks a core has stacked up
 
     print("Multiprocess start","Taskstack",chunksize,"Taskpool",ProcessesPerCycle,"Physical cores used",processes,"Images",len(MatchImages.ImagesInMem_Pairing))
@@ -671,6 +671,7 @@ def main():
     #start timer
     listTimings=[]
     listCounts=[]
+    listAvgTime=[]
     t1_start = time.perf_counter()
     for Index, BaseImageList in enumerate(MatchImages.ImagesInMem_Pairing):
         listJobs.append((MatchImages,BaseImageList))
@@ -689,17 +690,37 @@ def main():
             #get timings
             listTimings.append(round(time.perf_counter()-t1_start,2))
             listCounts.append(len(listJobs))
+            listAvgTime.append(round(listTimings[-1]/listCounts[-1],3))
             #start timer again
             t1_start = time.perf_counter()
             print("Jobs done:", CompletedProcesses,"/",len(MatchImages.ImagesInMem_Pairing))
-            print("timings",listTimings)
+            #print("timings per loop",listAvgTime)
             #clear list of jobs
             listJobs=[]
 
-            # if len(listTimings)>2:
-            #     Diffy=listTimings[-1]-listTimings[0]
-            #     Diffx=len(listTimings)
-            #     m=Diffy/Diffx
+            if len(listTimings)>3:
+                Diffy=listTimings[-1]-listTimings[1]
+                Diffx=len(listTimings)-1
+                m=Diffy/Diffx
+                _C=listTimings[1]-(m*1)
+                #playing around with time estimation
+                TaskLots=(len(MatchImages.ImagesInMem_Pairing)/ProcessesPerCycle)
+                TimeEstimate_sum=[]
+                TimeEstimateLeft_sum=[]
+                TimeEstimate_sum.append(listTimings[0])#first one is always non uniform
+                CurrentPosition=round(Index/ProcessesPerCycle)
+                for counter in range (1,int(TaskLots)):
+                    _Y=(m*counter)+_C
+                    if counter<CurrentPosition:
+                        TimeEstimate_sum.append(listTimings[counter])
+                    if counter>=CurrentPosition:
+                        TimeEstimate_sum.append(round(_Y,2))
+                        TimeEstimateLeft_sum.append(round(_Y,2))
+                print("Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
+                print("Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
+
+
+
 
     #create diagonally symetrical matrix
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
