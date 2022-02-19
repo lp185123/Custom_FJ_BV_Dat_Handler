@@ -33,7 +33,8 @@ import MatchImages_lib
 import matplotlib
 matplotlib.use('Agg')#can get "Tcl_AsyncDelete: async handler deleted by the wrong thread" crashes otherwise
 import matplotlib.pyplot as plt
-
+def HM_data_MetricDistances():
+    print("plop")
 def GetPhaseCorrelationReadyImage(Image):
     #experiment with using rotational cross correlation type approach to the fourier magnitude
     #similiarity, must be an easier way to reinterpret fourier as 1D - like using fourier cofficients
@@ -153,10 +154,10 @@ class MatchImagesObject():
         return image
         #return image[:,0:151,:]
     def USERFunction_Resize(self,image):
-        return image
+        #return image
         #this is pixels not percentage!
         #return image
-        #return cv2.resize(image.copy(),(400,300))
+        return cv2.resize(image.copy(),(500,400))
 
     class ProcessTerms(enum.Enum):
         Sequential="Sequential"
@@ -164,10 +165,11 @@ class MatchImagesObject():
 
     """Class to hold information for image sorting & match process"""
     def __init__(self):
-        #self.InputFolder=r"E:\NCR\TestImages\LightSabreDuel\RandomOrder"
+        self.InputFolder=r"E:\NCR\TestImages\LightSabreDuel\RandomOrder"
         #self.InputFolder=r"E:\NCR\TestImages\UK_verysmall"
-        self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
-        self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
+        #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
+        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
+        #self.InputFolder=r"E:\NCR\TestImages\Faces\randos"
         self.Outputfolder=r"C:\Working\FindIMage_In_Dat\MatchImages"
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
@@ -180,7 +182,7 @@ class MatchImagesObject():
         self.DuplicatesFound=[]
         self.Mean_Std_Per_cyclelist=None
         self.HistogramSelfSimilarityThreshold=0.005#should be zero but incase there is image compression noise
-        self.SubSetOfData=int(99)#subset of data
+        self.SubSetOfData=int(9999)#subset of data
         self.ImagesInMem_Pairing=dict()
         self.ImagesInMem_Pairing_orphans=dict()
         self.GetDuplicates=False
@@ -195,6 +197,13 @@ class MatchImagesObject():
         self.HM_data_HOG_Dist=None
         self.HM_data_All=None
         self.DummyMinValue=-9999923
+        self.MetricDictionary=dict()
+        
+        #populatemetricDictionary
+        Metrics_Function=[HM_data_MetricDistances]
+        Metrics_Data=[]
+
+
     class FeatureMatch_Dict_Common:
 
         SIFT_default=dict(nfeatures=0,nOctaveLayers=3,contrastThreshold=0.04,edgeThreshold=10)
@@ -688,7 +697,7 @@ def main():
 
             #feature match metric
             try:
-                MatchedPoints,OutputImage,PointsA,PointsB,FinalMatchMetric=_3DVisLabLib.Orb_FeatureMatch(Base_Image_FMatches,Base_Image_Descrips,Test_Image_FMatches,Test_Image_Descrips,99999,Base_Image_FM,Test_Image_FM,0.75)
+                MatchedPoints,OutputImage,PointsA,PointsB,FinalMatchMetric=_3DVisLabLib.Orb_FeatureMatch(Base_Image_FMatches,Base_Image_Descrips,Test_Image_FMatches,Test_Image_Descrips,99999,Base_Image_FM,Test_Image_FM,0.65,MatchImages.DummyMinValue)
                 AverageMatchDistance=FinalMatchMetric#smaller the better
                 #print("Feature match",FinalMatchMetric,len(Base_Image_FMatches),len(Test_Image_FMatches))
             except:

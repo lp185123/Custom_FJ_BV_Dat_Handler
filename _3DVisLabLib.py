@@ -724,7 +724,7 @@ def Akaze_FeatureMatch(kp1, descs1,kp2, descs2,MaxDistance,image1,image2):
                                 outImg = None,
                                 flags = cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
                                 
-def Orb_FeatureMatch(kp1, des1,kp2, des2,MaxDistance,Image1,Image2,MatchRatio):
+def Orb_FeatureMatch(kp1, des1,kp2, des2,MaxDistance,Image1,Image2,MatchRatio, DefaultDUmmyValue):
     #ratio recommmended by Lowe is 0.75
     l_good = [] 
     l_pts1 = []
@@ -733,11 +733,19 @@ def Orb_FeatureMatch(kp1, des1,kp2, des2,MaxDistance,Image1,Image2,MatchRatio):
     # If ORB is using WTA_K == 3 or 4, cv2.NORM_HAMMING2 should be used.
     #bf = cv2.BFMatcher()#we can sort out matches ourself
 
+    #lets try and find a metric for best performing matched images
+    LengthKp1=len(kp1)
+    LengthKp2=len(kp2)
+    BestMatch_len=max(LengthKp1,LengthKp2)
+
+
+
     bf = cv2.DescriptorMatcher_create(cv2.DescriptorMatcher_BRUTEFORCE_HAMMING)
     matches = bf.knnMatch(des1,des2, k=2)
+
+
     # Apply ratio test
     #lowe_ratio = 0.7
-
     Count=0
     Distance=0
     for match1,match2 in matches:
@@ -751,11 +759,12 @@ def Orb_FeatureMatch(kp1, des1,kp2, des2,MaxDistance,Image1,Image2,MatchRatio):
     #https://docs.opencv.org/3.4/db/d70/tutorial_akaze_matching.html
     #TODO this needs thinking about a bit more
     if Count>0:
-        FinalMatchMetric=Distance/Count
+        FinalMatchMetric=Count/BestMatch_len
+        FinalMatchMetric=1-FinalMatchMetric#lower is better
     else:
-        FinalMatchMetric=999
+        FinalMatchMetric=DefaultDUmmyValue#default value will be removed at end of process
 
-    FinalMatchMetric=min(FinalMatchMetric,999)
+    #FinalMatchMetric=min(FinalMatchMetric,DefaultDUmmyValue)
 
     OutputMatchImage=None
     if Image1 is not None and Image2 is not None:
