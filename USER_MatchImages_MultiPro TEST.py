@@ -18,6 +18,7 @@ import statistics
 import scipy
 import math
 import numpy as np
+from scipy import stats
 from scipy.stats import skew
 import gc
 import MatchImages_lib
@@ -35,7 +36,7 @@ import os
 
 
 import matplotlib
-matplotlib.use('Agg')#can get "Tcl_AsyncDelete: async handler deleted by the wrong thread" crashes otherwise
+#matplotlib.use('Agg')#can get "Tcl_AsyncDelete: async handler deleted by the wrong thread" crashes otherwise
 import matplotlib.pyplot as plt
 def HM_data_MetricDistances():
     print("plop")
@@ -162,11 +163,22 @@ class MatchImagesObject():
     def USERFunction_CropForHistogram(self,image):
         return image
         #return image[:,0:151,:]
+    def USERFunction_OriginalImage(self,image):
+        return cv2.resize(image.copy(),(600,300))
+
     def USERFunction_Resize(self,image):
+        #height/length
+        #grayscale image
+        if len(image.shape)!=3:
         #return image
+            return image[0:62,0:124]
+        else:
+            image= image[303:800,400:1500,:]
+            image=cv2.resize(image,(350,220))
+            return image
         #this is pixels not percentage!
         #return image
-        return cv2.resize(image.copy(),(300,200))
+        #return cv2.resize(image.copy(),(300,200))
 
     class ProcessTerms(enum.Enum):
         Sequential="Sequential"
@@ -174,13 +186,13 @@ class MatchImagesObject():
 
     """Class to hold information for image sorting & match process"""
     def __init__(self):
-        self.InputFolder=r"E:\NCR\TestImages\DELETE"
-        #self.InputFolder=r"E:\NCR\TestImages\UK_verysmall"
+        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
+        self.InputFolder=r"E:\NCR\TestImages\LightSabreDuel\RandomOrder"
         #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
         #self.InputFolder=r"E:\NCR\TestImages\Faces\randos"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL"
-        #self.InputFolder=r"E:\NCR\TestImages\TinyTest"
+        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
@@ -193,9 +205,9 @@ class MatchImagesObject():
         self.DuplicatesFound=[]
         self.Mean_Std_Per_cyclelist=None
         self.HistogramSelfSimilarityThreshold=0.005#should be zero but incase there is image compression noise
-        self.SubSetOfData=int(50)#subset of data
+        self.SubSetOfData=int(9999)#subset of data
         self.ImagesInMem_Pairing=dict()
-        self.ImagesInMem_Pairing_orphans=dict()
+        #self.ImagesInMem_Pairing_orphans=dict()
         self.GetDuplicates=False
         self.startTime =None
         self.Endtime =None
@@ -415,10 +427,13 @@ def main():
             ImageInfo=PrepareMatchImages.ImageInfo()
 
             #load in original image
+            
             OriginalImage_GrayScale = cv2.imread(ImagePath, cv2.IMREAD_GRAYSCALE)
             OriginalImage_col = cv2.imread(ImagePath)
+            InputImage=PrepareMatchImages.USERFunction_OriginalImage(OriginalImage_col)
             if Index<3: ImageReviewDict["OriginalImage_GrayScale"]=OriginalImage_GrayScale
             if Index<3: ImageReviewDict["OriginalImage_col"]=OriginalImage_col
+            if Index<3: ImageReviewDict["InputImage"]=InputImage
 
 
             
@@ -471,7 +486,8 @@ def main():
             if Index<3: ImageReviewDict["GradientImage_gray visualise"]=cv2.convertScaleAbs(GradientImage_gray)
 
             #for principle component analysis
-            Image_For_PCA=GradientImage.copy()
+            #has to have shape=3 (colour image)
+            Image_For_PCA=Colour_Resized.copy()
             PC,EigVal,EigVec=Get_PCA_(Image_For_PCA)
             if Index<3: ImageReviewDict["Image_For_PCA"]=Image_For_PCA
 
@@ -497,7 +513,7 @@ def main():
             DebugImage=PrepareMatchImages.StackTwoimages(Colour_Resized,FFT_magnitude_spectrum_visualise)
 
 
-            if Index==-1:
+            if Index==1:
                 #on first loop show image to user
                 FM_DrawnKeypoints=_3DVisLabLib.draw_keypoints_v2(StackedColour_AndGradient_img.copy(),keypoints)
                 ImageReviewDict["FM_DrawnKeypoints"]=FM_DrawnKeypoints
@@ -570,7 +586,7 @@ def main():
             ImageInfo.EigenVectors=EigVec
             ImageInfo.PrincpleComponents=None#PC
             ImageInfo.Histogram=hist
-            ImageInfo.OriginalImage=Colour_Resized#OriginalImage_col
+            ImageInfo.OriginalImage=InputImage#OriginalImage_col
             ImageInfo.ImageGrayscale=None#OriginalImage_GrayScale
             ImageInfo.ImageColour=None#Colour_Resized
             ImageInfo.ImageAdjusted=None#Image_For_FM
@@ -659,12 +675,25 @@ def main():
     #get info about cores for setting up multiprocess
     #WARNING might give weird results if inside a VM or a executable converted python 
     PhysicalCores=psutil.cpu_count(logical=False)#number of physical cores
-    HyperThreadedCores = int(os.environ['NUMBER_OF_PROCESSORS'])#don't use these
-    processes=max(PhysicalCores-2,1)#rule is thumb is to use number of logical cores minus 1, but always make sure this number >0. Its not a good idea to blast CPU at 100% as this can reduce performance as OS tries to balance the load
-    ProcessesPerCycle=2#processes*3##how many jobs do we build up to pass off to the multiprocess pool
-    chunksize=3#shouldnt have "processes" in here thats a mistake - this determines how many tasks a core has stacked up
+    HyperThreadedCores = int(os.environ['NUMBER_OF_PROCESSORS'])#don't use these simulated cores
+    processes=max(PhysicalCores-1,1)#rule is thumb is to use number of logical cores minus 1, but always make sure this number >0. Its not a good idea to blast CPU at 100% as this can reduce performance as OS tries to balance the load
+    chunksize=int(len(MatchImages.ImagesInMem_Pairing)/processes)#this determines how many tasks a core has stacked up
+    ProcessesPerCycle=processes*chunksize##how many jobs do we build up to pass off to the multiprocess pool, in this case in theory each core gets 3 stacked tasks
+    
 
-    print("Multiprocess start","Taskstack",chunksize,"Taskpool",ProcessesPerCycle,"Physical cores used",processes,"Images",len(MatchImages.ImagesInMem_Pairing))
+
+    #experimental with optimisation for multiprocessing
+    #currently multiprocesses have staggered finish due to allotment of jobs
+    #in this manner we wont have a situation where the first thread has the bigger range of the factorial jobs
+    #and all processes more or less have some workload - this can be done much nicer but this is quicker for now
+    SacrificialDictionary=copy.deepcopy(MatchImages.ImagesInMem_Pairing)
+    ImagesInMem_Pairing_ForThreading=dict()
+    while len(SacrificialDictionary)>0:
+        RandomItem=random.choice(list(SacrificialDictionary.keys()))
+        ImagesInMem_Pairing_ForThreading[RandomItem]=MatchImages.ImagesInMem_Pairing[RandomItem]
+        del SacrificialDictionary[RandomItem]
+
+    print("[Multiprocess start]","Taskstack per core:",chunksize,"  Taskpool size:",ProcessesPerCycle,"  Physical cores used:",processes,"   Images:",len(MatchImages.ImagesInMem_Pairing))
     pool = multiprocessing.Pool(processes=processes)
     listJobs=[]
     CompletedProcesses=0
@@ -672,8 +701,9 @@ def main():
     listTimings=[]
     listCounts=[]
     listAvgTime=[]
+    ProcessOnly_start = time.perf_counter()
     t1_start = time.perf_counter()
-    for Index, BaseImageList in enumerate(MatchImages.ImagesInMem_Pairing):
+    for Index, BaseImageList in enumerate(ImagesInMem_Pairing_ForThreading):
         listJobs.append((MatchImages,BaseImageList))
         if (Index%ProcessesPerCycle==0 and Index!=0) or Index==len(MatchImages.ImagesInMem_Pairing)-1:
             ReturnList=(pool.imap_unordered(MatchImages_lib.ProcessSimilarity,listJobs,chunksize=chunksize))#chunksize=chunksize
@@ -694,32 +724,58 @@ def main():
             #start timer again
             t1_start = time.perf_counter()
             print("Jobs done:", CompletedProcesses,"/",len(MatchImages.ImagesInMem_Pairing))
-            #print("timings per loop",listAvgTime)
             #clear list of jobs
             listJobs=[]
+            try:
+                #from scipy import stats
+                #slope, intercept, r_value, p_value, std_err = stats.linregress(x,y)
+                if len(listTimings)>3:
+                    Diffy=listTimings[-1]-listTimings[1]
+                    Diffx=len(listTimings)-1
+                    m=Diffy/Diffx
+                    _C=listTimings[1]-(m*1)
+                    #playing around with time estimation
+                    TaskLots=(len(MatchImages.ImagesInMem_Pairing)/ProcessesPerCycle)
+                    TimeEstimate_sum=[]
+                    TimeEstimateLeft_sum=[]
+                    TimeEstimate_sum.append(listTimings[0])#first one is always non uniform
+                    CurrentPosition=round(Index/ProcessesPerCycle)
+                    for counter in range (1,int(TaskLots)):
+                        _Y=(m*counter)+_C
+                        if counter<CurrentPosition:
+                            TimeEstimate_sum.append(listTimings[counter])
+                        if counter>=CurrentPosition:
+                            TimeEstimate_sum.append(round(_Y,2))
+                            TimeEstimateLeft_sum.append(round(_Y,2))
+                    # if len(listTimings)<7:
+                    #     print("(more samples needed) Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
+                    #     print("(more samples needed) Estimated Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
+                    # else:
+                    #     print("Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
+                    #     print("Estimated Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
+                    #second time estimate
+                    slope, intercept, r_value, p_value, std_err = stats.linregress(range(0,len(listTimings[1:-1])),listTimings[1:-1])
+                    TimeEstimate_sum=[]
+                    TimeEstimateLeft_sum=[]
+                    TimeEstimate_sum.append(listTimings[0])#first one is always non uniform
+                    for counter in range (1,int(TaskLots)):
+                        _Y=(slope*counter)+intercept
+                        if counter<CurrentPosition:
+                            TimeEstimate_sum.append(listTimings[counter])
+                        if counter>=CurrentPosition:
+                            TimeEstimate_sum.append(round(_Y,2))
+                            TimeEstimateLeft_sum.append(round(_Y,2))
+                    if len(listTimings)<7:
+                        print("LR       (more samples needed) Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
+                        print("LR       (more samples needed) Estimated Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
+                    else:
+                        print("LR       Estimated total time 2=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
+                        print("LR       Estimated Time left 2=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
+                    
+            except:
+                print("Problem with time estimate code")
 
-            if len(listTimings)>3:
-                Diffy=listTimings[-1]-listTimings[1]
-                Diffx=len(listTimings)-1
-                m=Diffy/Diffx
-                _C=listTimings[1]-(m*1)
-                #playing around with time estimation
-                TaskLots=(len(MatchImages.ImagesInMem_Pairing)/ProcessesPerCycle)
-                TimeEstimate_sum=[]
-                TimeEstimateLeft_sum=[]
-                TimeEstimate_sum.append(listTimings[0])#first one is always non uniform
-                CurrentPosition=round(Index/ProcessesPerCycle)
-                for counter in range (1,int(TaskLots)):
-                    _Y=(m*counter)+_C
-                    if counter<CurrentPosition:
-                        TimeEstimate_sum.append(listTimings[counter])
-                    if counter>=CurrentPosition:
-                        TimeEstimate_sum.append(round(_Y,2))
-                        TimeEstimateLeft_sum.append(round(_Y,2))
-                print("Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
-                print("Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
-
-
+    print("Total process only time:",str(datetime.timedelta(seconds= time.perf_counter()-ProcessOnly_start)))
 
 
     #create diagonally symetrical matrix
@@ -756,7 +812,7 @@ def main():
             AverageMatchDistance=MatchImages.HM_data_FM[BaseImageList,TestImageList]
             FourierDifference=MatchImages.HM_data_FourierDifference[BaseImageList,TestImageList]
             HOG_Distance=MatchImages.HM_data_HOG_Dist[BaseImageList,TestImageList]
-            PhaseCOr_Distance=MatchImages.HM_data_PhaseCorrelation[BaseImageList,TestImageList]
+            PhaseCOr_Distance=0#MatchImages.HM_data_PhaseCorrelation[BaseImageList,TestImageList]
             #experiment with metric distance
             MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]=math.sqrt((HistogramSimilarity**2)+(AverageMatchDistance**2)+(FourierDifference**2)+(EigenVectorDotProd**2)+(HOG_Distance**2)+(PhaseCOr_Distance**2))
             #mirror data for visualisation

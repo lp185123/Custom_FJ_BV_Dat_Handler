@@ -191,7 +191,7 @@ class MatchImagesObject():
         self.DuplicatesFound=[]
         self.Mean_Std_Per_cyclelist=None
         self.HistogramSelfSimilarityThreshold=0.005#should be zero but incase there is image compression noise
-        self.SubSetOfData=int(100)#subset of data
+        self.SubSetOfData=int(150)#subset of data
         self.ImagesInMem_Pairing=dict()
         self.ImagesInMem_Pairing_orphans=dict()
         self.GetDuplicates=False
@@ -725,10 +725,10 @@ def main():
     MatchImages_lib.PrintResults(MatchImages,PlotAndSave_2datas,PlotAndSave)
 
     #sequential matching
-    MatchImages_lib.SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave)
+    #MatchImages_lib.SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave)
 
     #pairwise matching
-    #MatchImages_lib.PairWise_Matching(MatchImages,PlotAndSave_2datas,PlotAndSave,ImgCol_InfoSheet_Class)
+    MatchImages_lib.PairWise_Matching(MatchImages,PlotAndSave_2datas,PlotAndSave,ImgCol_InfoSheet_Class)
 
     
 

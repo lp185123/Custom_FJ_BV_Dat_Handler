@@ -10,6 +10,25 @@ import matplotlib.pyplot as pl
 from statistics import mean 
 import math
 
+def FFt(inputdata):
+    #https://stackoverflow.com/questions/30527902/numpy-fft-fast-fourier-transformation-of-1-dimensional-array
+    img = (inputdata)
+    f = np.fft.fft(img)
+    fshift = np.fft.fftshift(f)
+    magnitude_spectrum = (np.abs(fshift))
+
+    pl.subplot(121)
+    pl.plot(img)
+    pl.title('Input Image')
+    pl.xticks([]), pl.yticks([])
+
+    pl.subplot(122)
+    pl.plot(magnitude_spectrum)
+    pl.title('Magnitude Spectrum')
+    pl.xticks([]), pl.yticks([])
+
+    pl.show()
+
 def PairWise_Matching(MatchImages,PlotAndSave_2datas,PlotAndSave,ImgCol_InfoSheet_Class):
 
     #create reference object of filename VS ID
@@ -38,7 +57,7 @@ def PairWise_Matching(MatchImages,PlotAndSave_2datas,PlotAndSave,ImgCol_InfoShee
     MatchMetric_Std_PerList=[]
     MatchMetric_mean_PerList=[]
     
-    for Looper in range (0,3):
+    for Looper in range (0,4):
         #lame way of marking refinement loops
         MatchMetric_Std_PerList.append(3)
         MatchMetric_mean_PerList.append(3)
@@ -183,8 +202,6 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
     #debug final data
     MatchImages.HM_data_All=MatchImages.HM_data_MetricDistances
 
-    
-
     #for every image or subsets of images, roll through heatmap finding nearest best match then
     #cross referencing it
     OrderedImages=dict()
@@ -264,9 +281,27 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
         #move to next element
         BaseImageList=Element
 
-        
-        
-        
+    #create accumulation mean/std deviation -maybe can see where drop off is
+    MatchMetric_Filter_mean=[]
+    MatchMetric_Filter_std=[]
+    FilterSize=5
+    Buffer = [0] * FilterSize
+    Buffered_Metric=Buffer + MatchMetric_all + Buffer
+    for OuterIndexer, Metric in enumerate(Buffered_Metric):
+        #break out before hitting end
+        if OuterIndexer==len(MatchMetric_all)-FilterSize:break
+        #get subset
+        MatchMetric_all_subset=Buffered_Metric[OuterIndexer:OuterIndexer+FilterSize]
+        MatchMetric_Filter_std.append(statistics.pstdev(MatchMetric_all_subset))
+        MatchMetric_Filter_mean.append(statistics.mean(MatchMetric_all_subset))
+
+    MatchMetricProdFilter = [a * b for a, b in zip(MatchMetric_Filter_std, MatchMetric_Filter_mean)]
+    PlotAndSave("MatchMetricProdFilter",MatchImages.OutputPairs +"\\MatchMetricProdFilter.jpg",MatchMetricProdFilter,1)
+
+    
+
+
+
     PlotAndSave("MatchMetric_all",MatchImages.OutputPairs +"\\MatchMetric_all.jpg",MatchMetric_all,1)
     PlotAndSave("MatchMetric_Fourier",MatchImages.OutputPairs +"\\MatchMetric_Fourier.jpg",MatchMetric_Fourier,1)
     PlotAndSave("MatchMetric_FM",MatchImages.OutputPairs +"\\MatchMetric_FM.jpg",MatchMetric_FM,1)
@@ -363,6 +398,7 @@ def ProcessSimilarity(Input):
         ListEigenDots=[]
         ListEigenVals=[]
         for EVector in range (0,min(len(Base_Image_EigenVectors),len(Test_Image_EigenVectors))):
+            #need to look at this closer to see if we need to do anything to vectors before getting dot prod
             ListEigenDots.append(1-round((Base_Image_EigenVectors[EVector] @ Test_Image_EigenVectors[EVector]),8))
             ListEigenVals.append(abs((Base_Image_EigenValues[EVector] )-(Test_Image_EigenValues[EVector] )))
 
@@ -396,6 +432,8 @@ def ProcessSimilarity(Input):
 
 
         HOG_distance=CompareHistograms(Base_Image_HOG_Descriptor, Test_Image_HOG_Descriptor)
+
+
         #fourier difference metric
         #get differnce between fourier magnitudes of image
         #not the best solution as fourier magnitude will rotate with image 
@@ -406,14 +444,11 @@ def ProcessSimilarity(Input):
         #use a polar wrapped version of the fourier transform magnitude
         #this is probably a silly way to do this
         #x and y are translation
-
-
-
-        (sx, sy), PhaseCorrelationMatch_raw = cv2.phaseCorrelate(Base_Image_Phase_CorImg, Test_Image_Phase_CorImg)
-        PhaseCorrelationMatch=1-PhaseCorrelationMatch_raw#signal power so we will reverse it 
-        if np.isnan(PhaseCorrelationMatch):
-            PhaseCorrelationMatch=MatchImages.DummyMinValue
-            
+        #(sx, sy), PhaseCorrelationMatch_raw = cv2.phaseCorrelate(Base_Image_Phase_CorImg, Test_Image_Phase_CorImg)
+        #PhaseCorrelationMatch=1-PhaseCorrelationMatch_raw#signal power so we will reverse it 
+        #if np.isnan(PhaseCorrelationMatch):
+        #    PhaseCorrelationMatch=MatchImages.DummyMinValue
+        PhaseCorrelationMatch=0
             
 
         #StackTwoimages=MatchImages.StackTwoimages(Base_Image_FM,Test_Image_FM)
@@ -442,5 +477,4 @@ def ProcessSimilarity(Input):
     ReturnList["HM_data_EigenVectorDotProd"]=MatchImages.HM_data_EigenVectorDotProd[CurrentBaseImage,:]
     ReturnList["HM_data_HOG_Dist"]=MatchImages.HM_data_HOG_Dist[CurrentBaseImage,:]
     ReturnList["HM_data_PhaseCorrelation"]=MatchImages.HM_data_PhaseCorrelation[CurrentBaseImage,:]
-    #print("ext finished",str(CurrentBaseImage))
     return ReturnList
