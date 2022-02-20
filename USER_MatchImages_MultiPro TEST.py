@@ -164,7 +164,7 @@ class MatchImagesObject():
         return image
         #return image[:,0:151,:]
     def USERFunction_OriginalImage(self,image):
-        return cv2.resize(image.copy(),(600,300))
+        return cv2.resize(image.copy(),(500,250))
 
     def USERFunction_Resize(self,image):
         #height/length
@@ -173,8 +173,8 @@ class MatchImagesObject():
         #return image
             return image[0:62,0:124]
         else:
-            image= image[303:800,400:1500,:]
-            image=cv2.resize(image,(350,220))
+            #image= image[303:800,400:1500,:]
+            image=cv2.resize(image,(500,250))
             return image
         #this is pixels not percentage!
         #return image
@@ -186,26 +186,29 @@ class MatchImagesObject():
 
     """Class to hold information for image sorting & match process"""
     def __init__(self):
+        #USER VARS
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
-        self.InputFolder=r"E:\NCR\TestImages\LightSabreDuel\RandomOrder"
+        self.InputFolder=r"E:\NCR\TestImages\Goodfellas_longshot_Random"
         #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
         #self.InputFolder=r"E:\NCR\TestImages\Faces\randos"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
+        self.SubSetOfData=int(9999)#subset of data
+        self.MemoryError_ReduceLoad=(True,4)#fix memory errors (multiprocess makes copies of everything) Activation,N+1 cores to use
+        self.BeastMode=True# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
+        self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
+
+
+
+
+
+
+        #internal variables
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
         self.OutputDuplicates=self.Outputfolder + "\\Duplicates\\"
-        self.AverageDistanceFM=100
-        #self.Std_dv_Cutoff=0.5#set this to cut off how close notes can be in similarity
-        self.TraceExtractedImg_to_DatRecordObj=None
-        self.ImagesInMem_to_Process=dict()
-        self.DuplicatesToCheck=dict()
-        self.DuplicatesFound=[]
-        self.Mean_Std_Per_cyclelist=None
-        self.HistogramSelfSimilarityThreshold=0.005#should be zero but incase there is image compression noise
-        self.SubSetOfData=int(9999)#subset of data
         self.ImagesInMem_Pairing=dict()
         #self.ImagesInMem_Pairing_orphans=dict()
         self.GetDuplicates=False
@@ -221,7 +224,12 @@ class MatchImagesObject():
         self.HM_data_All=None
         self.DummyMinValue=-9999923
         self.MetricDictionary=dict()
-
+        self.TraceExtractedImg_to_DatRecordObj=None
+        self.ImagesInMem_to_Process=dict()
+        self.DuplicatesToCheck=dict()
+        self.DuplicatesFound=[]
+        self.Mean_Std_Per_cyclelist=None
+        self.HistogramSelfSimilarityThreshold=0.005#should be zero but incase there is image compression noise
         self.CurrentBaseImage=None
         
         #populatemetricDictionary
@@ -264,6 +272,7 @@ class MatchImagesObject():
             self.OPENCV_hog_descriptor=None
             self.PhaseCorrelate_FourierMagImg=None
             self.DebugImage=None
+            self.OriginalImageFilePath=None
             
 def PlotAndSave(Title,Filepath,Data,maximumvalue):
     
@@ -420,7 +429,7 @@ def main():
     #record images to allow us to debug code
     ImageReviewDict=dict()
     for Index, ImagePath in enumerate(RandomOrder):
-        print("Loading in image",ImagePath )
+        if Index%30==0: print("Image load",Index,"/",len(RandomOrder))
 
         try:
             #create class object for each image
@@ -586,7 +595,7 @@ def main():
             ImageInfo.EigenVectors=EigVec
             ImageInfo.PrincpleComponents=None#PC
             ImageInfo.Histogram=hist
-            ImageInfo.OriginalImage=InputImage#OriginalImage_col
+            ImageInfo.OriginalImage=None#InputImage#OriginalImage_col
             ImageInfo.ImageGrayscale=None#OriginalImage_GrayScale
             ImageInfo.ImageColour=None#Colour_Resized
             ImageInfo.ImageAdjusted=None#Image_For_FM
@@ -596,12 +605,13 @@ def main():
             ImageInfo.HOG_Mag=None#HOG_mag
             ImageInfo.HOG_Angle=None#HOG_angle
             ImageInfo.OPENCV_hog_descriptor=OPENCV_hog_descriptor
-            ImageInfo.PhaseCorrelate_FourierMagImg=PhaseCorrelate_FourierMagImg
+            ImageInfo.PhaseCorrelate_FourierMagImg=None#PhaseCorrelate_FourierMagImg
             ImageInfo.DebugImage=None#DebugImage
+            ImageInfo.OriginalImageFilePath=ImagePath
             #populate dictionary
             PrepareMatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
         except:
-            print("error with image, skipping")
+            print("error with image, skipping",ImagePath)
 
     #need this to copy the keypoints for some reason - incompatible with pickle which means
     #any multiprocessing wont work either
@@ -676,23 +686,32 @@ def main():
     #WARNING might give weird results if inside a VM or a executable converted python 
     PhysicalCores=psutil.cpu_count(logical=False)#number of physical cores
     HyperThreadedCores = int(os.environ['NUMBER_OF_PROCESSORS'])#don't use these simulated cores
+    if MatchImages.MemoryError_ReduceLoad[0]==True and PhysicalCores>1:
+        PhysicalCores=min(PhysicalCores,MatchImages.MemoryError_ReduceLoad[1])
+        print("Memory protection: restricting cores to", PhysicalCores)
+
     processes=max(PhysicalCores-1,1)#rule is thumb is to use number of logical cores minus 1, but always make sure this number >0. Its not a good idea to blast CPU at 100% as this can reduce performance as OS tries to balance the load
-    chunksize=int(len(MatchImages.ImagesInMem_Pairing)/processes)#this determines how many tasks a core has stacked up
+    
+    if MatchImages.BeastMode==False:
+        chunksize=processes*3
+    else:
+        print("WARNING! Beast mode active - this optimisation prohibits any timing feedback")
+        chunksize=int(len(MatchImages.ImagesInMem_Pairing)/processes)
     ProcessesPerCycle=processes*chunksize##how many jobs do we build up to pass off to the multiprocess pool, in this case in theory each core gets 3 stacked tasks
     
-
-
     #experimental with optimisation for multiprocessing
     #currently multiprocesses have staggered finish due to allotment of jobs
     #in this manner we wont have a situation where the first thread has the bigger range of the factorial jobs
-    #and all processes more or less have some workload - this can be done much nicer but this is quicker for now
+    #and all processes more or less have some workload - this can be done more systematically but this
+    #gets us most the way there without fiddly code
+    print("Optimising multiprocess load balance")
     SacrificialDictionary=copy.deepcopy(MatchImages.ImagesInMem_Pairing)
     ImagesInMem_Pairing_ForThreading=dict()
     while len(SacrificialDictionary)>0:
         RandomItem=random.choice(list(SacrificialDictionary.keys()))
         ImagesInMem_Pairing_ForThreading[RandomItem]=MatchImages.ImagesInMem_Pairing[RandomItem]
         del SacrificialDictionary[RandomItem]
-
+    
     print("[Multiprocess start]","Taskstack per core:",chunksize,"  Taskpool size:",ProcessesPerCycle,"  Physical cores used:",processes,"   Images:",len(MatchImages.ImagesInMem_Pairing))
     pool = multiprocessing.Pool(processes=processes)
     listJobs=[]
@@ -706,7 +725,7 @@ def main():
     for Index, BaseImageList in enumerate(ImagesInMem_Pairing_ForThreading):
         listJobs.append((MatchImages,BaseImageList))
         if (Index%ProcessesPerCycle==0 and Index!=0) or Index==len(MatchImages.ImagesInMem_Pairing)-1:
-            ReturnList=(pool.imap_unordered(MatchImages_lib.ProcessSimilarity,listJobs,chunksize=chunksize))#chunksize=chunksize
+            ReturnList=(pool.imap_unordered(MatchImages_lib.ProcessSimilarity,listJobs,chunksize=chunksize))
             #populate output metric comparison matrices
             for ReturnObjects in ReturnList:
                 Rtrn_CurrentBaseImage=ReturnObjects["BASEIMAGE"]
@@ -766,11 +785,11 @@ def main():
                             TimeEstimate_sum.append(round(_Y,2))
                             TimeEstimateLeft_sum.append(round(_Y,2))
                     if len(listTimings)<7:
-                        print("LR       (more samples needed) Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
-                        print("LR       (more samples needed) Estimated Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
+                        print("(More time samples needed) Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
+                        print("(More time samples needed) Estimated Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
                     else:
-                        print("LR       Estimated total time 2=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
-                        print("LR       Estimated Time left 2=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
+                        print("Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
+                        print("Estimated Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
                     
             except:
                 print("Problem with time estimate code")

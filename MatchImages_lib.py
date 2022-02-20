@@ -9,7 +9,7 @@ import statistics
 import matplotlib.pyplot as pl
 from statistics import mean 
 import math
-
+import shutil
 def FFt(inputdata):
     #https://stackoverflow.com/questions/30527902/numpy-fft-fast-fourier-transformation-of-1-dimensional-array
     img = (inputdata)
@@ -162,7 +162,9 @@ def PairWise_Matching(MatchImages,PlotAndSave_2datas,PlotAndSave,ImgCol_InfoShee
                 #MatchDistance=str(MatchImages.ImagesInMem_Pairing[ListOfImages][1])
                 FileName=ImgNameV_ID[Images]
                 TempFfilename=SetMatchImages_folder  + "00" + str(ListIndex) + "_" +str(imgIndex)  + ".jpg"
-                cv2.imwrite(TempFfilename,MatchImages.ImagesInMem_to_Process[FileName].OriginalImage)
+                ImagePath=MatchImages.ImagesInMem_to_Process[Images].OriginalImageFilePath
+                shutil.copyfile(ImagePath, TempFfilename)
+                #cv2.imwrite(TempFfilename,MatchImages.ImagesInMem_to_Process[FileName].OriginalImage)
 
 
     PlotAndSave("MatchMetric_all",MatchImages.OutputPairs +"\\MatchMetric_all.jpg",MatchMetric_all,1)
@@ -259,7 +261,9 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
                 #raise Exception("too many images")
             SplitImagePath=Images.split("\\")[-1]
             FilePath=MatchImages.OutputPairs +"\\00" +str(Counter)+ "_ImgNo_" + str(BaseImageList) + "_score_" + str(round(MatchImages.HM_data_All[Element,BaseImageList],3))+ "_" + SplitImagePath
-            cv2.imwrite(FilePath,MatchImages.ImagesInMem_to_Process[Images].OriginalImage)
+            ImagePath=MatchImages.ImagesInMem_to_Process[Images].OriginalImageFilePath
+            shutil.copyfile(ImagePath, FilePath)
+            #cv2.imwrite(FilePath,MatchImages.ImagesInMem_to_Process[Images].OriginalImage)
             if Images in OrderedImages:
                 raise Exception("output images file already exists!!! logic error " + FilePath)
             else:
@@ -448,8 +452,8 @@ def ProcessSimilarity(Input):
         #PhaseCorrelationMatch=1-PhaseCorrelationMatch_raw#signal power so we will reverse it 
         #if np.isnan(PhaseCorrelationMatch):
         #    PhaseCorrelationMatch=MatchImages.DummyMinValue
-        PhaseCorrelationMatch=0
-            
+        PhaseCorrelationMatch=1#
+
 
         #StackTwoimages=MatchImages.StackTwoimages(Base_Image_FM,Test_Image_FM)
         #_3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(StackTwoimages,(StackTwoimages.shape[1]*1,StackTwoimages.shape[0]*1)),0,True,True)
