@@ -164,6 +164,7 @@ class MatchImagesObject():
         return image
         #return image[:,0:151,:]
     def USERFunction_OriginalImage(self,image):
+        return image
         return cv2.resize(image.copy(),(500,250))
 
     def USERFunction_Resize(self,image):
@@ -173,6 +174,7 @@ class MatchImagesObject():
         #return image
             return image[0:62,0:124]
         else:
+            return image[0:62,0:124]
             #image= image[303:800,400:1500,:]
             image=cv2.resize(image,(500,250))
             return image
@@ -188,16 +190,16 @@ class MatchImagesObject():
     def __init__(self):
         #USER VARS
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
-        self.InputFolder=r"E:\NCR\TestImages\Goodfellas_longshot_Random"
+        self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
         #self.InputFolder=r"E:\NCR\TestImages\Faces\randos"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
-        self.SubSetOfData=int(9999)#subset of data
-        self.MemoryError_ReduceLoad=(True,4)#fix memory errors (multiprocess makes copies of everything) Activation,N+1 cores to use
-        self.BeastMode=True# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
+        self.SubSetOfData=int(500)#subset of data
+        self.MemoryError_ReduceLoad=(True,4)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use)
+        self.BeastMode=False# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
 
 
@@ -332,7 +334,9 @@ def Get_PCA_(InputImage):
     EigVec = EigVec[:,order]
     #Projecting data on Eigen vector directions resulting to Principal Components 
     PC = np.matmul(MB_matrix,EigVec)   #cross product
-    return PC,EigVal,EigVec
+
+    ReturnSize=min(len(EigVal),6)
+    return PC,EigVal[0:ReturnSize],EigVec[0:ReturnSize]
 
 def GetAverageOfMatches(List,Span):
     Spanlist=List[0:Span]
@@ -436,7 +440,6 @@ def main():
             ImageInfo=PrepareMatchImages.ImageInfo()
 
             #load in original image
-            
             OriginalImage_GrayScale = cv2.imread(ImagePath, cv2.IMREAD_GRAYSCALE)
             OriginalImage_col = cv2.imread(ImagePath)
             InputImage=PrepareMatchImages.USERFunction_OriginalImage(OriginalImage_col)
@@ -444,15 +447,10 @@ def main():
             if Index<3: ImageReviewDict["OriginalImage_col"]=OriginalImage_col
             if Index<3: ImageReviewDict["InputImage"]=InputImage
 
-
-            
-
             #create resized versions
             GrayScale_Resized=PrepareMatchImages.USERFunction_Resize(OriginalImage_GrayScale)
             Colour_Resized=PrepareMatchImages.USERFunction_Resize(OriginalImage_col)
             if Index<3: ImageReviewDict["Colour_Resized"]=Colour_Resized
-
-
 
             #create version for feature matching
             Image_For_FM=PrepareMatchImages.USERFunction_CropForFM(Colour_Resized)
@@ -522,7 +520,7 @@ def main():
             DebugImage=PrepareMatchImages.StackTwoimages(Colour_Resized,FFT_magnitude_spectrum_visualise)
 
 
-            if Index==1:
+            if Index==-1:
                 #on first loop show image to user
                 FM_DrawnKeypoints=_3DVisLabLib.draw_keypoints_v2(StackedColour_AndGradient_img.copy(),keypoints)
                 ImageReviewDict["FM_DrawnKeypoints"]=FM_DrawnKeypoints

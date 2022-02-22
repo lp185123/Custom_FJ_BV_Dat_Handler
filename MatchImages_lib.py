@@ -404,12 +404,12 @@ def ProcessSimilarity(Input):
         for EVector in range (0,min(len(Base_Image_EigenVectors),len(Test_Image_EigenVectors))):
             #need to look at this closer to see if we need to do anything to vectors before getting dot prod
             ListEigenDots.append(1-round((Base_Image_EigenVectors[EVector] @ Test_Image_EigenVectors[EVector]),8))
-            ListEigenVals.append(abs((Base_Image_EigenValues[EVector] )-(Test_Image_EigenValues[EVector] )))
+            ListEigenVals.append(abs((Base_Image_EigenValues[EVector]-Test_Image_EigenValues[EVector])))
 
         EigenDotProduct=mean(ListEigenDots)#round((Base_Image_EigenVectors[0] @ Test_Image_EigenVectors[0]),5)
-        EigenValue_diff=mean(ListEigenVals)#abs((Base_Image_EigenValues[0] )-(Test_Image_EigenValues[0] ))
+        EigenValue_diff=sum(ListEigenVals)#abs((Base_Image_EigenValues[0] )-(Test_Image_EigenValues[0] ))
         #get distance
-        EigenValue_diff=math.sqrt((EigenDotProduct**2)+(EigenValue_diff**2))
+        EigenValue_diff=math.sqrt((EigenValue_diff**2))#+(EigenValue_diff**2))
         #print(EigenValue_diff)
         #CheckImages_InfoSheet.All_EigenDotProd_result.append(EigenValue_diff)
 

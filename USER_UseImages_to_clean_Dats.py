@@ -1,7 +1,8 @@
-import DatScraper_broken_onlyExtract
+import DatScraper_tool_broken_onlyExtract_NEW
 import _3DVisLabLib
 import json
 import shutil
+import os
 
 InputPath=r"C:\Working\FindIMage_In_Dat\Output"
 InputJson=InputPath+"\\TraceImg_to_DatRecord.json" 
@@ -63,12 +64,19 @@ if (_3DVisLabLib.yesno("WIP - is this multiple record data and records to be exc
 #otherwise use this if lots of records per dat
     for datfiletoclean in RecordToRemove_dict:
         print("will remove",RecordToRemove_dict[datfiletoclean] , "from",datfiletoclean)
-        imageExtractor = DatScraper_broken_onlyExtract.ImageExtractor(datfiletoclean)
-        imageExtractor.clean(RecordToRemove_dict[datfiletoclean])
+        
     exit
 
-    if (_3DVisLabLib.yesno("do you wish to proceed?")):
+    if (_3DVisLabLib.yesno("do you wish to proceed? WARNING! WILL OVERWRITE YOUR DATS!!!")):
         for datfiletoclean in RecordToRemove_dict:
+            DelimitedFilePath=datfiletoclean.split("\\")
+            BaseFilePath=datfiletoclean.replace(DelimitedFilePath[-1],"")
+            CleanFileName=datfiletoclean
+            DirtyFileName=BaseFilePath +"dummyDirtyData.dat"
             print("will remove",RecordToRemove_dict[datfiletoclean] , "from",datfiletoclean)
+            imageExtractor = DatScraper_tool_broken_onlyExtract_NEW.ImageExtractor(datfiletoclean)
+            imageExtractor.clean(RecordToRemove_dict[datfiletoclean],cleanPath=CleanFileName,dirtyPath=DirtyFileName)
+            os.remove(DirtyFileName)
+            
     else:
         raise Exception("User declined to continue")
