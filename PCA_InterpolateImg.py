@@ -137,112 +137,114 @@
 
 
 
-# Import important libraries
-import cv2
-import numpy as np
-import copy
-# Load the image
-imgpath = r"E:\NCR\TestImages\Anything\20210324_125733.jpg"
-imgpath2 = r"E:\NCR\TestImages\Anything\3-2020_tes_3D_capture_03_003_pod2primary.jpg"
+# # Import important libraries
+# import cv2
+# import numpy as np
+# import copy
+# # Load the image
+# imgpath = r"E:\NCR\TestImages\noisy10degline.jpg"
+# imgpath2 = r"E:\NCR\TestImages\noisy45degline.jpg"
 
 
 
-def PCA_Image(FilePath):
-    img = cv2.imread(FilePath, 0)
-    img =cv2.resize(img,(600,600))
+# def PCA_Image(FilePath):
+#     img = cv2.imread(FilePath, 0)
+#     img =cv2.resize(img,(600,600))
 
-    # Calculating the mean columnwise
-    M = np.mean(img.T, axis=1)
+#     # Calculating the mean columnwise
+#     M = np.mean(img.T, axis=1)
 
-    # Sustracting the mean columnwise
-    C = img - M
+#     # Sustracting the mean columnwise
+#     C = img - M
 
-    # Calculating the covariance matrix
-    V = np.cov(C.T)
+#     # Calculating the covariance matrix
+#     V = np.cov(C.T)
 
-    # Computing the eigenvalues and eigenvectors of covarince matrix
-    values, vectors = np.linalg.eig(V)
+#     # Computing the eigenvalues and eigenvectors of covarince matrix
+#     values, vectors = np.linalg.eig(V)
 
-    p = np.size(vectors, axis =1)
+#     p = np.size(vectors, axis =1)
 
-    # Sorting the eigen values in ascending order
-    idx = np.argsort(values)
-    idx = idx[::-1]
+#     # Sorting the eigen values in ascending order
+#     idx = np.argsort(values)
+#     idx = idx[::-1]
 
-    # Sorting eigen vectors
-    vectors = vectors[:,idx]
-    values = values[idx]
+#     # Sorting eigen vectors
+#     vectors = vectors[:,idx]
+#     values = values[idx]
 
-    # PCs used for reconstruction (can be varied)
-    num_PC = 20#len(vectors)
+#     # PCs used for reconstruction (can be varied)
+#     num_PC = len(vectors)
 
-    # Cutting the PCs
-    if num_PC <p or num_PC >0:
-        vectors = vectors[:, range(num_PC)]
+#     # Cutting the PCs
+#     if num_PC <p or num_PC >0:
+#         vectors = vectors[:, range(num_PC)]
 
-    # Reconstructing the image with PCs
-    #score = np.dot(vectors.T, C)
-    #constructed_img = np.dot(vectors, score) + M
-    #constructed_img = np.uint8(np.absolute(constructed_img))
+#     # Reconstructing the image with PCs
+#     #score = np.dot(vectors.T, C)
+#     #constructed_img = np.dot(vectors, score) + M
+#     #constructed_img = np.uint8(np.absolute(constructed_img))
 
-    # Show reconstructed image
-    #cv2.imshow("Reconstructed Image", constructed_img)
-    #cv2.waitKey(0)
-    #cv2.destroyAllWindows()
+#     # Show reconstructed image
+#     #cv2.imshow("Reconstructed Image", constructed_img)
+#     #cv2.waitKey(0)
+#     #cv2.destroyAllWindows()
 
-    return vectors,M,C
+#     return vectors,M,C
 
-def Reconstruct(vectors,M,C):
-    # Reconstructing the image with PCs
-    score = np.dot(vectors.T, C)
-    constructed_img = np.dot(vectors, score) + M
-    constructed_img = np.uint8(np.absolute(constructed_img))
+# def Reconstruct(vectors,M,C):
+#     # Reconstructing the image with PCs
+#     score = np.dot(vectors.T, C)
+#     constructed_img = np.dot(vectors, score) + M
+#     constructed_img = np.uint8(np.absolute(constructed_img))
 
-    # Show reconstructed image
-    cv2.imshow("Reconstructed Image", constructed_img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+#     # Show reconstructed image
+#     cv2.imshow("Reconstructed Image", constructed_img)
+#     cv2.waitKey(0)
+#     cv2.destroyAllWindows()
 
-vectors1,M1,C1=PCA_Image(imgpath)
-vectors2,M2,C2=PCA_Image(imgpath2)
+# vectors1,M1,C1=PCA_Image(imgpath)
+# vectors2,M2,C2=PCA_Image(imgpath2)
 
-#make sure vectors same length
-MaxLength=min(len(vectors1),len(vectors2))
-vectors1=vectors1[:MaxLength]
-vectors2=vectors2[:MaxLength]
+# #make sure vectors same length
+# MaxLength=min(len(vectors1),len(vectors2))
+# vectors1=vectors1[:MaxLength]
+# vectors2=vectors2[:MaxLength]
 
-#average mean 
-res=[]
-for Indexer, Item in enumerate(M1):
-    res.append((M1[Indexer]+M2[Indexer])/2)
+# #average mean 
+# res=[]
+# for Indexer, Item in enumerate(M1):
+#     res.append((M1[Indexer]+M2[Indexer])/2)
 
-print(len(vectors1))
-print(len(vectors2))
+# print(len(vectors1))
+# print(len(vectors2))
 
-AverageVector=copy.deepcopy(vectors1)
+# AverageVector=copy.deepcopy(vectors1)
 
-for indexer, ArrayElemOuter in enumerate(vectors1):
-    for innerIndex, ArrayElemInner in enumerate(ArrayElemOuter):
-        #will die if dont exist
-        AverageVector[indexer,innerIndex]=(vectors1[indexer,innerIndex]+vectors2[indexer,innerIndex])/2
+# for indexer, ArrayElemOuter in enumerate(vectors1):
+#     for innerIndex, ArrayElemInner in enumerate(ArrayElemOuter):
+#         #will die if dont exist
+#         AverageVector[indexer,innerIndex]=(vectors1[indexer,innerIndex]+vectors2[indexer,innerIndex])/2
 
-AverageM=copy.deepcopy(M1)
-for indexer, ArrayElem in enumerate(M1):
-    AverageM[indexer]=(M1[indexer]+M2[indexer])/2
-
-
-AverageC=copy.deepcopy(C1)
-for indexer, ArrayElemOuter in enumerate(C1):
-    for innerIndex, ArrayElem in enumerate(ArrayElemOuter):
-        AverageC[indexer,innerIndex]=(C1[indexer,innerIndex]+C2[indexer,innerIndex])/2
+# AverageM=copy.deepcopy(M1)
+# for indexer, ArrayElem in enumerate(M1):
+#     AverageM[indexer]=(M1[indexer]+M2[indexer])/2
 
 
-#Recostruct(AverageVector,M2,AverageC)
-#Reconstruct(AverageVector,AverageM,AverageC)
-#Reconstruct(AverageVector,AverageM,AverageC)
+# AverageC=copy.deepcopy(C1)
+# for indexer, ArrayElemOuter in enumerate(C1):
+#     for innerIndex, ArrayElem in enumerate(ArrayElemOuter):
+#         AverageC[indexer,innerIndex]=(C1[indexer,innerIndex]+C2[indexer,innerIndex])/2
 
-#Reconstruct(vectors2,M2,C2)
-Reconstruct(AverageVector,M2,AverageC)
+
+# #Recostruct(AverageVector,M2,AverageC)
+# #Reconstruct(AverageVector,AverageM,AverageC)
+# #Reconstruct(AverageVector,AverageM,AverageC)
+
+# #Reconstruct(vectors2,M2,C2)
+# Reconstruct(vectors1,M1,C1)
+# Reconstruct(AverageVector,AverageM,AverageC)
+# Reconstruct(vectors2,M1,C2)
 
 
 
@@ -277,44 +279,49 @@ Reconstruct(AverageVector,M2,AverageC)
 
 
 
-# import matplotlib.image as mplib
-# import matplotlib.pyplot as plt
-# import numpy as np
-# from sklearn.decomposition import PCA
+import matplotlib.image as mplib
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.decomposition import PCA
+import copy
 
-# def getPCA(ImageFile):
-#     img=mplib.imread(ImageFile)
-#     print(img.shape)
-#     img_re=np.reshape(img,(img.shape[0],img.shape[1]*3))
-#     PCA_Object=PCA(200).fit(img_re)
-#     img_trans=PCA_Object.transform(img_re)
-
-
-#     return PCA_Object,img_trans,img.shape
+def getPCA(ImageFile):
+    img=mplib.imread(ImageFile)
+    print(img.shape)
+    img_re=np.reshape(img,(img.shape[0],img.shape[1]*3))
+    PCA_Object=PCA(400).fit(img_re)
+    img_trans=PCA_Object.transform(img_re)
 
 
-
-# #
-# def InversePCA(PCA_Object,img_trans,img_shape):
-#     img_Inv=PCA_Object.inverse_transform(img_trans)
-#     img=np.reshape(img_Inv,img_shape)
-#     plt.axis('off')
-#     plt.imshow(img.astype('uint8'))
-#     plt.show()
-
-# #Load the image
-# imgpath = r"E:\NCR\TestImages\noisy45degline.jpg"
-# imgpath2 = r"E:\NCR\TestImages\noisy10degline.jpg"
-
-
-# PCA_Object1,img_trans1,img_shape1=getPCA(imgpath)
-# PCA_Object2,img_trans2,img_shape2=getPCA(imgpath2)
+    return PCA_Object,img_trans,img.shape
 
 
 
+#
+def InversePCA(PCA_Object,img_trans,img_shape):
+    img_Inv=PCA_Object.inverse_transform(img_trans)
+    img=np.reshape(img_Inv,img_shape)
+    plt.axis('off')
+    plt.imshow(img.astype('uint8'))
+    plt.show()
 
-# InversePCA(PCA_Object1,img_trans1,img_shape1)
+#Load the image
+imgpath = r"E:\NCR\TestImages\noisy45degline.jpg"
+imgpath2 = r"E:\NCR\TestImages\noisy10degline.jpg"
 
+
+PCA_Object1,img_trans1,img_shape1=getPCA(imgpath)
+PCA_Object2,img_trans2,img_shape2=getPCA(imgpath2)
+
+Averageimg_trans=copy.deepcopy(img_trans1)
+for indexer, ArrayElemOuter in enumerate(img_trans1):
+    for innerIndex, ArrayElem in enumerate(ArrayElemOuter):
+        Averageimg_trans[indexer,innerIndex]=(img_trans1[indexer,innerIndex]+img_trans2[indexer,innerIndex])/2
+
+
+
+InversePCA(PCA_Object1,Averageimg_trans,img_shape1)
+InversePCA(PCA_Object2,img_trans2,img_shape2)
 
 
 

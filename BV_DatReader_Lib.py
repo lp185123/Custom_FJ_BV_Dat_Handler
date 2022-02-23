@@ -304,6 +304,7 @@ def AutomaticExtraction(UserParameters):
                 #print("Dat file",FileIndex,"/",str(len(InputFiles_cleaned)))
                 cv2.imwrite(Savestring,OutputImage)
                 #CreateImageVDatfileRecord provenance tracker
+                #ImageHash=_3DVisLabLib. pHash(OutputImage)
                 ImgVDatFile_andRecord[Savestring]=(DatFile,Index+1,SNR_ReadResult)
         print(DatFile,NoteCount)
     #save out dictionary so we can trace images back to dat files and record number

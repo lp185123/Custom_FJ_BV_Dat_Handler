@@ -190,7 +190,7 @@ class MatchImagesObject():
     def __init__(self):
         #USER VARS
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
-        self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
+        self.InputFolder=r"E:\NCR\TestImages\MixTestSides"
         #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
         #self.InputFolder=r"E:\NCR\TestImages\Faces\randos"
@@ -198,7 +198,7 @@ class MatchImagesObject():
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
         self.SubSetOfData=int(500)#subset of data
-        self.MemoryError_ReduceLoad=(True,4)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use)
+        self.MemoryError_ReduceLoad=(False,4)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use)
         self.BeastMode=False# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
 
@@ -686,7 +686,7 @@ def main():
     HyperThreadedCores = int(os.environ['NUMBER_OF_PROCESSORS'])#don't use these simulated cores
     if MatchImages.MemoryError_ReduceLoad[0]==True and PhysicalCores>1:
         PhysicalCores=min(PhysicalCores,MatchImages.MemoryError_ReduceLoad[1])
-        print("Memory protection: restricting cores to", PhysicalCores)
+        print("THROTTLING BY USER - Memory protection: restricting cores to", PhysicalCores, "user option MemoryError_ReduceLoad")
 
     processes=max(PhysicalCores-1,1)#rule is thumb is to use number of logical cores minus 1, but always make sure this number >0. Its not a good idea to blast CPU at 100% as this can reduce performance as OS tries to balance the load
     

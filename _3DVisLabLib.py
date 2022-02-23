@@ -5164,3 +5164,12 @@ def Get_PCA_getOrientation(pts, img):
     angle =  math.atan2(eigenvectors[0,1], eigenvectors[0,0]) # orientation in radians
     
     return angle
+    
+def pHash(cv_image):
+    
+        #hash the image
+    #https://stackoverflow.com/questions/55685803/using-opencvs-image-hashing-module-from-python
+    imgg = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+    h=cv2.img_hash.pHash(imgg) # 8-byte hash
+    pH=int.from_bytes(h.tobytes(), byteorder='big', signed=False)
+    return pH

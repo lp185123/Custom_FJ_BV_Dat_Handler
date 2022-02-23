@@ -209,15 +209,24 @@ class ImageExtractor:
         arrayOfNoteIds.sort(reverse=True)
 
         badNotes = []
+        goodNotes = []
 
-        for noteId in arrayOfNoteIds:
-            badNotes.append(self.notes.pop(noteId))
+        for i in range(0,len(self.notes)):
+            addedImage = False
+            # We iterate through the whole list to allow multiple of the same
+            # image to be added
+            for noteId in arrayOfNoteIds:
+                if i == noteId:
+                    addedImage = True
+                    badNotes.append(self.notes[noteId])
+            if addedImage == False:
+                goodNotes.append(self.notes[i])
 
-        clean = ""
-        for note in self.notes:
+        clean = self.header
+        for note in goodNotes:
             clean += note.print()
 
-        dirty = ""
+        dirty = self.header
         for note in badNotes:
             dirty += note.print()
 
@@ -404,7 +413,6 @@ class ImageMerger:
                 mergeCount += count
                 self.totalMergeCount += count
                 if self.requiredCount == self.totalMergeCount:
-                    print('outputting')
                     self.outputMerge()
                     self.contents = ''
                     self.noteCountIndex += 1
