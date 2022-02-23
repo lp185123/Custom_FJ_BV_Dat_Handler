@@ -1,4 +1,5 @@
 import copy
+from difflib import Match
 import numpy as np
 import time
 import random
@@ -195,6 +196,13 @@ def PrintResults(MatchImages,PlotAndSave_2datas,PlotAndSave):
     PlotAndSave_2datas("HM_data_HOG_Dist",FilePath,MatchImages.HM_data_HOG_Dist)
     FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_PhaseCorrelation") +".jpg"
     PlotAndSave_2datas("HM_data_PhaseCorrelation",FilePath,MatchImages.HM_data_PhaseCorrelation)
+
+
+    for MatchMetric in MatchImages.Metrics_dict:
+        FilePath=MatchImages.OutputPairs +"\\" + str(MatchMetric) + "auto" +".jpg"
+        PlotAndSave_2datas(str(MatchMetric) + "_auto",FilePath,MatchImages.Metrics_dict[MatchMetric])
+    FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_MetricDistances_auto") +".jpg"
+    PlotAndSave_2datas("HM_data_MetricDistances_auto",FilePath,MatchImages.HM_data_MetricDistances_auto)
 
 def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
     OutOfUse="OutOfUse"

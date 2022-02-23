@@ -197,7 +197,7 @@ class MatchImagesObject():
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
-        self.SubSetOfData=int(500)#subset of data
+        self.SubSetOfData=int(30)#subset of data
         self.MemoryError_ReduceLoad=(False,4)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use)
         self.BeastMode=False# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
@@ -217,6 +217,7 @@ class MatchImagesObject():
         self.startTime =None
         self.Endtime =None
         self.HM_data_MetricDistances=None
+        self.HM_data_MetricDistances_auto=None
         self.HM_data_FM=None
         self.HM_data_histo=None
         self.HM_data_FourierDifference=None
@@ -236,8 +237,15 @@ class MatchImagesObject():
         
         #populatemetricDictionary
         Metrics_Function=[HM_data_MetricDistances]
-        Metrics_Data=[]
-
+        self.Metrics_dict=dict()
+        self.Metrics_dict["HM_data_FM"]=None
+        self.Metrics_dict["HM_data_histo"]=None
+        self.Metrics_dict["HM_data_FourierDifference"]=None
+        self.Metrics_dict["HM_data_PhaseCorrelation"]=None
+        self.Metrics_dict["HM_data_HOG_Dist"]=None
+        self.Metrics_dict["HM_data_EigenVectorDotProd"]=None
+        #self.Metrics_dict["HM_data_MetricDistances"]=None
+        #self.Metrics_dict["HM_data_All"]=None
 
     class FeatureMatch_Dict_Common:
 
@@ -352,6 +360,9 @@ def normalize_2d(matrix):
     if matrix.min()==0 and matrix.max()==0:
         print("WARNING, matrix all zeros")
         return matrix
+    if matrix.max()==matrix.min():
+        print("WARNING: matrix homogenous")
+        return np.ones(matrix.shape)
     return (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
 
 def GetHOG_featureVector(image):
@@ -675,8 +686,10 @@ def main():
     MatchImages.HM_data_EigenVectorDotProd = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     MatchImages.HM_data_HOG_Dist = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
     MatchImages.HM_data_PhaseCorrelation = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
-
-
+    MatchImages.HM_data_MetricDistances_auto = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+    #initialise all metric matrices
+    for MetricsMatrix in MatchImages.Metrics_dict:
+        MatchImages.Metrics_dict[MetricsMatrix]=np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
 
 
 
@@ -733,6 +746,15 @@ def main():
                 MatchImages.HM_data_EigenVectorDotProd[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_EigenVectorDotProd"]
                 MatchImages.HM_data_HOG_Dist[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_HOG_Dist"]
                 MatchImages.HM_data_PhaseCorrelation[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_PhaseCorrelation"]
+            
+            #for ReturnObjects in ReturnList:
+                Rtrn_CurrentBaseImage=ReturnObjects["BASEIMAGE"]
+                for returnItem in MatchImages.Metrics_dict:
+                    if returnItem in ReturnObjects:
+                        MatchImages.Metrics_dict[returnItem][Rtrn_CurrentBaseImage,:]=ReturnObjects[returnItem]
+                    else:
+                        print("No match for",returnItem)
+
             CompletedProcesses=CompletedProcesses+len(listJobs)
             #get timings
             listTimings.append(round(time.perf_counter()-t1_start,2))
@@ -806,6 +828,21 @@ def main():
                 MatchImages.HM_data_HOG_Dist[BaseImageList,testImageList]=MatchImages.HM_data_HOG_Dist[testImageList,BaseImageList]
                 MatchImages.HM_data_PhaseCorrelation[BaseImageList,testImageList]=MatchImages.HM_data_PhaseCorrelation[testImageList,BaseImageList]
 
+    #create diagonally symetrical matrix
+    for BaseImageList in MatchImages.ImagesInMem_Pairing:
+        for testImageList in MatchImages.ImagesInMem_Pairing:
+            if testImageList<BaseImageList:
+                for MatchMetric in MatchImages.Metrics_dict:
+                    MatchImages.Metrics_dict[MatchMetric][BaseImageList,testImageList]=MatchImages.Metrics_dict[MatchMetric][testImageList,BaseImageList]
+    #fix any bad numbers
+    for BaseImageList in MatchImages.ImagesInMem_Pairing:
+        for testImageList in MatchImages.ImagesInMem_Pairing:
+            for MatchMetric in MatchImages.Metrics_dict:
+                if math.isnan( MatchImages.Metrics_dict[MatchMetric][BaseImageList,testImageList]):
+                    MatchImages.Metrics_dict[MatchMetric][BaseImageList,testImageList]=MatchImages.DummyMinValue
+                    print("Bad value found, ",MatchMetric)
+
+
 
     #sort out results and populate final metric
     
@@ -819,6 +856,21 @@ def main():
     MatchImages.HM_data_HOG_Dist=normalize_2d(MatchImages.HM_data_HOG_Dist)
     MatchImages.HM_data_PhaseCorrelation=normalize_2d(np.where(MatchImages.HM_data_PhaseCorrelation==MatchImages.DummyMinValue, MatchImages.HM_data_PhaseCorrelation.max()+1, MatchImages.HM_data_PhaseCorrelation))
     
+
+    
+
+
+
+
+    #normalize
+    for MatchMetric in MatchImages.Metrics_dict:
+        MatchImages.Metrics_dict[MatchMetric]=normalize_2d(np.where(MatchImages.Metrics_dict[MatchMetric]==MatchImages.DummyMinValue, MatchImages.Metrics_dict[MatchMetric].max()+1, MatchImages.Metrics_dict[MatchMetric]))
+
+
+
+
+
+
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
         for TestImageList in MatchImages.ImagesInMem_Pairing:
             if TestImageList<BaseImageList:
@@ -838,6 +890,32 @@ def main():
     MatchImages.HM_data_MetricDistances=normalize_2d(MatchImages.HM_data_MetricDistances)
     #HM_data_All=normalize_2d(MatchImages.HM_data_histo+MatchImages.HM_data_FM+MatchImages.HM_data_FourierDifference)
    
+    for BaseImageList in MatchImages.ImagesInMem_Pairing:
+        for TestImageList in MatchImages.ImagesInMem_Pairing:
+            if TestImageList<BaseImageList:
+                #data is diagonally symmetrical
+                continue
+            #create total of all metrics
+            BuildUpTotals=[]
+            for MatchMetric in MatchImages.Metrics_dict:
+                if math.isnan(MatchImages.Metrics_dict[MatchMetric][BaseImageList,TestImageList]):
+                    BuildUpTotals.append(MatchImages.Metrics_dict[MatchMetric][BaseImageList,TestImageList])
+                else:
+                    BuildUpTotals.append(MatchImages.Metrics_dict[MatchMetric][BaseImageList,TestImageList])
+            SquaredSum=0
+            for Total in BuildUpTotals:
+                SquaredSum=SquaredSum+Total**2
+            MatchImages.HM_data_MetricDistances_auto[TestImageList,BaseImageList]=MatchImages.HM_data_MetricDistances_auto[TestImageList,BaseImageList]+math.sqrt(SquaredSum)
+             #mirror data for visualisation
+            MatchImages.HM_data_MetricDistances_auto[BaseImageList,TestImageList]=MatchImages.HM_data_MetricDistances_auto[TestImageList,BaseImageList]
+
+
+
+
+
+
+
+
     MatchImages_lib.PrintResults(MatchImages,PlotAndSave_2datas,PlotAndSave)
 
     #sequential matching
