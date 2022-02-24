@@ -291,8 +291,6 @@ def getPCA(ImageFile):
     img_re=np.reshape(img,(img.shape[0],img.shape[1]*3))
     PCA_Object=PCA(400).fit(img_re)
     img_trans=PCA_Object.transform(img_re)
-
-
     return PCA_Object,img_trans,img.shape
 
 

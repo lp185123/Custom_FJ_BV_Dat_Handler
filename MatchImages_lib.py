@@ -179,29 +179,29 @@ def PairWise_Matching(MatchImages,PlotAndSave_2datas,PlotAndSave,ImgCol_InfoShee
     exit()
 
 def PrintResults(MatchImages,PlotAndSave_2datas,PlotAndSave):
-    OutOfUse="WhatIsThis"
-    #FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_All") +".jpg"
-    #PlotAndSave_2datas("HM_data_All",FilePath,MatchImages.HM_data_All)
-    FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_FM") +".jpg"
-    PlotAndSave_2datas("HM_data_FM",FilePath,MatchImages.HM_data_FM)
-    FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_histo") +".jpg"
-    PlotAndSave_2datas("HM_data_histo",FilePath,MatchImages.HM_data_histo)
-    FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_FourierDifference") +".jpg"
-    PlotAndSave_2datas("HM_data_FourierDifference",FilePath,MatchImages.HM_data_FourierDifference)
-    FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_EigenVectorDotProd") +".jpg"
-    PlotAndSave_2datas("HM_data_EigenVectorDotProd",FilePath,MatchImages.HM_data_EigenVectorDotProd)
-    FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_MetricDistances") +".jpg"
-    PlotAndSave_2datas("HM_data_MetricDistances",FilePath,MatchImages.HM_data_MetricDistances)
-    FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_HOG_Dist") +".jpg"
-    PlotAndSave_2datas("HM_data_HOG_Dist",FilePath,MatchImages.HM_data_HOG_Dist)
-    FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_PhaseCorrelation") +".jpg"
-    PlotAndSave_2datas("HM_data_PhaseCorrelation",FilePath,MatchImages.HM_data_PhaseCorrelation)
+    # OutOfUse="WhatIsThis"
+    # #FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_All") +".jpg"
+    # #PlotAndSave_2datas("HM_data_All",FilePath,MatchImages.HM_data_All)
+    # FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_FM") +".jpg"
+    # PlotAndSave_2datas("HM_data_FM",FilePath,MatchImages.HM_data_FM)
+    # FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_histo") +".jpg"
+    # PlotAndSave_2datas("HM_data_histo",FilePath,MatchImages.HM_data_histo)
+    # FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_FourierDifference") +".jpg"
+    # PlotAndSave_2datas("HM_data_FourierDifference",FilePath,MatchImages.HM_data_FourierDifference)
+    # FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_EigenVectorDotProd") +".jpg"
+    # PlotAndSave_2datas("HM_data_EigenVectorDotProd",FilePath,MatchImages.HM_data_EigenVectorDotProd)
+    # FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_MetricDistances") +".jpg"
+    # PlotAndSave_2datas("HM_data_MetricDistances",FilePath,MatchImages.HM_data_MetricDistances)
+    # FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_HOG_Dist") +".jpg"
+    # PlotAndSave_2datas("HM_data_HOG_Dist",FilePath,MatchImages.HM_data_HOG_Dist)
+    # FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_PhaseCorrelation") +".jpg"
+    # PlotAndSave_2datas("HM_data_PhaseCorrelation",FilePath,MatchImages.HM_data_PhaseCorrelation)
 
 
     for MatchMetric in MatchImages.Metrics_dict:
         FilePath=MatchImages.OutputPairs +"\\" + str(MatchMetric) + "auto" +".jpg"
         PlotAndSave_2datas(str(MatchMetric) + "_auto",FilePath,MatchImages.Metrics_dict[MatchMetric])
-    FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_MetricDistances_auto") +".jpg"
+    FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +("HM_data_MetricDistances_auto") +".jpg"
     PlotAndSave_2datas("HM_data_MetricDistances_auto",FilePath,MatchImages.HM_data_MetricDistances_auto)
 
 def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
@@ -236,12 +236,7 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
         MatchMetricGraphDict[MatchMetric]=[]
 
     MatchMetric_all=[]
-    MatchMetric_Histo=[]
-    MatchMetric_Fourier=[]
-    MatchMetric_FM=[]
-    MatchMetric_EigenVectorDotProd=[]
-    MatchMetric_HOG_Distance=[]
-    MatchMetric_data_PhaseCorrelation=[]
+
     while len(OrderedImages)+1<len(MatchImages.ImagesInMem_Pairing):#+1 is a fudge or it crashes out with duplicate image bug - cant figure this out 
         Counter=Counter+1
         #print(len(OrderedImages),"/",len(MatchImages.ImagesInMem_Pairing))
@@ -256,20 +251,12 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
         result = np.where(Row == np.amin(Row))
         #print("REsult",Row)
         Element=random.choice(result[0])#incase we have two identical results
-        #print("nearest matching is element",Element)
-        #print("nearest value",HM_data_All[Element,BaseImageList])
-        MatchMetric_all.append(MatchImages.HM_data_All[Element,BaseImageList])
-        MatchMetric_Histo.append(MatchImages.HM_data_histo[Element,BaseImageList])
-        MatchMetric_Fourier.append(MatchImages.HM_data_FourierDifference[Element,BaseImageList])
-        MatchMetric_FM.append(MatchImages.HM_data_FM[Element,BaseImageList])
-        MatchMetric_EigenVectorDotProd.append(MatchImages.HM_data_EigenVectorDotProd[Element,BaseImageList])
-        MatchMetric_HOG_Distance.append(MatchImages.HM_data_HOG_Dist[Element,BaseImageList])
-        MatchMetric_data_PhaseCorrelation.append(MatchImages.HM_data_PhaseCorrelation[Element,BaseImageList])
         
         #populate dynamic match metrics
         for MatchMetric in MatchMetricGraphDict:
             MatchMetricGraphDict[MatchMetric].append(MatchImages.Metrics_dict[MatchMetric][Element,BaseImageList])
-
+        #populate overall metric
+        MatchMetric_all.append(MatchImages.HM_data_All[Element,BaseImageList])
         #add to output images
         
 
@@ -293,10 +280,6 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
         #blank out element in All places
         MatchImages.HM_data_All[0:len(MatchImages.ImagesInMem_Pairing),BaseImageList]=BlankOut
         MatchImages.HM_data_All[BaseImageList,0:len(MatchImages.ImagesInMem_Pairing)]=BlankOut
-        #if Counter==1:
-        #    HM_data_All[0:len(MatchImages.ImagesInMem_Pairing),Element]=BlankOut
-        #    HM_data_All[Element,0:len(MatchImages.ImagesInMem_Pairing)]=BlankOut
-        #baseimage should be an integer
         #work in columns to find nearest match, data should be mirrored diagonally to make it easier to visualise#
         
         #move to next element
@@ -323,18 +306,9 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
     #save out dynamic match metrics
     for MatchMetric in MatchMetricGraphDict:
         PlotAndSave(MatchMetric,MatchImages.OutputPairs +"\\" + str(MatchMetric) +"_AUTO.jpg",MatchMetricGraphDict[MatchMetric],1)
-
-
-
+    #summed metric saved out seperately
     PlotAndSave("MatchMetric_all",MatchImages.OutputPairs +"\\MatchMetric_all.jpg",MatchMetric_all,1)
-    PlotAndSave("MatchMetric_Fourier",MatchImages.OutputPairs +"\\MatchMetric_Fourier.jpg",MatchMetric_Fourier,1)
-    PlotAndSave("MatchMetric_FM",MatchImages.OutputPairs +"\\MatchMetric_FM.jpg",MatchMetric_FM,1)
-    PlotAndSave("MatchMetric_Histo",MatchImages.OutputPairs +"\\MatchMetric_Histo.jpg",MatchMetric_Histo,1)
-    PlotAndSave("MatchMetric_FM_EigenVectorDotProd",MatchImages.OutputPairs +"\\MatchMetric_FM_EigenVectorDotProd.jpg",MatchMetric_EigenVectorDotProd,1)
-    PlotAndSave("HM_data_HOG_Dist",MatchImages.OutputPairs +"\\HM_data_HOG_Dist.jpg",MatchMetric_HOG_Distance,1)
-    PlotAndSave("MatchMetric_data_PhaseCorrelation",MatchImages.OutputPairs +"\\MatchMetric_data_PhaseCorrelation.jpg",MatchMetric_data_PhaseCorrelation,1)
 
-            
 
     MatchImages.Endtime= time.time()
     print("time taken (hrs):",round((MatchImages.Endtime- MatchImages.startTime)/60/60,2))
@@ -421,15 +395,17 @@ def ProcessSimilarity(Input):
         #the eigenvector dot product will probably just add noise
         ListEigenDots=[]
         ListEigenVals=[]
-        for EVector in range (0,min(len(Base_Image_EigenVectors),len(Test_Image_EigenVectors))):
+        #get range of eigen values/vectors to test - arbitrary amount of 5
+        MinVal_Eigens=min(len(Base_Image_EigenVectors),len(Test_Image_EigenVectors))
+        ValRange=min(MinVal_Eigens,5)
+        for EVector in range (0,ValRange):
             #need to look at this closer to see if we need to do anything to vectors before getting dot prod
             ListEigenDots.append(1-round((Base_Image_EigenVectors[EVector] @ Test_Image_EigenVectors[EVector]),8))
             ListEigenVals.append(abs((Base_Image_EigenValues[EVector]-Test_Image_EigenValues[EVector])))
 
-        EigenDotProduct=mean(ListEigenDots)#round((Base_Image_EigenVectors[0] @ Test_Image_EigenVectors[0]),5)
+        EigenVectorDotProd=sum(ListEigenDots)#round((Base_Image_EigenVectors[0] @ Test_Image_EigenVectors[0]),5)
         EigenValue_diff=sum(ListEigenVals)#abs((Base_Image_EigenValues[0] )-(Test_Image_EigenValues[0] ))
         #get distance
-        EigenValue_diff=math.sqrt((EigenValue_diff**2))#+(EigenValue_diff**2))
         #print(EigenValue_diff)
         #CheckImages_InfoSheet.All_EigenDotProd_result.append(EigenValue_diff)
 
@@ -486,7 +462,10 @@ def ProcessSimilarity(Input):
         if "HM_data_HOG_Dist" in MatchImages.Metrics_dict:
             MatchImages.Metrics_dict["HM_data_HOG_Dist"][CurrentBaseImage,TestImageList]=HOG_distance
         if "HM_data_EigenVectorDotProd" in MatchImages.Metrics_dict:
-            MatchImages.Metrics_dict["HM_data_EigenVectorDotProd"][CurrentBaseImage,TestImageList]=EigenValue_diff
+            MatchImages.Metrics_dict["HM_data_EigenVectorDotProd"][CurrentBaseImage,TestImageList]=EigenVectorDotProd
+        if "HM_data_EigenValueDifference" in MatchImages.Metrics_dict:
+            MatchImages.Metrics_dict["HM_data_EigenValueDifference"][CurrentBaseImage,TestImageList]=EigenValue_diff
+
 
 
         #make data symmetrical for visualisation
@@ -495,19 +474,19 @@ def ProcessSimilarity(Input):
 
 
 
-        MatchImages.HM_data_histo[CurrentBaseImage,TestImageList]=HistogramSimilarity
-        MatchImages.HM_data_FM[CurrentBaseImage,TestImageList]=AverageMatchDistance
-        MatchImages.HM_data_FourierDifference[CurrentBaseImage,TestImageList]=FourierDifference
-        MatchImages.HM_data_EigenVectorDotProd[CurrentBaseImage,TestImageList]=EigenValue_diff
-        MatchImages.HM_data_HOG_Dist[CurrentBaseImage,TestImageList]=HOG_distance
-        MatchImages.HM_data_PhaseCorrelation[CurrentBaseImage,TestImageList]=PhaseCorrelationMatch
-        #data is symmetrical - fill it in to help with visualisation
-        MatchImages.HM_data_histo[TestImageList,CurrentBaseImage]=HistogramSimilarity
-        MatchImages.HM_data_FM[TestImageList,CurrentBaseImage]=AverageMatchDistance
-        MatchImages.HM_data_FourierDifference[TestImageList,CurrentBaseImage]=FourierDifference
-        MatchImages.HM_data_EigenVectorDotProd[TestImageList,CurrentBaseImage]=EigenValue_diff
-        MatchImages.HM_data_HOG_Dist[TestImageList,CurrentBaseImage]=HOG_distance
-        MatchImages.HM_data_PhaseCorrelation[TestImageList,CurrentBaseImage]=PhaseCorrelationMatch
+        # MatchImages.HM_data_histo[CurrentBaseImage,TestImageList]=HistogramSimilarity
+        # MatchImages.HM_data_FM[CurrentBaseImage,TestImageList]=AverageMatchDistance
+        # MatchImages.HM_data_FourierDifference[CurrentBaseImage,TestImageList]=FourierDifference
+        # MatchImages.HM_data_EigenVectorDotProd[CurrentBaseImage,TestImageList]=EigenValue_diff
+        # MatchImages.HM_data_HOG_Dist[CurrentBaseImage,TestImageList]=HOG_distance
+        # MatchImages.HM_data_PhaseCorrelation[CurrentBaseImage,TestImageList]=PhaseCorrelationMatch
+        # #data is symmetrical - fill it in to help with visualisation
+        # MatchImages.HM_data_histo[TestImageList,CurrentBaseImage]=HistogramSimilarity
+        # MatchImages.HM_data_FM[TestImageList,CurrentBaseImage]=AverageMatchDistance
+        # MatchImages.HM_data_FourierDifference[TestImageList,CurrentBaseImage]=FourierDifference
+        # MatchImages.HM_data_EigenVectorDotProd[TestImageList,CurrentBaseImage]=EigenValue_diff
+        # MatchImages.HM_data_HOG_Dist[TestImageList,CurrentBaseImage]=HOG_distance
+        # MatchImages.HM_data_PhaseCorrelation[TestImageList,CurrentBaseImage]=PhaseCorrelationMatch
         
     # #build up return object
     # ReturnList=dict()
