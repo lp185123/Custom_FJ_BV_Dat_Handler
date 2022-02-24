@@ -206,7 +206,7 @@ class MatchImagesObject():
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
-        self.SubSetOfData=int(30)#subset of data
+        self.SubSetOfData=int(70)#subset of data
         self.MemoryError_ReduceLoad=(False,6)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use)
         self.BeastMode=False# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
@@ -245,7 +245,6 @@ class MatchImagesObject():
         self.CurrentBaseImage=None
         
         #populatemetricDictionary
-        Metrics_Function=[HM_data_MetricDistances]
         self.Metrics_dict=dict()
         self.Metrics_dict["HM_data_FM"]=None
         self.Metrics_dict["HM_data_histo"]=None
@@ -437,12 +436,7 @@ def main():
         randomchoice_img=random.choice(list(randomdict.keys()))
         RandomOrder.append(randomchoice_img)
         del randomdict[randomchoice_img]
-        #if user is reducing data
-        #for Subdivide in range (2,PrepareMatchImages.ReduceData):
-        #    if len(randomdict)>0:
-        #        randomchoice_img=random.choice(list(randomdict.keys()))
-        #        del randomdict[randomchoice_img]
-    print("User image reduction, operating on with",len(RandomOrder),"/",len(ListAllImages),"images")
+    print("User image reduction, operating on with",len(RandomOrder)," from ",len(ListAllImages),"images")
     #populate images 
     #load images into memory
 
@@ -639,8 +633,6 @@ def main():
     #build dictionary to remove items from
     for Index, img in enumerate(MatchImages.ImagesInMem_to_Process):
         MatchImages.DuplicatesToCheck[img]=img
-          #self.DuplicatesToCheck=dict()
-        #self.DuplicatesFound=[]
     if MatchImages.GetDuplicates==True:
         ScanIndex=0
         StartingLength_images=len(MatchImages.DuplicatesToCheck)
@@ -746,13 +738,13 @@ def main():
             ReturnList=(pool.imap_unordered(MatchImages_lib.ProcessSimilarity,listJobs,chunksize=chunksize))
             #populate output metric comparison matrices
             for ReturnObjects in ReturnList:
-                Rtrn_CurrentBaseImage=ReturnObjects["BASEIMAGE"]
-                MatchImages.HM_data_histo[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_histo"]
-                MatchImages.HM_data_FM[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_FM"]
-                MatchImages.HM_data_FourierDifference[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_FourierDifference"]
-                MatchImages.HM_data_EigenVectorDotProd[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_EigenVectorDotProd"]
-                MatchImages.HM_data_HOG_Dist[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_HOG_Dist"]
-                MatchImages.HM_data_PhaseCorrelation[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_PhaseCorrelation"]
+                # Rtrn_CurrentBaseImage=ReturnObjects["BASEIMAGE"]
+                # MatchImages.HM_data_histo[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_histo"]
+                # MatchImages.HM_data_FM[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_FM"]
+                # MatchImages.HM_data_FourierDifference[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_FourierDifference"]
+                # MatchImages.HM_data_EigenVectorDotProd[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_EigenVectorDotProd"]
+                # MatchImages.HM_data_HOG_Dist[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_HOG_Dist"]
+                # MatchImages.HM_data_PhaseCorrelation[Rtrn_CurrentBaseImage,:]=ReturnObjects["HM_data_PhaseCorrelation"]
             
             #for ReturnObjects in ReturnList:
                 Rtrn_CurrentBaseImage=ReturnObjects["BASEIMAGE"]
@@ -824,16 +816,16 @@ def main():
     print("Total process only time:",str(datetime.timedelta(seconds= time.perf_counter()-ProcessOnly_start)))
 
 
-    #create diagonally symetrical matrix
-    for BaseImageList in MatchImages.ImagesInMem_Pairing:
-        for testImageList in MatchImages.ImagesInMem_Pairing:
-            if testImageList<BaseImageList:
-                MatchImages.HM_data_histo[BaseImageList,testImageList]=MatchImages.HM_data_histo[testImageList,BaseImageList]
-                MatchImages.HM_data_FM[BaseImageList,testImageList]=MatchImages.HM_data_FM[testImageList,BaseImageList]
-                MatchImages.HM_data_FourierDifference[BaseImageList,testImageList]=MatchImages.HM_data_FourierDifference[testImageList,BaseImageList]
-                MatchImages.HM_data_EigenVectorDotProd[BaseImageList,testImageList]=MatchImages.HM_data_EigenVectorDotProd[testImageList,BaseImageList]
-                MatchImages.HM_data_HOG_Dist[BaseImageList,testImageList]=MatchImages.HM_data_HOG_Dist[testImageList,BaseImageList]
-                MatchImages.HM_data_PhaseCorrelation[BaseImageList,testImageList]=MatchImages.HM_data_PhaseCorrelation[testImageList,BaseImageList]
+    # #create diagonally symetrical matrix
+    # for BaseImageList in MatchImages.ImagesInMem_Pairing:
+    #     for testImageList in MatchImages.ImagesInMem_Pairing:
+    #         if testImageList<BaseImageList:
+    #             MatchImages.HM_data_histo[BaseImageList,testImageList]=MatchImages.HM_data_histo[testImageList,BaseImageList]
+    #             MatchImages.HM_data_FM[BaseImageList,testImageList]=MatchImages.HM_data_FM[testImageList,BaseImageList]
+    #             MatchImages.HM_data_FourierDifference[BaseImageList,testImageList]=MatchImages.HM_data_FourierDifference[testImageList,BaseImageList]
+    #             MatchImages.HM_data_EigenVectorDotProd[BaseImageList,testImageList]=MatchImages.HM_data_EigenVectorDotProd[testImageList,BaseImageList]
+    #             MatchImages.HM_data_HOG_Dist[BaseImageList,testImageList]=MatchImages.HM_data_HOG_Dist[testImageList,BaseImageList]
+    #             MatchImages.HM_data_PhaseCorrelation[BaseImageList,testImageList]=MatchImages.HM_data_PhaseCorrelation[testImageList,BaseImageList]
 
     #create diagonally symetrical matrix
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
@@ -856,12 +848,12 @@ def main():
     #test for NAN arrays
     #we have to repair placeholder for no data by maxing it out over valid max, but just enough so 
     #we can still use the visualisations easily without them being oversaturated with large dynamic rane
-    MatchImages.HM_data_FM=normalize_2d(np.where(MatchImages.HM_data_FM==MatchImages.DummyMinValue, MatchImages.HM_data_FM.max()+1, MatchImages.HM_data_FM))
-    MatchImages.HM_data_histo=normalize_2d(MatchImages.HM_data_histo)
-    MatchImages.HM_data_FourierDifference=normalize_2d(MatchImages.HM_data_FourierDifference)
-    MatchImages.HM_data_EigenVectorDotProd=normalize_2d(MatchImages.HM_data_EigenVectorDotProd)
-    MatchImages.HM_data_HOG_Dist=normalize_2d(MatchImages.HM_data_HOG_Dist)
-    MatchImages.HM_data_PhaseCorrelation=normalize_2d(np.where(MatchImages.HM_data_PhaseCorrelation==MatchImages.DummyMinValue, MatchImages.HM_data_PhaseCorrelation.max()+1, MatchImages.HM_data_PhaseCorrelation))
+    # MatchImages.HM_data_FM=normalize_2d(np.where(MatchImages.HM_data_FM==MatchImages.DummyMinValue, MatchImages.HM_data_FM.max()+1, MatchImages.HM_data_FM))
+    # MatchImages.HM_data_histo=normalize_2d(MatchImages.HM_data_histo)
+    # MatchImages.HM_data_FourierDifference=normalize_2d(MatchImages.HM_data_FourierDifference)
+    # MatchImages.HM_data_EigenVectorDotProd=normalize_2d(MatchImages.HM_data_EigenVectorDotProd)
+    # MatchImages.HM_data_HOG_Dist=normalize_2d(MatchImages.HM_data_HOG_Dist)
+    # MatchImages.HM_data_PhaseCorrelation=normalize_2d(np.where(MatchImages.HM_data_PhaseCorrelation==MatchImages.DummyMinValue, MatchImages.HM_data_PhaseCorrelation.max()+1, MatchImages.HM_data_PhaseCorrelation))
     
 
     #normalize
@@ -873,24 +865,24 @@ def main():
 
 
 
-    for BaseImageList in MatchImages.ImagesInMem_Pairing:
-        for TestImageList in MatchImages.ImagesInMem_Pairing:
-            if TestImageList<BaseImageList:
-                #data is diagonally symmetrical
-                continue
-            EigenVectorDotProd=MatchImages.HM_data_EigenVectorDotProd[BaseImageList,TestImageList]
-            HistogramSimilarity=MatchImages.HM_data_histo[BaseImageList,TestImageList]
-            AverageMatchDistance=MatchImages.HM_data_FM[BaseImageList,TestImageList]
-            FourierDifference=MatchImages.HM_data_FourierDifference[BaseImageList,TestImageList]
-            HOG_Distance=MatchImages.HM_data_HOG_Dist[BaseImageList,TestImageList]
-            PhaseCOr_Distance=0#MatchImages.HM_data_PhaseCorrelation[BaseImageList,TestImageList]
-            #experiment with metric distance
-            #MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]=math.sqrt((HistogramSimilarity**2)+(AverageMatchDistance**2)+(FourierDifference**2)+(EigenVectorDotProd**2)+(HOG_Distance**2)+(PhaseCOr_Distance**2))
-            #mirror data for visualisation
-            #MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]=MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]
+    # for BaseImageList in MatchImages.ImagesInMem_Pairing:
+    #     for TestImageList in MatchImages.ImagesInMem_Pairing:
+    #         if TestImageList<BaseImageList:
+    #             #data is diagonally symmetrical
+    #             continue
+    #         EigenVectorDotProd=MatchImages.HM_data_EigenVectorDotProd[BaseImageList,TestImageList]
+    #         HistogramSimilarity=MatchImages.HM_data_histo[BaseImageList,TestImageList]
+    #         AverageMatchDistance=MatchImages.HM_data_FM[BaseImageList,TestImageList]
+    #         FourierDifference=MatchImages.HM_data_FourierDifference[BaseImageList,TestImageList]
+    #         HOG_Distance=MatchImages.HM_data_HOG_Dist[BaseImageList,TestImageList]
+    #         PhaseCOr_Distance=0#MatchImages.HM_data_PhaseCorrelation[BaseImageList,TestImageList]
+    #         #experiment with metric distance
+    #         #MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]=math.sqrt((HistogramSimilarity**2)+(AverageMatchDistance**2)+(FourierDifference**2)+(EigenVectorDotProd**2)+(HOG_Distance**2)+(PhaseCOr_Distance**2))
+    #         #mirror data for visualisation
+    #         #MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]=MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]
 
-    #MatchImages.HM_data_MetricDistances=normalize_2d(MatchImages.HM_data_MetricDistances)
-    #HM_data_All=normalize_2d(MatchImages.HM_data_histo+MatchImages.HM_data_FM+MatchImages.HM_data_FourierDifference)
+    # #MatchImages.HM_data_MetricDistances=normalize_2d(MatchImages.HM_data_MetricDistances)
+    # #HM_data_All=normalize_2d(MatchImages.HM_data_histo+MatchImages.HM_data_FM+MatchImages.HM_data_FourierDifference)
    
 
 

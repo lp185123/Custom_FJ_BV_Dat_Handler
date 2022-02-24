@@ -452,11 +452,7 @@ def ProcessSimilarity(Input):
             AverageMatchDistance=MatchImages.DummyMinValue
         #CheckImages_InfoSheet.All_FM_results.append(AverageMatchDistance)
 
-
-
-
         HOG_distance=CompareHistograms(Base_Image_HOG_Descriptor, Test_Image_HOG_Descriptor)
-
 
         #fourier difference metric
         #get differnce between fourier magnitudes of image
@@ -478,6 +474,27 @@ def ProcessSimilarity(Input):
         #StackTwoimages=MatchImages.StackTwoimages(Base_Image_FM,Test_Image_FM)
         #_3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(StackTwoimages,(StackTwoimages.shape[1]*1,StackTwoimages.shape[0]*1)),0,True,True)
         #populate output metric comparison matrices
+
+        if "HM_data_FM" in MatchImages.Metrics_dict:
+            MatchImages.Metrics_dict["HM_data_FM"][CurrentBaseImage,TestImageList]=AverageMatchDistance
+        if "HM_data_histo" in MatchImages.Metrics_dict:
+            MatchImages.Metrics_dict["HM_data_histo"][CurrentBaseImage,TestImageList]=HistogramSimilarity
+        if "HM_data_FourierDifference" in MatchImages.Metrics_dict:
+            MatchImages.Metrics_dict["HM_data_FourierDifference"][CurrentBaseImage,TestImageList]=FourierDifference
+        if "HM_data_PhaseCorrelation" in MatchImages.Metrics_dict:
+            MatchImages.Metrics_dict["HM_data_PhaseCorrelation"][CurrentBaseImage,TestImageList]=PhaseCorrelationMatch
+        if "HM_data_HOG_Dist" in MatchImages.Metrics_dict:
+            MatchImages.Metrics_dict["HM_data_HOG_Dist"][CurrentBaseImage,TestImageList]=HOG_distance
+        if "HM_data_EigenVectorDotProd" in MatchImages.Metrics_dict:
+            MatchImages.Metrics_dict["HM_data_EigenVectorDotProd"][CurrentBaseImage,TestImageList]=EigenValue_diff
+
+
+        #make data symmetrical for visualisation
+        for MatchMetric in MatchImages.Metrics_dict:
+            MatchImages.Metrics_dict[MatchMetric][TestImageList,CurrentBaseImage]=MatchImages.Metrics_dict[MatchMetric][CurrentBaseImage,TestImageList]
+
+
+
         MatchImages.HM_data_histo[CurrentBaseImage,TestImageList]=HistogramSimilarity
         MatchImages.HM_data_FM[CurrentBaseImage,TestImageList]=AverageMatchDistance
         MatchImages.HM_data_FourierDifference[CurrentBaseImage,TestImageList]=FourierDifference
@@ -492,13 +509,21 @@ def ProcessSimilarity(Input):
         MatchImages.HM_data_HOG_Dist[TestImageList,CurrentBaseImage]=HOG_distance
         MatchImages.HM_data_PhaseCorrelation[TestImageList,CurrentBaseImage]=PhaseCorrelationMatch
         
+    # #build up return object
+    # ReturnList=dict()
+    # ReturnList["BASEIMAGE"]=CurrentBaseImage
+    # ReturnList["HM_data_histo"]=MatchImages.HM_data_histo[CurrentBaseImage,:]
+    # ReturnList["HM_data_FM"]=MatchImages.HM_data_FM[CurrentBaseImage,:]
+    # ReturnList["HM_data_FourierDifference"]=MatchImages.HM_data_FourierDifference[CurrentBaseImage,:]
+    # ReturnList["HM_data_EigenVectorDotProd"]=MatchImages.HM_data_EigenVectorDotProd[CurrentBaseImage,:]
+    # ReturnList["HM_data_HOG_Dist"]=MatchImages.HM_data_HOG_Dist[CurrentBaseImage,:]
+    # ReturnList["HM_data_PhaseCorrelation"]=MatchImages.HM_data_PhaseCorrelation[CurrentBaseImage,:]
+
     #build up return object
     ReturnList=dict()
     ReturnList["BASEIMAGE"]=CurrentBaseImage
-    ReturnList["HM_data_histo"]=MatchImages.HM_data_histo[CurrentBaseImage,:]
-    ReturnList["HM_data_FM"]=MatchImages.HM_data_FM[CurrentBaseImage,:]
-    ReturnList["HM_data_FourierDifference"]=MatchImages.HM_data_FourierDifference[CurrentBaseImage,:]
-    ReturnList["HM_data_EigenVectorDotProd"]=MatchImages.HM_data_EigenVectorDotProd[CurrentBaseImage,:]
-    ReturnList["HM_data_HOG_Dist"]=MatchImages.HM_data_HOG_Dist[CurrentBaseImage,:]
-    ReturnList["HM_data_PhaseCorrelation"]=MatchImages.HM_data_PhaseCorrelation[CurrentBaseImage,:]
+    for MatchMetric in MatchImages.Metrics_dict:
+        ReturnList[MatchMetric]=MatchImages.Metrics_dict[MatchMetric][CurrentBaseImage,:]
+
+
     return ReturnList
