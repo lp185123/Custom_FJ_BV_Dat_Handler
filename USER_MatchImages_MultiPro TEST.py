@@ -169,6 +169,15 @@ class MatchImagesObject():
 
     def USERFunction_Resize(self,image):
         #height/length
+        
+        if len(image.shape)!=3:
+        #return image
+            return cv2.resize(image.copy(),(300,200))
+        else:
+            return cv2.resize(image.copy(),(300,200))
+
+
+        #usual for mm1 side
         #grayscale image
         if len(image.shape)!=3:
         #return image
@@ -190,7 +199,7 @@ class MatchImagesObject():
     def __init__(self):
         #USER VARS
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
-        self.InputFolder=r"E:\NCR\TestImages\MixTestSides"
+        self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
         #self.InputFolder=r"E:\NCR\TestImages\Faces\randos"
@@ -198,7 +207,7 @@ class MatchImagesObject():
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
         self.SubSetOfData=int(30)#subset of data
-        self.MemoryError_ReduceLoad=(False,4)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use)
+        self.MemoryError_ReduceLoad=(False,6)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use)
         self.BeastMode=False# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
 
@@ -352,8 +361,6 @@ def GetAverageOfMatches(List,Span):
     for elem in Spanlist:
         Distances.append(elem.distance)
     return round(mean(Distances),2)
-
-
 
 def normalize_2d(matrix):
     #check the matrix isnt all same number
@@ -699,7 +706,7 @@ def main():
     HyperThreadedCores = int(os.environ['NUMBER_OF_PROCESSORS'])#don't use these simulated cores
     if MatchImages.MemoryError_ReduceLoad[0]==True and PhysicalCores>1:
         PhysicalCores=min(PhysicalCores,MatchImages.MemoryError_ReduceLoad[1])
-        print("THROTTLING BY USER - Memory protection: restricting cores to", PhysicalCores, "user option MemoryError_ReduceLoad")
+        print("THROTTLING BY USER - Memory protection: restricting cores to", PhysicalCores, ", user option MemoryError_ReduceLoad")
 
     processes=max(PhysicalCores-1,1)#rule is thumb is to use number of logical cores minus 1, but always make sure this number >0. Its not a good idea to blast CPU at 100% as this can reduce performance as OS tries to balance the load
     
@@ -857,11 +864,6 @@ def main():
     MatchImages.HM_data_PhaseCorrelation=normalize_2d(np.where(MatchImages.HM_data_PhaseCorrelation==MatchImages.DummyMinValue, MatchImages.HM_data_PhaseCorrelation.max()+1, MatchImages.HM_data_PhaseCorrelation))
     
 
-    
-
-
-
-
     #normalize
     for MatchMetric in MatchImages.Metrics_dict:
         MatchImages.Metrics_dict[MatchMetric]=normalize_2d(np.where(MatchImages.Metrics_dict[MatchMetric]==MatchImages.DummyMinValue, MatchImages.Metrics_dict[MatchMetric].max()+1, MatchImages.Metrics_dict[MatchMetric]))
@@ -883,13 +885,21 @@ def main():
             HOG_Distance=MatchImages.HM_data_HOG_Dist[BaseImageList,TestImageList]
             PhaseCOr_Distance=0#MatchImages.HM_data_PhaseCorrelation[BaseImageList,TestImageList]
             #experiment with metric distance
-            MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]=math.sqrt((HistogramSimilarity**2)+(AverageMatchDistance**2)+(FourierDifference**2)+(EigenVectorDotProd**2)+(HOG_Distance**2)+(PhaseCOr_Distance**2))
+            #MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]=math.sqrt((HistogramSimilarity**2)+(AverageMatchDistance**2)+(FourierDifference**2)+(EigenVectorDotProd**2)+(HOG_Distance**2)+(PhaseCOr_Distance**2))
             #mirror data for visualisation
-            MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]=MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]
+            #MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]=MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]
 
-    MatchImages.HM_data_MetricDistances=normalize_2d(MatchImages.HM_data_MetricDistances)
+    #MatchImages.HM_data_MetricDistances=normalize_2d(MatchImages.HM_data_MetricDistances)
     #HM_data_All=normalize_2d(MatchImages.HM_data_histo+MatchImages.HM_data_FM+MatchImages.HM_data_FourierDifference)
    
+
+
+
+
+
+
+
+
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
         for TestImageList in MatchImages.ImagesInMem_Pairing:
             if TestImageList<BaseImageList:
@@ -905,13 +915,12 @@ def main():
             SquaredSum=0
             for Total in BuildUpTotals:
                 SquaredSum=SquaredSum+Total**2
-            MatchImages.HM_data_MetricDistances_auto[TestImageList,BaseImageList]=MatchImages.HM_data_MetricDistances_auto[TestImageList,BaseImageList]+math.sqrt(SquaredSum)
+            MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]=MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]+math.sqrt(SquaredSum)
              #mirror data for visualisation
-            MatchImages.HM_data_MetricDistances_auto[BaseImageList,TestImageList]=MatchImages.HM_data_MetricDistances_auto[TestImageList,BaseImageList]
+            MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]=MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]
 
-
-
-
+    #normalise final data
+    MatchImages.HM_data_MetricDistances=normalize_2d(MatchImages.HM_data_MetricDistances)
 
 
 

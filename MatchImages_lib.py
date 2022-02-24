@@ -205,10 +205,7 @@ def PrintResults(MatchImages,PlotAndSave_2datas,PlotAndSave):
     PlotAndSave_2datas("HM_data_MetricDistances_auto",FilePath,MatchImages.HM_data_MetricDistances_auto)
 
 def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
-    OutOfUse="OutOfUse"
-    #HM_data_All=MatchImages.HM_data_FM
-    HM_data_All_Copy=copy.deepcopy(MatchImages.HM_data_All)
-
+    
     #debug final data
     MatchImages.HM_data_All=MatchImages.HM_data_MetricDistances
 
@@ -231,6 +228,13 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
     #print("-----")
     BaseImageList=0#random.choice(list(MatchImages.ImagesInMem_Pairing.keys()))
     Counter=0
+
+    #generate sequential match metric graphs for each metric stored in dictionary
+    #dictionary of lists
+    MatchMetricGraphDict=dict()
+    for MatchMetric in MatchImages.Metrics_dict:
+        MatchMetricGraphDict[MatchMetric]=[]
+
     MatchMetric_all=[]
     MatchMetric_Histo=[]
     MatchMetric_Fourier=[]
@@ -261,6 +265,11 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
         MatchMetric_EigenVectorDotProd.append(MatchImages.HM_data_EigenVectorDotProd[Element,BaseImageList])
         MatchMetric_HOG_Distance.append(MatchImages.HM_data_HOG_Dist[Element,BaseImageList])
         MatchMetric_data_PhaseCorrelation.append(MatchImages.HM_data_PhaseCorrelation[Element,BaseImageList])
+        
+        #populate dynamic match metrics
+        for MatchMetric in MatchMetricGraphDict:
+            MatchMetricGraphDict[MatchMetric].append(MatchImages.Metrics_dict[MatchMetric][Element,BaseImageList])
+
         #add to output images
         
 
@@ -311,6 +320,9 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
     PlotAndSave("MatchMetricProdFilter",MatchImages.OutputPairs +"\\MatchMetricProdFilter.jpg",MatchMetricProdFilter,1)
 
     
+    #save out dynamic match metrics
+    for MatchMetric in MatchMetricGraphDict:
+        PlotAndSave(MatchMetric,MatchImages.OutputPairs +"\\" + str(MatchMetric) +"_AUTO.jpg",MatchMetricGraphDict[MatchMetric],1)
 
 
 

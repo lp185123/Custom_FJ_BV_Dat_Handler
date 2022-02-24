@@ -6,7 +6,8 @@ import _3DVisLabLib
 class InfoStrings():
     List_known_4Asuffix=["_Genuine"]
     List_known_4Bsuffix=["_Damage"]#["Clearly","_Damage"]
-    list_known_countries=["Belarus","Brazil","Czech","Hungary","Malaysia","Poland","Mexico","Russia","Turkey","UK","INDIA","USD","USD2","EUR_PREVTB_FIX","EUR POSTVTB_FIX"]
+    #list_known_countries=["Belarus","Brazil","Czech","Hungary","Malaysia","Poland","Mexico","Russia","Turkey","UK","INDIA","USD","USD2","EUR_PREVTB_FIX","EUR POSTVTB_FIX"]
+    list_known_countries=["INDIA","USD","EUR_PREVTB_FIX","EUR POSTVTB_FIX"]
     list_known_GenerationTypes=["Minimum","Standard"]
     list_FinalCategories=["CIRCULATIONFIT","COUNTERFEIT","GEN","NEW","TELLERFIT","UNFIT","UNKNOWN","UNKNOWN2"]
 
@@ -198,15 +199,14 @@ if __name__ == "__main__":
             totalNote_check=totalNote_check+int(CategoryBreakdown_dict[Cats][0])
 
 
-
-
         #get country - assume is in correct folder structure
         Country=None
         for CountryName in InfoStrings.list_known_countries:
             if CountryName.lower() in Item.lower():
-                if CountryName.lower() in Item.split("\\")[-4].lower():
+                if CountryName.lower() == Item.split("\\")[-4].lower():
                     Country=CountryName
         if Country==None:
+            continue
             raise Exception("Country name not found or using wrong root folder" + Item)
 
 
