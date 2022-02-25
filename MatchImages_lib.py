@@ -11,6 +11,32 @@ import matplotlib.pyplot as pl
 from statistics import mean 
 import math
 import shutil
+
+def GetPwrSpcDensity(image):
+    #https://bertvandenbroucke.netlify.app/2019/05/24/computing-a-power-spectrum-in-python/
+    npix = image.shape[0]
+
+    fourier_image = np.fft.fftn(image)
+    fourier_amplitudes = np.abs(fourier_image)**2
+
+    kfreq = np.fft.fftfreq(npix) * npix
+    kfreq2D = np.meshgrid(kfreq, kfreq)
+    knrm = np.sqrt(kfreq2D[0]**2 + kfreq2D[1]**2)
+
+    knrm = knrm.flatten()
+    fourier_amplitudes = fourier_amplitudes.flatten()
+
+    kbins = np.arange(0.5, npix//2+1, 1.)
+    kvals = 0.5 * (kbins[1:] + kbins[:-1])
+    Length=min(len(fourier_amplitudes),len(knrm))
+    Abins, _, _ = stats.binned_statistic(knrm[0:Length], fourier_amplitudes[0:Length],
+                                        statistic = "mean",
+                                        bins = kbins)
+    Abins *= np.pi * (kbins[1:]**2 - kbins[:-1]**2)
+
+    return Abins
+
+
 def FFt(inputdata):
     #https://stackoverflow.com/questions/30527902/numpy-fft-fast-fourier-transformation-of-1-dimensional-array
     img = (inputdata)
@@ -58,7 +84,7 @@ def PairWise_Matching(MatchImages,PlotAndSave_2datas,PlotAndSave,ImgCol_InfoShee
     MatchMetric_Std_PerList=[]
     MatchMetric_mean_PerList=[]
     
-    for Looper in range (0,4):
+    for Looper in range (0,2):
         #lame way of marking refinement loops
         MatchMetric_Std_PerList.append(3)
         MatchMetric_mean_PerList.append(3)
@@ -163,8 +189,7 @@ def PairWise_Matching(MatchImages,PlotAndSave_2datas,PlotAndSave,ImgCol_InfoShee
                 #MatchDistance=str(MatchImages.ImagesInMem_Pairing[ListOfImages][1])
                 FileName=ImgNameV_ID[Images]
                 TempFfilename=SetMatchImages_folder  + "00" + str(ListIndex) + "_" +str(imgIndex)  + ".jpg"
-                ImagePath=MatchImages.ImagesInMem_to_Process[Images].OriginalImageFilePath
-                shutil.copyfile(ImagePath, TempFfilename)
+                shutil.copyfile(FileName, TempFfilename)
                 #cv2.imwrite(TempFfilename,MatchImages.ImagesInMem_to_Process[FileName].OriginalImage)
 
 
@@ -179,23 +204,6 @@ def PairWise_Matching(MatchImages,PlotAndSave_2datas,PlotAndSave,ImgCol_InfoShee
     exit()
 
 def PrintResults(MatchImages,PlotAndSave_2datas,PlotAndSave):
-    # OutOfUse="WhatIsThis"
-    # #FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_All") +".jpg"
-    # #PlotAndSave_2datas("HM_data_All",FilePath,MatchImages.HM_data_All)
-    # FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_FM") +".jpg"
-    # PlotAndSave_2datas("HM_data_FM",FilePath,MatchImages.HM_data_FM)
-    # FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_histo") +".jpg"
-    # PlotAndSave_2datas("HM_data_histo",FilePath,MatchImages.HM_data_histo)
-    # FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_FourierDifference") +".jpg"
-    # PlotAndSave_2datas("HM_data_FourierDifference",FilePath,MatchImages.HM_data_FourierDifference)
-    # FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_EigenVectorDotProd") +".jpg"
-    # PlotAndSave_2datas("HM_data_EigenVectorDotProd",FilePath,MatchImages.HM_data_EigenVectorDotProd)
-    # FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_MetricDistances") +".jpg"
-    # PlotAndSave_2datas("HM_data_MetricDistances",FilePath,MatchImages.HM_data_MetricDistances)
-    # FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_HOG_Dist") +".jpg"
-    # PlotAndSave_2datas("HM_data_HOG_Dist",FilePath,MatchImages.HM_data_HOG_Dist)
-    # FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +  str(OutOfUse) +("HM_data_PhaseCorrelation") +".jpg"
-    # PlotAndSave_2datas("HM_data_PhaseCorrelation",FilePath,MatchImages.HM_data_PhaseCorrelation)
 
 
     for MatchMetric in MatchImages.Metrics_dict:
@@ -288,7 +296,7 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
     #create accumulation mean/std deviation -maybe can see where drop off is
     MatchMetric_Filter_mean=[]
     MatchMetric_Filter_std=[]
-    FilterSize=5
+    FilterSize=2
     Buffer = [0] * FilterSize
     Buffered_Metric=Buffer + MatchMetric_all + Buffer
     for OuterIndexer, Metric in enumerate(Buffered_Metric):
@@ -367,7 +375,7 @@ def ProcessSimilarity(Input):
     Base_Image_EigenValues=MatchImages.ImagesInMem_to_Process[Base_Image_name].EigenValues
     Base_Image_HOG_Descriptor=MatchImages.ImagesInMem_to_Process[Base_Image_name].OPENCV_hog_descriptor
     Base_Image_Phase_CorImg=MatchImages.ImagesInMem_to_Process[Base_Image_name].PhaseCorrelate_FourierMagImg
-
+    Base_PwrSpectralDensity=MatchImages.ImagesInMem_to_Process[Base_Image_name].PwrSpectralDensity
 
     for TestImageList in MatchImages.ImagesInMem_Pairing:
         if TestImageList<CurrentBaseImage:
@@ -386,6 +394,7 @@ def ProcessSimilarity(Input):
         Test_Image_EigenValues=MatchImages.ImagesInMem_to_Process[Test_Image_name].EigenValues
         Test_Image_HOG_Descriptor=MatchImages.ImagesInMem_to_Process[Test_Image_name].OPENCV_hog_descriptor
         Test_Image_Phase_CorImg=MatchImages.ImagesInMem_to_Process[Test_Image_name].PhaseCorrelate_FourierMagImg
+        Test_PwrSpectralDensity=MatchImages.ImagesInMem_to_Process[Test_Image_name].PwrSpectralDensity
 
 
         if "HM_data_EigenValueDifference" in MatchImages.Metrics_dict:
@@ -408,11 +417,6 @@ def ProcessSimilarity(Input):
             MatchImages.Metrics_dict["HM_data_EigenValueDifference"][CurrentBaseImage,TestImageList]=EigenValue_diff
 
 
-
-
-
-
-        #CheckImages_InfoSheet.All_EigenDotProd_result.append(EigenValue_diff)
         if "HM_data_EigenVectorDotProd" in MatchImages.Metrics_dict:
             ListEigenDots=[]
             #get range of eigen values/vectors to test - arbitrary amount of 5
@@ -420,7 +424,14 @@ def ProcessSimilarity(Input):
             ValRange=min(MinVal_Eigens,5)
             for EVector in range (0,ValRange):
                 #need to look at this closer to see if we need to do anything to vectors before getting dot prod
-                ListEigenDots.append(1-round((Base_Image_EigenVectors[EVector] @ Test_Image_EigenVectors[EVector]),8))
+                #if unit vector, same direction =1 , opposite = -1,perpendicular=0
+                RawDotProd=Base_Image_EigenVectors[EVector] @ Test_Image_EigenVectors[EVector]
+                if RawDotProd<-1.001 or RawDotProd>1.001:#rounding errors
+                    print("ERROR, dot product should be between -1 and 1",RawDotProd)
+                #move into positive numbers just in case
+                RawDotProd=RawDotProd+1
+                SCore=abs(2-RawDotProd)
+                ListEigenDots.append(round(SCore,8))
 
             EigenVectorDotProd=sum(ListEigenDots)#round((Base_Image_EigenVectors[0] @ Test_Image_EigenVectors[0]),5)
             
@@ -454,7 +465,12 @@ def ProcessSimilarity(Input):
             HOG_distance=CompareHistograms(Base_Image_HOG_Descriptor, Test_Image_HOG_Descriptor)
             MatchImages.Metrics_dict["HM_data_HOG_Dist"][CurrentBaseImage,TestImageList]=HOG_distance
         
-
+        if "HM_data_PowerDensity" in MatchImages.Metrics_dict:
+            #HM_data_PowerDensity=random.random()
+            HM_data_PowerDensity=np.correlate(Base_PwrSpectralDensity,Test_PwrSpectralDensity,mode='full')[0]
+            print(np.correlate(Base_PwrSpectralDensity,Test_PwrSpectralDensity,mode='full')[0:10])
+            MatchImages.Metrics_dict["HM_data_PowerDensity"][CurrentBaseImage,TestImageList]=HM_data_PowerDensity
+        
         #fourier difference metric
         #get differnce between fourier magnitudes of image
         #not the best solution as fourier magnitude will rotate with image 
@@ -465,17 +481,18 @@ def ProcessSimilarity(Input):
         
 
         if "HM_data_PhaseCorrelation" in MatchImages.Metrics_dict:
-            PhaseCorrelationMatch=1#
+            #phase correlation difference
+            #use a polar wrapped version of the fourier transform magnitude
+            #this is probably a silly way to do this
+            #x and y are translation
+            (sx, sy), PhaseCorrelationMatch_raw = cv2.phaseCorrelate(Base_Image_Phase_CorImg, Test_Image_Phase_CorImg)
+            if PhaseCorrelationMatch_raw>1.9:#account for rounding errors - very big account! this shouldnt be possible according to literature
+                print("ERROR, PhaseCorrelationMatch is greater than 1, this shoudnt be possible",PhaseCorrelationMatch_raw )
+            PhaseCorrelationMatch=1-PhaseCorrelationMatch_raw#signal power so we will reverse it 
             MatchImages.Metrics_dict["HM_data_PhaseCorrelation"][CurrentBaseImage,TestImageList]=PhaseCorrelationMatch
-        #phase correlation difference
-        #use a polar wrapped version of the fourier transform magnitude
-        #this is probably a silly way to do this
-        #x and y are translation
-        #(sx, sy), PhaseCorrelationMatch_raw = cv2.phaseCorrelate(Base_Image_Phase_CorImg, Test_Image_Phase_CorImg)
-        #PhaseCorrelationMatch=1-PhaseCorrelationMatch_raw#signal power so we will reverse it 
-        #if np.isnan(PhaseCorrelationMatch):
-        #    PhaseCorrelationMatch=MatchImages.DummyMinValue
-        
+            #if np.isnan(PhaseCorrelationMatch):
+            #    PhaseCorrelationMatch=MatchImages.DummyMinValue
+            
 
 
         #StackTwoimages=MatchImages.StackTwoimages(Base_Image_FM,Test_Image_FM)
@@ -496,30 +513,6 @@ def ProcessSimilarity(Input):
             MatchImages.Metrics_dict[MatchMetric][TestImageList,CurrentBaseImage]=MatchImages.Metrics_dict[MatchMetric][CurrentBaseImage,TestImageList]
 
 
-
-        # MatchImages.HM_data_histo[CurrentBaseImage,TestImageList]=HistogramSimilarity
-        # MatchImages.HM_data_FM[CurrentBaseImage,TestImageList]=AverageMatchDistance
-        # MatchImages.HM_data_FourierDifference[CurrentBaseImage,TestImageList]=FourierDifference
-        # MatchImages.HM_data_EigenVectorDotProd[CurrentBaseImage,TestImageList]=EigenValue_diff
-        # MatchImages.HM_data_HOG_Dist[CurrentBaseImage,TestImageList]=HOG_distance
-        # MatchImages.HM_data_PhaseCorrelation[CurrentBaseImage,TestImageList]=PhaseCorrelationMatch
-        # #data is symmetrical - fill it in to help with visualisation
-        # MatchImages.HM_data_histo[TestImageList,CurrentBaseImage]=HistogramSimilarity
-        # MatchImages.HM_data_FM[TestImageList,CurrentBaseImage]=AverageMatchDistance
-        # MatchImages.HM_data_FourierDifference[TestImageList,CurrentBaseImage]=FourierDifference
-        # MatchImages.HM_data_EigenVectorDotProd[TestImageList,CurrentBaseImage]=EigenValue_diff
-        # MatchImages.HM_data_HOG_Dist[TestImageList,CurrentBaseImage]=HOG_distance
-        # MatchImages.HM_data_PhaseCorrelation[TestImageList,CurrentBaseImage]=PhaseCorrelationMatch
-        
-    # #build up return object
-    # ReturnList=dict()
-    # ReturnList["BASEIMAGE"]=CurrentBaseImage
-    # ReturnList["HM_data_histo"]=MatchImages.HM_data_histo[CurrentBaseImage,:]
-    # ReturnList["HM_data_FM"]=MatchImages.HM_data_FM[CurrentBaseImage,:]
-    # ReturnList["HM_data_FourierDifference"]=MatchImages.HM_data_FourierDifference[CurrentBaseImage,:]
-    # ReturnList["HM_data_EigenVectorDotProd"]=MatchImages.HM_data_EigenVectorDotProd[CurrentBaseImage,:]
-    # ReturnList["HM_data_HOG_Dist"]=MatchImages.HM_data_HOG_Dist[CurrentBaseImage,:]
-    # ReturnList["HM_data_PhaseCorrelation"]=MatchImages.HM_data_PhaseCorrelation[CurrentBaseImage,:]
 
     #build up return object
     ReturnList=dict()

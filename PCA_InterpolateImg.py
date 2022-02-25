@@ -279,47 +279,47 @@
 
 
 
-# import matplotlib.image as mplib
-# import matplotlib.pyplot as plt
-# import numpy as np
-# from sklearn.decomposition import PCA
-# import copy
+import matplotlib.image as mplib
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.decomposition import PCA
+import copy
 
-# def getPCA(ImageFile):
-#     img=mplib.imread(ImageFile)
-#     print(img.shape)
-#     img_re=np.reshape(img,(img.shape[0],img.shape[1]*3))
-#     PCA_Object=PCA(400).fit(img_re)
-#     img_trans=PCA_Object.transform(img_re)
-#     return PCA_Object,img_trans,img.shape
-
-
-
-# #
-# def InversePCA(PCA_Object,img_trans,img_shape):
-#     img_Inv=PCA_Object.inverse_transform(img_trans)
-#     img=np.reshape(img_Inv,img_shape)
-#     plt.axis('off')
-#     plt.imshow(img.astype('uint8'))
-#     plt.show()
-
-# #Load the image
-# imgpath = r"E:\NCR\TestImages\noisy45degline.jpg"
-# imgpath2 = r"E:\NCR\TestImages\noisy10degline.jpg"
-
-
-# PCA_Object1,img_trans1,img_shape1=getPCA(imgpath)
-# PCA_Object2,img_trans2,img_shape2=getPCA(imgpath2)
-
-# Averageimg_trans=copy.deepcopy(img_trans1)
-# for indexer, ArrayElemOuter in enumerate(img_trans1):
-#     for innerIndex, ArrayElem in enumerate(ArrayElemOuter):
-#         Averageimg_trans[indexer,innerIndex]=(img_trans1[indexer,innerIndex]+img_trans2[indexer,innerIndex])/2
+def getPCA(ImageFile):
+    img=mplib.imread(ImageFile)
+    print(img.shape)
+    img_re=np.reshape(img,(img.shape[0],img.shape[1]*3))
+    PCA_Object=PCA(400).fit(img_re)
+    img_trans=PCA_Object.transform(img_re)
+    return PCA_Object,img_trans,img.shape
 
 
 
-# InversePCA(PCA_Object1,Averageimg_trans,img_shape1)
-# InversePCA(PCA_Object2,img_trans2,img_shape2)
+#
+def InversePCA(PCA_Object,img_trans,img_shape):
+    img_Inv=PCA_Object.inverse_transform(img_trans)
+    img=np.reshape(img_Inv,img_shape)
+    plt.axis('off')
+    plt.imshow(img.astype('uint8'))
+    plt.show()
+
+#Load the image
+imgpath = r"E:\NCR\TestImages\noisy45degline.jpg"
+imgpath2 = r"E:\NCR\TestImages\noisy10degline.jpg"
+
+
+PCA_Object1,img_trans1,img_shape1=getPCA(imgpath)
+PCA_Object2,img_trans2,img_shape2=getPCA(imgpath2)
+
+Averageimg_trans=copy.deepcopy(img_trans1)
+for indexer, ArrayElemOuter in enumerate(img_trans1):
+    for innerIndex, ArrayElem in enumerate(ArrayElemOuter):
+        Averageimg_trans[indexer,innerIndex]=(img_trans1[indexer,innerIndex]+img_trans2[indexer,innerIndex])/2
+
+
+
+InversePCA(PCA_Object1,Averageimg_trans,img_shape1)
+InversePCA(PCA_Object2,img_trans2,img_shape2)
 
 
 
@@ -397,29 +397,29 @@
 
 
 
-import cv2
-import numpy as np
-import sklearn.datasets, sklearn.decomposition
+# import cv2
+# import numpy as np
+# import sklearn.datasets, sklearn.decomposition
 
 
-def pca(X, numOfPca=0):
-    [n,m] = X.shape
-    print (X)
-    Pusai = X.mean(axis=0)
-    print (Pusai)
-    X = X - Pusai
-    print (X)
-    Cov = cv2.mulTransposed(X, False)
-    print (Cov)
-    [retval, eigenvalues, eigenvectors] = cv2.eigen(Cov, True)
-    indexes = np.argsort(-eigenvalues)
-    eigenvalues = eigenvalues[indexes]
-    eigenvectors = eigenvectors[:,indexes]
-    eigenvalues = eigenvalues[0:numOfPca].copy()
-    eigenvectors = eigenvectors[:,0:numOfPca].copy()
-    return [eigenvalues, eigenvectors, Pusai]
+# def pca(X, numOfPca=0):
+#     [n,m] = X.shape
+#     print (X)
+#     Pusai = X.mean(axis=0)
+#     print (Pusai)
+#     X = X - Pusai
+#     print (X)
+#     Cov = cv2.mulTransposed(X, False)
+#     print (Cov)
+#     [retval, eigenvalues, eigenvectors] = cv2.eigen(Cov, True)
+#     indexes = np.argsort(-eigenvalues)
+#     eigenvalues = eigenvalues[indexes]
+#     eigenvectors = eigenvectors[:,indexes]
+#     eigenvalues = eigenvalues[0:numOfPca].copy()
+#     eigenvectors = eigenvectors[:,0:numOfPca].copy()
+#     return [eigenvalues, eigenvectors, Pusai]
 
-imgpath = r"E:\NCR\TestImages\Anything\20210324_125733.jpg"
-img = cv2.imread(imgpath, 0)
-img =cv2.resize(img,(600,600))
-pca(img,10)
+# imgpath = r"E:\NCR\TestImages\Anything\20210324_125733.jpg"
+# img = cv2.imread(imgpath, 0)
+# img =cv2.resize(img,(600,600))
+# pca(img,10)

@@ -167,9 +167,13 @@ class MatchImagesObject():
         return image
         return cv2.resize(image.copy(),(500,250))
 
+    def USERFunction_ResizePercent(self,image,Percent):
+        Percent=Percent/100
+        return cv2.resize(image.copy(),(int(image.shape[1]*Percent),int(image.shape[0]*Percent)))
+
     def USERFunction_Resize(self,image):
         #height/length
-        
+        #return image
         # if len(image.shape)!=3:
         # #return image
         #     return cv2.resize(image.copy(),(300,200))
@@ -181,9 +185,9 @@ class MatchImagesObject():
         #grayscale image
         if len(image.shape)!=3:
         #return image
-            return image[0:62,0:151]
+            return image[0:62,0:130]
         else:
-            return image[0:62,0:124,:]
+            return image[0:62,0:130,:]
             #image= image[303:800,400:1500,:]
             image=cv2.resize(image,(500,250))
             return image
@@ -199,14 +203,14 @@ class MatchImagesObject():
     def __init__(self):
         #USER VARS
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
-        self.InputFolder=r"C:\Working\FindIMage_In_Dat\Output"
+        self.InputFolder=r"E:\NCR\TestImages\MixedSets_side"
         #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
         #self.InputFolder=r"E:\NCR\TestImages\Faces\randos"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
-        self.SubSetOfData=int(2000)#subset of data
+        self.SubSetOfData=int(50)#subset of data
         self.MemoryError_ReduceLoad=(False,5)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
         self.BeastMode=False# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
@@ -239,14 +243,14 @@ class MatchImagesObject():
         
         #populatemetricDictionary
         self.Metrics_dict=dict()
-        self.Metrics_dict["HM_data_FM"]=None#slow
+        #self.Metrics_dict["HM_data_FM"]=None#slow
         self.Metrics_dict["HM_data_histo"]=None#fast
         self.Metrics_dict["HM_data_FourierDifference"]=None#fast
-        #self.Metrics_dict["HM_data_PhaseCorrelation"]=None
+        self.Metrics_dict["HM_data_PhaseCorrelation"]=None
         self.Metrics_dict["HM_data_HOG_Dist"]=None#slow
         #self.Metrics_dict["HM_data_EigenVectorDotProd"]=None#fast
         self.Metrics_dict["HM_data_EigenValueDifference"]=None#fast
-
+        self.Metrics_dict["HM_data_PowerDensity"]=None#fast
     class FeatureMatch_Dict_Common:
 
         SIFT_default=dict(nfeatures=0,nOctaveLayers=3,contrastThreshold=0.04,edgeThreshold=10)
@@ -283,6 +287,7 @@ class MatchImagesObject():
             self.PhaseCorrelate_FourierMagImg=None
             self.DebugImage=None
             self.OriginalImageFilePath=None
+            self.PwrSpectralDensity=None
             
 def PlotAndSave(Title,Filepath,Data,maximumvalue):
     
@@ -319,6 +324,11 @@ def Get_PCA_(InputImage):
     # 3 dimensional dummy array with zeros
     #multi channel PCA
     PCA_image=InputImage
+
+    #bad code to convert gray to colour - this is inefficient when we process similarity
+    if len(PCA_image.shape)!=3:
+        PCA_image=cv2.cvtColor(PCA_image,cv2.COLOR_GRAY2RGB)
+
     MB_img = np.zeros((PCA_image.shape[0],PCA_image.shape[1],PCA_image.shape[2]))
     # stacking up images (channels?) into the array
     #this is unncessary but leave here in case we want to do something later on by laying up images
@@ -445,8 +455,9 @@ def main():
             ImageInfo=PrepareMatchImages.ImageInfo()
 
             #load in original image
-            OriginalImage_GrayScale = cv2.imread(ImagePath, cv2.IMREAD_GRAYSCALE)
+            #OriginalImage_GrayScale = cv2.imread(ImagePath, cv2.IMREAD_GRAYSCALE)
             OriginalImage_col = cv2.imread(ImagePath)
+            OriginalImage_GrayScale=cv2.cvtColor(OriginalImage_col, cv2.COLOR_BGR2GRAY)
             InputImage=PrepareMatchImages.USERFunction_OriginalImage(OriginalImage_col)
             if Index<3: ImageReviewDict["OriginalImage_GrayScale"]=OriginalImage_GrayScale
             if Index<3: ImageReviewDict["OriginalImage_col"]=OriginalImage_col
@@ -463,6 +474,7 @@ def main():
 
             #create version for histogram matching
             Image_For_Histogram=PrepareMatchImages.USERFunction_CropForHistogram(Colour_Resized)
+            Image_For_Histogram=PrepareMatchImages.USERFunction_ResizePercent(Image_For_Histogram,90)
             if Index<3: ImageReviewDict["Image_For_Histogram"]=Image_For_Histogram
             #get histogram for comparing colours
             hist = cv2.calcHist([Image_For_Histogram], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
@@ -499,7 +511,7 @@ def main():
 
             #for principle component analysis
             #has to have shape=3 (colour image)
-            Image_For_PCA=Colour_Resized.copy()
+            Image_For_PCA=PrepareMatchImages.USERFunction_ResizePercent(Colour_Resized,90)
             PC,EigVal,EigVec=Get_PCA_(Image_For_PCA)
             if Index<3: ImageReviewDict["Image_For_PCA"]=Image_For_PCA
 
@@ -523,15 +535,29 @@ def main():
             if Index<3: ImageReviewDict["FFT_magnitude_spectrum_visualise"]=FFT_magnitude_spectrum_visualise
             #PowerSpectralDensity=10*np.log10(abs(fshift).^2)
             
+
+            #get power spectral density 1d array
+
+            PwrSpectralDensity=MatchImages_lib. GetPwrSpcDensity(Image_For_Histogram)
+            #if Index<3: ImageReviewDict["PwrSpectralDensity_visualise"]=PwrSpectralDensity
+
             #get a version of the Fourier magnitude that will work with the opencv phase correlation function to get similarity metric
             #this works with the fourier as it is positioned in the centre of the image - this wouldnt work well with
             #images that have translation and rotation differences
             PhaseCorrelate_FourierMagImg=GetPhaseCorrelationReadyImage(FFT_magnitude_spectrum)
-            if Index<3: ImageReviewDict["PhaseCorrelate_Image visualise"]=cv2.convertScaleAbs(PhaseCorrelate_FourierMagImg)
+            if Index<3: ImageReviewDict["PhaseCorrelate_FourierMagImg visualise"]=cv2.convertScaleAbs(PhaseCorrelate_FourierMagImg)
+
+
+            PhaseCorrelate_Std=PrepareMatchImages.USERFunction_ResizePercent(GrayScale_Resized,40)
+            #if we are using an image we hvae to convert to float
+            PhaseCorrelate_Std = PhaseCorrelate_Std.astype("float32")
+            #PhaseCorrelate_Std=GetPhaseCorrelationReadyImage(PhaseCorrelate_Std)
+            if Index<3: ImageReviewDict["PhaseCorrelate_Std visualise"]=cv2.convertScaleAbs(PhaseCorrelate_Std)
+
 
             DebugImage=PrepareMatchImages.StackTwoimages(Colour_Resized,FFT_magnitude_spectrum_visualise)
 
-            if Index==1:
+            if Index==-1:
                 #on first loop show image to user
                 FM_DrawnKeypoints=_3DVisLabLib.draw_keypoints_v2(StackedColour_AndGradient_img.copy(),keypoints)
                 ImageReviewDict["FM_DrawnKeypoints"]=FM_DrawnKeypoints
@@ -614,11 +640,13 @@ def main():
             ImageInfo.HOG_Mag=None#HOG_mag
             ImageInfo.HOG_Angle=None#HOG_angle
             ImageInfo.OPENCV_hog_descriptor=OPENCV_hog_descriptor
-            ImageInfo.PhaseCorrelate_FourierMagImg=None#PhaseCorrelate_FourierMagImg
+            ImageInfo.PhaseCorrelate_FourierMagImg=PhaseCorrelate_Std
             ImageInfo.DebugImage=None#DebugImage
             ImageInfo.OriginalImageFilePath=ImagePath
+            ImageInfo.PwrSpectralDensity=PwrSpectralDensity
             #populate dictionary
             PrepareMatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
+            
         except:
             print("error with image, skipping",ImagePath)
 
@@ -838,10 +866,10 @@ def main():
     MatchImages_lib.PrintResults(MatchImages,PlotAndSave_2datas,PlotAndSave)
 
     #sequential matching
-    MatchImages_lib.SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave)
+    MatchImages_lib.SequentialMatchingPerImage(copy.deepcopy(MatchImages),PlotAndSave_2datas,PlotAndSave)
 
     #pairwise matching
-    #MatchImages_lib.PairWise_Matching(MatchImages,PlotAndSave_2datas,PlotAndSave,ImgCol_InfoSheet_Class)
+    MatchImages_lib.PairWise_Matching(copy.deepcopy(MatchImages),PlotAndSave_2datas,PlotAndSave,ImgCol_InfoSheet_Class)
 
     
 
