@@ -170,20 +170,20 @@ class MatchImagesObject():
     def USERFunction_Resize(self,image):
         #height/length
         
-        if len(image.shape)!=3:
-        #return image
-            return cv2.resize(image.copy(),(300,200))
-        else:
-            return cv2.resize(image.copy(),(300,200))
+        # if len(image.shape)!=3:
+        # #return image
+        #     return cv2.resize(image.copy(),(300,200))
+        # else:
+        #     return cv2.resize(image.copy(),(300,200))
 
 
         #usual for mm1 side
         #grayscale image
         if len(image.shape)!=3:
         #return image
-            return image[0:62,0:124]
+            return image[0:62,0:151]
         else:
-            return image[0:62,0:124]
+            return image[0:62,0:124,:]
             #image= image[303:800,400:1500,:]
             image=cv2.resize(image,(500,250))
             return image
@@ -199,16 +199,16 @@ class MatchImagesObject():
     def __init__(self):
         #USER VARS
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
-        self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
+        self.InputFolder=r"C:\Working\FindIMage_In_Dat\Output"
         #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
         #self.InputFolder=r"E:\NCR\TestImages\Faces\randos"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
-        self.SubSetOfData=int(150)#subset of data
-        self.MemoryError_ReduceLoad=(False,3)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use)
-        self.BeastMode=True# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
+        self.SubSetOfData=int(2000)#subset of data
+        self.MemoryError_ReduceLoad=(False,5)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
+        self.BeastMode=False# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
 
 
@@ -239,13 +239,13 @@ class MatchImagesObject():
         
         #populatemetricDictionary
         self.Metrics_dict=dict()
-        self.Metrics_dict["HM_data_FM"]=None
-        self.Metrics_dict["HM_data_histo"]=None
-        self.Metrics_dict["HM_data_FourierDifference"]=None
-        self.Metrics_dict["HM_data_PhaseCorrelation"]=None
-        self.Metrics_dict["HM_data_HOG_Dist"]=None
-        #self.Metrics_dict["HM_data_EigenVectorDotProd"]=None
-        self.Metrics_dict["HM_data_EigenValueDifference"]=None
+        self.Metrics_dict["HM_data_FM"]=None#slow
+        self.Metrics_dict["HM_data_histo"]=None#fast
+        self.Metrics_dict["HM_data_FourierDifference"]=None#fast
+        #self.Metrics_dict["HM_data_PhaseCorrelation"]=None
+        self.Metrics_dict["HM_data_HOG_Dist"]=None#slow
+        #self.Metrics_dict["HM_data_EigenVectorDotProd"]=None#fast
+        self.Metrics_dict["HM_data_EigenValueDifference"]=None#fast
 
     class FeatureMatch_Dict_Common:
 
@@ -513,7 +513,7 @@ def main():
             FFT_magnitude_spectrum = 20*np.log(np.abs(fshift))#magnitude is what we will use to compare
 
             #most of fourier is just noise - lets crop it
-            CropRange=0.30#%
+            CropRange=0.80#1.0=100%
             RangeX=int(FFT_magnitude_spectrum.shape[0]*CropRange)
             RangeY=int(FFT_magnitude_spectrum.shape[1]*CropRange)
             BufferX=int((FFT_magnitude_spectrum.shape[0]-RangeX)/2)

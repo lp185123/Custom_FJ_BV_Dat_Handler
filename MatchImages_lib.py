@@ -388,54 +388,85 @@ def ProcessSimilarity(Input):
         Test_Image_Phase_CorImg=MatchImages.ImagesInMem_to_Process[Test_Image_name].PhaseCorrelate_FourierMagImg
 
 
+        if "HM_data_EigenValueDifference" in MatchImages.Metrics_dict:
+            
+            #eigenvector metric
+            #get dot product of top eigenvector (should be sorted for most significant set to [0])
+            #if using static scene (like MM1 or a movie rather than freely translateable objects)
+            #the eigenvector dot product will probably just add noise
+            ListEigenVals=[]
+            #get range of eigen values/vectors to test - arbitrary amount of 5
+            MinVal_Eigens=min(len(Base_Image_EigenVectors),len(Test_Image_EigenVectors))
+            ValRange=min(MinVal_Eigens,5)
+            for EVector in range (0,ValRange):
+                #need to look at this closer to see if we need to do anything to vectors before getting dot prod
+                ListEigenVals.append(abs((Base_Image_EigenValues[EVector]-Test_Image_EigenValues[EVector])))
 
-        #eigenvector metric
-        #get dot product of top eigenvector (should be sorted for most significant set to [0])
-        #if using static scene (like MM1 or a movie rather than freely translateable objects)
-        #the eigenvector dot product will probably just add noise
-        ListEigenDots=[]
-        ListEigenVals=[]
-        #get range of eigen values/vectors to test - arbitrary amount of 5
-        MinVal_Eigens=min(len(Base_Image_EigenVectors),len(Test_Image_EigenVectors))
-        ValRange=min(MinVal_Eigens,5)
-        for EVector in range (0,ValRange):
-            #need to look at this closer to see if we need to do anything to vectors before getting dot prod
-            ListEigenDots.append(1-round((Base_Image_EigenVectors[EVector] @ Test_Image_EigenVectors[EVector]),8))
-            ListEigenVals.append(abs((Base_Image_EigenValues[EVector]-Test_Image_EigenValues[EVector])))
+            EigenValue_diff=sum(ListEigenVals)#abs((Base_Image_EigenValues[0] )-(Test_Image_EigenValues[0] ))
+            #get distance
+            #print(EigenValue_diff)
+            MatchImages.Metrics_dict["HM_data_EigenValueDifference"][CurrentBaseImage,TestImageList]=EigenValue_diff
 
-        EigenVectorDotProd=sum(ListEigenDots)#round((Base_Image_EigenVectors[0] @ Test_Image_EigenVectors[0]),5)
-        EigenValue_diff=sum(ListEigenVals)#abs((Base_Image_EigenValues[0] )-(Test_Image_EigenValues[0] ))
-        #get distance
-        #print(EigenValue_diff)
+
+
+
+
+
         #CheckImages_InfoSheet.All_EigenDotProd_result.append(EigenValue_diff)
+        if "HM_data_EigenVectorDotProd" in MatchImages.Metrics_dict:
+            ListEigenDots=[]
+            #get range of eigen values/vectors to test - arbitrary amount of 5
+            MinVal_Eigens=min(len(Base_Image_EigenVectors),len(Test_Image_EigenVectors))
+            ValRange=min(MinVal_Eigens,5)
+            for EVector in range (0,ValRange):
+                #need to look at this closer to see if we need to do anything to vectors before getting dot prod
+                ListEigenDots.append(1-round((Base_Image_EigenVectors[EVector] @ Test_Image_EigenVectors[EVector]),8))
 
+            EigenVectorDotProd=sum(ListEigenDots)#round((Base_Image_EigenVectors[0] @ Test_Image_EigenVectors[0]),5)
+            
+            MatchImages.Metrics_dict["HM_data_EigenVectorDotProd"][CurrentBaseImage,TestImageList]=EigenVectorDotProd
         #StackTwoimages=MatchImages.StackTwoimages(Base_Image_FM,Test_Image_FM)
         #_3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(StackTwoimages,(StackTwoimages.shape[1]*1,StackTwoimages.shape[0]*1)),0,True,True)
         
 
         #histogram metric
-        HistogramSimilarity=CompareHistograms(Base_Image_Histo,Test_Image_Histo)
+        if "HM_data_histo" in MatchImages.Metrics_dict:
+            HistogramSimilarity=CompareHistograms(Base_Image_Histo,Test_Image_Histo)
+            MatchImages.Metrics_dict["HM_data_histo"][CurrentBaseImage,TestImageList]=HistogramSimilarity
+        
         #CheckImages_InfoSheet.AllHisto_results.append(HistogramSimilarity)
 
         #feature match metric
-        try:
-            MatchedPoints,OutputImage,PointsA,PointsB,FinalMatchMetric=_3DVisLabLib.Orb_FeatureMatch(Base_Image_FMatches,Base_Image_Descrips,Test_Image_FMatches,Test_Image_Descrips,99999,Base_Image_FM,Test_Image_FM,0.65,MatchImages.DummyMinValue)
-            AverageMatchDistance=FinalMatchMetric#smaller the better
-            #print("Feature match",FinalMatchMetric,len(Base_Image_FMatches),len(Test_Image_FMatches))
-        except:
-            print("ERROR with feature match",len(Base_Image_FMatches),len(Test_Image_FMatches))
-            #watch out this might not be a valid maximum!!
-            AverageMatchDistance=MatchImages.DummyMinValue
-        #CheckImages_InfoSheet.All_FM_results.append(AverageMatchDistance)
+        if "HM_data_FM" in MatchImages.Metrics_dict:
+            try:
+                MatchedPoints,OutputImage,PointsA,PointsB,FinalMatchMetric=_3DVisLabLib.Orb_FeatureMatch(Base_Image_FMatches,Base_Image_Descrips,Test_Image_FMatches,Test_Image_Descrips,99999,Base_Image_FM,Test_Image_FM,0.7,MatchImages.DummyMinValue)
+                AverageMatchDistance=FinalMatchMetric#smaller the better
+                #print("Feature match",FinalMatchMetric,len(Base_Image_FMatches),len(Test_Image_FMatches))
+            except:
+                print("ERROR with feature match",len(Base_Image_FMatches),len(Test_Image_FMatches))
+                #watch out this might not be a valid maximum!!
+                AverageMatchDistance=MatchImages.DummyMinValue
+            MatchImages.Metrics_dict["HM_data_FM"][CurrentBaseImage,TestImageList]=AverageMatchDistance
 
-        HOG_distance=CompareHistograms(Base_Image_HOG_Descriptor, Test_Image_HOG_Descriptor)
+
+
+        if "HM_data_HOG_Dist" in MatchImages.Metrics_dict:
+            HOG_distance=CompareHistograms(Base_Image_HOG_Descriptor, Test_Image_HOG_Descriptor)
+            MatchImages.Metrics_dict["HM_data_HOG_Dist"][CurrentBaseImage,TestImageList]=HOG_distance
+        
 
         #fourier difference metric
         #get differnce between fourier magnitudes of image
         #not the best solution as fourier magnitude will rotate with image 
         #generally this performs well on its own as matches similar notes with similar skew
-        FourierDifference=(abs(Base_Image_FourierMag-Test_Image_FourierMag)).sum()
+        if "HM_data_FourierDifference" in MatchImages.Metrics_dict:
+            FourierDifference=(abs(Base_Image_FourierMag-Test_Image_FourierMag)).sum()
+            MatchImages.Metrics_dict["HM_data_FourierDifference"][CurrentBaseImage,TestImageList]=FourierDifference
+        
 
+        if "HM_data_PhaseCorrelation" in MatchImages.Metrics_dict:
+            PhaseCorrelationMatch=1#
+            MatchImages.Metrics_dict["HM_data_PhaseCorrelation"][CurrentBaseImage,TestImageList]=PhaseCorrelationMatch
         #phase correlation difference
         #use a polar wrapped version of the fourier transform magnitude
         #this is probably a silly way to do this
@@ -444,27 +475,19 @@ def ProcessSimilarity(Input):
         #PhaseCorrelationMatch=1-PhaseCorrelationMatch_raw#signal power so we will reverse it 
         #if np.isnan(PhaseCorrelationMatch):
         #    PhaseCorrelationMatch=MatchImages.DummyMinValue
-        PhaseCorrelationMatch=1#
+        
 
 
         #StackTwoimages=MatchImages.StackTwoimages(Base_Image_FM,Test_Image_FM)
         #_3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(StackTwoimages,(StackTwoimages.shape[1]*1,StackTwoimages.shape[0]*1)),0,True,True)
         #populate output metric comparison matrices
 
-        if "HM_data_FM" in MatchImages.Metrics_dict:
-            MatchImages.Metrics_dict["HM_data_FM"][CurrentBaseImage,TestImageList]=AverageMatchDistance
-        if "HM_data_histo" in MatchImages.Metrics_dict:
-            MatchImages.Metrics_dict["HM_data_histo"][CurrentBaseImage,TestImageList]=HistogramSimilarity
-        if "HM_data_FourierDifference" in MatchImages.Metrics_dict:
-            MatchImages.Metrics_dict["HM_data_FourierDifference"][CurrentBaseImage,TestImageList]=FourierDifference
-        if "HM_data_PhaseCorrelation" in MatchImages.Metrics_dict:
-            MatchImages.Metrics_dict["HM_data_PhaseCorrelation"][CurrentBaseImage,TestImageList]=PhaseCorrelationMatch
-        if "HM_data_HOG_Dist" in MatchImages.Metrics_dict:
-            MatchImages.Metrics_dict["HM_data_HOG_Dist"][CurrentBaseImage,TestImageList]=HOG_distance
-        if "HM_data_EigenVectorDotProd" in MatchImages.Metrics_dict:
-            MatchImages.Metrics_dict["HM_data_EigenVectorDotProd"][CurrentBaseImage,TestImageList]=EigenVectorDotProd
-        if "HM_data_EigenValueDifference" in MatchImages.Metrics_dict:
-            MatchImages.Metrics_dict["HM_data_EigenValueDifference"][CurrentBaseImage,TestImageList]=EigenValue_diff
+        
+        
+        
+        
+        
+        
 
 
 
