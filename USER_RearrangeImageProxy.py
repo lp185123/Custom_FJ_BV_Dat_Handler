@@ -3,10 +3,12 @@ import _3DVisLabLib
 import json
 import shutil
 import os
+from math import floor
 
 InputPath=r"C:\Working\FindIMage_In_Dat\Output"
 InputJson=InputPath+"\\TraceImg_to_DatRecord.json" 
 OutputFolder=r"C:\Working\FindIMage_In_Dat\Output"
+MergedRecordSize=300
 
 #what folder has user placed in images (dat records) to merge
 TestMergingFolder=r"C:\Working\FindIMage_In_Dat\Output\TestMerge"
@@ -125,6 +127,13 @@ for Indexer , datfiletoclean in enumerate(RecordToKeep_dict):
 merger = DatScraper_tool_broken_onlyExtract_NEWER.ImageMerger()
 merger.files = list_dats_Cleaup
 merger.outputDirectory=TestMergingFolder + "\\"
+RecordCount=len(InputFiles)
+Chunks=floor(RecordCount/MergedRecordSize)
+RemainderChunk=RecordCount%MergedRecordSize
+merger.arrayOfNoteCounts=([MergedRecordSize]*Chunks)+[RemainderChunk]#build string for merging library
+if sum(merger.arrayOfNoteCounts)!=RecordCount:
+    print("ERROR with merger.arrayOfNoteCounts logic, defaulting to 100 size chunks for merged file")
+    merger.arrayOfNoteCounts=([300]*100)#give the user something to work with - unlikely to have such a huge dat file
 merger.start()
 #clean up working dats
 for DatToDelete in list_dats_Cleaup:

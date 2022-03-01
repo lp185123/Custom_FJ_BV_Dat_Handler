@@ -2,7 +2,9 @@
 import os
 import win32clipboard
 import copy
-import _3DVisLabLib
+#import _3DVisLabLib
+import shutil
+
 class InfoStrings():
     List_known_4Asuffix=["_Genuine"]
     List_known_4Bsuffix=["_Damage"]#["Clearly","_Damage"]
@@ -52,6 +54,16 @@ def GetList_Of_ImagesInList(ListOfFiles, ImageTypes=(".jPg", ".Png",".gif")):
     
     return Image_FileNames
 
+def yesno(question):
+    """Simple Yes/No Function."""
+    prompt = f'{question} ? (y/n): '
+    ans = input(prompt).strip().lower()
+    if ans not in ['y', 'n']:
+        print(f'{ans} is invalid, please try again...')
+        return yesno(question)
+    if ans == 'y':
+        return True
+    return False
 
 class SingleSimRes_Breakdown():
     def __init__(self):
@@ -84,14 +96,45 @@ class SingleSimRes_Breakdown():
     def GetPercentageOfCat(self,InputNumber):
         return round(((int(InputNumber)/int(self.TotalNotes))*100),2)
 
+def DeleteFiles_RecreateFolder(FolderPath):
+    Deltree(FolderPath)
+    os.mkdir(FolderPath)
+
+def Deltree(Folderpath):
+
+      # check if folder exists
+    if len(Folderpath)<10:
+        raise("Input:" + str(Folderpath))
+        raise ValueError("Deltree error - path too short warning might be root!")
+        return
+    if os.path.exists(Folderpath):
+         # remove if exists
+         shutil.rmtree(Folderpath)
+    else:
+         # throw your exception to handle this special scenario
+         #raise Exception("Unknown Error trying to Deltree: " + Folderpath)
+         pass
+    return
+
+def DeleteFiles_RecreateFolder(FolderPath):
+    Deltree(FolderPath)
+    os.mkdir(FolderPath)
+
 if __name__ == "__main__":
     #user input
     OutputFOlder=r"E:\NCR\TEMP_SPRINT_OUTPUT\\"
-    _3DVisLabLib.yesno("press y to delete output folder :  " + OutputFOlder)
-    _3DVisLabLib.DeleteFiles_RecreateFolder(OutputFOlder)
+    Result = input("Please enter output folder:   Default is " + str(OutputFOlder))
+    if Result!="":#user just presses enter
+        OutputFOlder=Result
+
+    if yesno("press y to delete output folder :  " + OutputFOlder)==True:
+        DeleteFiles_RecreateFolder(OutputFOlder)
+
     #ResultFolder = input("Please enter folder with sim results:")
     ResultFolder=r"C:\Users\LP185123\OneDrive - NCR Corporation\Desktop\SR_GEN_Sprint"
-    input("analysing: " + ResultFolder)
+    Result = input("Please enter results folder:   Default is " + str(ResultFolder))
+
+    #input("analysing: " + ResultFolder)
     AllFiles=GetAllFilesInFolder_Recursive(ResultFolder)
     #simulation results end with this suffix
     TxtFiles=GetList_Of_ImagesInList(AllFiles,[".dat.txt"])
@@ -139,7 +182,6 @@ if __name__ == "__main__":
         Statistics_Header=Delimited.index('Information')
 
 
-
         #get block of statistics
         StatisticsBlock=[]
         for Singleline in range (Statistics_Header+2,TotalString-1):
@@ -150,13 +192,17 @@ if __name__ == "__main__":
         CatCount=0
         for OuterIndex in range(0,len(StatisticsBlock)):
             if (StatisticsBlock[OuterIndex]=="x"):#this hex marker is consistent per category breakdown element
-                CatCount=CatCount+1
+                CatCount=CatCount+1#used as index for each category of notes in top level statistics
+                if CatCount in CategoryBreakdown_dict:
+                    raise Exception("LOGIC ERROR","if CatCount in CategoryBreakdown_dict:","key already in dictionary")
                 CategoryBreakdown_dict[CatCount]=[]
                 for InnerIndex in range(OuterIndex+1,len(StatisticsBlock)):#now find next x
-                    CategoryBreakdown_dict[CatCount].append(StatisticsBlock[InnerIndex])
                     if (StatisticsBlock[InnerIndex]=="x") :#next category
                         OuterIndex=InnerIndex+1
                         break
+                    else:
+                        #keep adding to breakdown list
+                        CategoryBreakdown_dict[CatCount].append(StatisticsBlock[InnerIndex])
 
         #use string matching to find category 4B
         Categories4B_dict=dict()
@@ -198,7 +244,6 @@ if __name__ == "__main__":
             #get # of notes for each category
             totalNote_check=totalNote_check+int(CategoryBreakdown_dict[Cats][0])
 
-
         #get country - assume is in correct folder structure
         Country=None
         for CountryName in InfoStrings.list_known_countries:
@@ -208,7 +253,6 @@ if __name__ == "__main__":
         if Country==None:
             continue
             raise Exception("Country name not found or using wrong root folder" + Item)
-
 
         #get type of generation
         GenerationType=None
@@ -315,8 +359,8 @@ if __name__ == "__main__":
     Str_Totalpcs=Str_Totalpcs.replace("%","")
     copyToClipboard(Str_Totalpcs)
     print("Skipped files:",str(SkippedFile))
+
 if len(list_datnames)!=len(List_Totalpcs):
     raise Exception("total % vs total dat names dont match")
-#yesno("scores in clipboard, press y to populate with dat file names")
 
     

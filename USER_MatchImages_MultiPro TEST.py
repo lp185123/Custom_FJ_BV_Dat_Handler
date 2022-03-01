@@ -80,7 +80,9 @@ def TestImagePhaseCorr(Image):
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-
+def TemplateMatch():
+    #res = cv2.matchTemplate(MainImage,TemplateImage,cv2.TM_SQDIFF_NORMED)
+    pass
 def PlotAndSave_2datas(Title,Filepath,Data1):
     
     #this causes crashes
@@ -167,11 +169,18 @@ class MatchImagesObject():
         return image
         return cv2.resize(image.copy(),(500,250))
 
+    def USERFunction_Crop_Pixels(self,image,CropRangeY,CropRangeX):
+        if len(image.shape)!=3:
+            return image[CropRangeY[0]:CropRangeY[1],CropRangeX[0]:CropRangeX[1]]
+        else:
+            return image[CropRangeY[0]:CropRangeY[1],CropRangeX[0]:CropRangeX[1],:]
+
     def USERFunction_ResizePercent(self,image,Percent):
         Percent=Percent/100
         return cv2.resize(image.copy(),(int(image.shape[1]*Percent),int(image.shape[0]*Percent)))
 
     def USERFunction_Resize(self,image):
+
         #height/length
         #return image
         # if len(image.shape)!=3:
@@ -179,7 +188,7 @@ class MatchImagesObject():
         #     return cv2.resize(image.copy(),(300,200))
         # else:
         #     return cv2.resize(image.copy(),(300,200))
-
+        return image
 
         #usual for mm1 side
         #grayscale image
@@ -202,30 +211,30 @@ class MatchImagesObject():
     """Class to hold information for image sorting & match process"""
     def __init__(self):
         #USER VARS
-        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
-        self.InputFolder=r"E:\NCR\TestImages\MixedSets_side"
+        self.InputFolder=r"E:\NCR\TestImages\Faces\img_align_celeba"
+        #self.InputFolder=r"E:\NCR\TestImages\Goodfellas_longshot_Random"
         #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
-        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_ALL"
+        #self.InputFolder=r"E:\NCR\TestImages\UK_1000"
         #self.InputFolder=r"E:\NCR\TestImages\Faces\randos"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL"
-        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
+        #self.InputFolder=r"E:\NCR\TestImages\Faces\img_align_celeba"
+        #self.InputFolder=r"C:\Working\FindIMage_In_Dat\Output"
+        
         self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
-        self.SubSetOfData=int(50)#subset of data
-        self.MemoryError_ReduceLoad=(False,5)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
+        self.SubSetOfData=int(6000)#subset of data
+        self.MemoryError_ReduceLoad=(True,10)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
         self.BeastMode=False# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
-
-
-
-
-
-
+        self.HyperThreading=True#Experimental - hyperthreads are virtual cores - so if you see multiprocesses not maxed out for their
+        #share of CPU - potentially this might mean they could be hyperthreaded - but feature matching may not work as well like this if
+        #enabled.. needs more testing - also lots of threads will blow out the memory
         #internal variables
+        self.FreeMemoryBuffer_pc=25#how much memory % should be reserved while processing
+
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
         self.OutputDuplicates=self.Outputfolder + "\\Duplicates\\"
         self.ImagesInMem_Pairing=dict()
-        #self.ImagesInMem_Pairing_orphans=dict()
         self.GetDuplicates=False
         self.startTime =None
         self.Endtime =None
@@ -243,14 +252,15 @@ class MatchImagesObject():
         
         #populatemetricDictionary
         self.Metrics_dict=dict()
-        #self.Metrics_dict["HM_data_FM"]=None#slow
-        self.Metrics_dict["HM_data_histo"]=None#fast
-        self.Metrics_dict["HM_data_FourierDifference"]=None#fast
-        self.Metrics_dict["HM_data_PhaseCorrelation"]=None
-        self.Metrics_dict["HM_data_HOG_Dist"]=None#slow
+
+        #self.Metrics_dict["HM_data_FM"]=None#slow - maybe cant be hyperthreaded?
+        self.Metrics_dict["HM_data_histo"]=None#fast =no idea about hyperthreading
+        #self.Metrics_dict["HM_data_FourierDifference"]=None#fast -hyperthreading yes
+        #self.Metrics_dict["HM_data_PhaseCorrelation"]=None #-hyperthreading yes
+        self.Metrics_dict["HM_data_HOG_Dist"]=None#slow -hyperthreading yes
         #self.Metrics_dict["HM_data_EigenVectorDotProd"]=None#fast
-        self.Metrics_dict["HM_data_EigenValueDifference"]=None#fast
-        self.Metrics_dict["HM_data_PowerDensity"]=None#fast
+        self.Metrics_dict["HM_data_EigenValueDifference"]=None#fast #-hyperthreading yes
+        self.Metrics_dict["HM_data_PowerDensity"]=None#fast #-hyperthreading yes
     class FeatureMatch_Dict_Common:
 
         SIFT_default=dict(nfeatures=0,nOctaveLayers=3,contrastThreshold=0.04,edgeThreshold=10)
@@ -266,7 +276,6 @@ class MatchImagesObject():
                         nlevels=4,edgeThreshold=0,
                         firstLevel=4, WTA_K=2,
                         scoreType=0,patchSize=100)
-
 
     class ImageInfo():
         def __init__(self):
@@ -328,6 +337,7 @@ def Get_PCA_(InputImage):
     #bad code to convert gray to colour - this is inefficient when we process similarity
     if len(PCA_image.shape)!=3:
         PCA_image=cv2.cvtColor(PCA_image,cv2.COLOR_GRAY2RGB)
+        
 
     MB_img = np.zeros((PCA_image.shape[0],PCA_image.shape[1],PCA_image.shape[2]))
     # stacking up images (channels?) into the array
@@ -375,6 +385,11 @@ def normalize_2d(matrix):
     return (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
 
 def GetHOG_featureVector(image):
+    #bad code to convert gray to colour - this is inefficient when we process similarity
+    if len(image.shape)!=3:
+        img=cv2.cvtColor(image,cv2.COLOR_GRAY2RGB)
+        
+
     img = np.float32(image) / 255.0
     # Calculate gradient
     gx = cv2.Sobel(img, cv2.CV_32F, 1, 0, ksize=1)
@@ -403,7 +418,7 @@ def main():
         _3DVisLabLib. MakeFolder(PrepareMatchImages.OutputDuplicates)
 
     #ask if user wants to check for duplicates
-    print("Get duplicates only?? - this will be in factorial time (very long)!!!")
+    print("Get duplicates only?? - this will be in ~o^2 time (very long)!!!")
     PrepareMatchImages.GetDuplicates= _3DVisLabLib.yesno("?")
 
     #get all files in input folder
@@ -450,31 +465,47 @@ def main():
     for Index, ImagePath in enumerate(RandomOrder):
         if Index%30==0: print("Image load",Index,"/",len(RandomOrder))
 
-        try:
+        if True==True:
+        #try:
             #create class object for each image
             ImageInfo=PrepareMatchImages.ImageInfo()
 
             #load in original image
-            #OriginalImage_GrayScale = cv2.imread(ImagePath, cv2.IMREAD_GRAYSCALE)
             OriginalImage_col = cv2.imread(ImagePath)
-            OriginalImage_GrayScale=cv2.cvtColor(OriginalImage_col, cv2.COLOR_BGR2GRAY)
+            #bad code to convert gray to colour but still 3 channels
+            if len(OriginalImage_col.shape)!=3:
+                OriginalImage_col=cv2.cvtColor(OriginalImage_col,cv2.COLOR_GRAY2RGB)
+                OriginalImage_GrayScale=OriginalImage_col.copy()
+            else:
+                #load as grayscale but still with 3 channels to be compatible with functions
+                #very lazy code 
+                OriginalImage_GrayScale_temp = cv2.cvtColor(OriginalImage_col, cv2.COLOR_BGR2GRAY)
+                OriginalImage_GrayScale=OriginalImage_col.copy()
+                OriginalImage_GrayScale[:,:,0]=OriginalImage_GrayScale_temp
+                OriginalImage_GrayScale[:,:,1]=OriginalImage_GrayScale_temp
+                OriginalImage_GrayScale[:,:,2]=OriginalImage_GrayScale_temp
+
+            OriginalImage_col=OriginalImage_GrayScale.copy()
+
             InputImage=PrepareMatchImages.USERFunction_OriginalImage(OriginalImage_col)
             if Index<3: ImageReviewDict["OriginalImage_GrayScale"]=OriginalImage_GrayScale
             if Index<3: ImageReviewDict["OriginalImage_col"]=OriginalImage_col
             if Index<3: ImageReviewDict["InputImage"]=InputImage
 
             #create resized versions
-            GrayScale_Resized=PrepareMatchImages.USERFunction_Resize(OriginalImage_GrayScale)
-            Colour_Resized=PrepareMatchImages.USERFunction_Resize(OriginalImage_col)
+            GrayScale_Resized=PrepareMatchImages.USERFunction_ResizePercent(OriginalImage_GrayScale,100)
+            Colour_Resized=PrepareMatchImages.USERFunction_ResizePercent(OriginalImage_col,100)
+            GrayScale_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(GrayScale_Resized,(52,115),(53,130))#Y range then X range
+            Colour_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized,(52,115),(53,130))#Y range then X range
             if Index<3: ImageReviewDict["Colour_Resized"]=Colour_Resized
 
             #create version for feature matching
-            Image_For_FM=PrepareMatchImages.USERFunction_CropForFM(Colour_Resized)
+            Image_For_FM=Colour_Resized.copy()#PrepareMatchImages.USERFunction_CropForFM(CoFlour_Resized)
             if Index<3: ImageReviewDict["Image_For_FM"]=Image_For_FM
 
             #create version for histogram matching
-            Image_For_Histogram=PrepareMatchImages.USERFunction_CropForHistogram(Colour_Resized)
-            Image_For_Histogram=PrepareMatchImages.USERFunction_ResizePercent(Image_For_Histogram,90)
+            Image_For_Histogram=Colour_Resized.copy()#PrepareMatchImages.USERFunction_CropForHistogram(Colour_Resized)
+            Image_For_Histogram=PrepareMatchImages.USERFunction_ResizePercent(Image_For_Histogram,100)
             if Index<3: ImageReviewDict["Image_For_Histogram"]=Image_For_Histogram
             #get histogram for comparing colours
             hist = cv2.calcHist([Image_For_Histogram], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
@@ -557,7 +588,7 @@ def main():
 
             DebugImage=PrepareMatchImages.StackTwoimages(Colour_Resized,FFT_magnitude_spectrum_visualise)
 
-            if Index==-1:
+            if Index==1:
                 #on first loop show image to user
                 FM_DrawnKeypoints=_3DVisLabLib.draw_keypoints_v2(StackedColour_AndGradient_img.copy(),keypoints)
                 ImageReviewDict["FM_DrawnKeypoints"]=FM_DrawnKeypoints
@@ -566,7 +597,7 @@ def main():
                 for imagereviewimg in ImageReviewDict:
                     Img=ImageReviewDict[imagereviewimg]
                     print(imagereviewimg)
-                    _3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(Img,(Img.shape[1]*2,Img.shape[0]*2)),0,True,True)
+                    _3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(Img,(Img.shape[1]*1,Img.shape[0]*1)),0,True,True)
                 
 
             #get fourier transform
@@ -647,8 +678,8 @@ def main():
             #populate dictionary
             PrepareMatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
             
-        except:
-            print("error with image, skipping",ImagePath)
+        #except:
+        #    print("error with image, skipping",ImagePath)
 
     #need this to copy the keypoints for some reason - incompatible with pickle which means
     #any multiprocessing wont work either
@@ -715,25 +746,57 @@ def main():
     #WARNING might give weird results if inside a VM or a executable converted python 
     PhysicalCores=psutil.cpu_count(logical=False)#number of physical cores
     HyperThreadedCores = int(os.environ['NUMBER_OF_PROCESSORS'])#don't use these simulated cores
-    if MatchImages.MemoryError_ReduceLoad[0]==True and PhysicalCores>1:
-        PhysicalCores=min(PhysicalCores,MatchImages.MemoryError_ReduceLoad[1])
-        print("THROTTLING BY USER - Memory protection: restricting cores to", PhysicalCores, ", user option MemoryError_ReduceLoad")
-
-    processes=max(PhysicalCores-1,1)#rule is thumb is to use number of logical cores minus 1, but always make sure this number >0. Its not a good idea to blast CPU at 100% as this can reduce performance as OS tries to balance the load
+    #conditional user options
+    if MatchImages.HyperThreading==True:
+        print("Hyperthreading cores will be used (User option)")
+        #user wants to use virtual cores - this might not be compatible with all similarity metrics
+        Cores_Available=HyperThreadedCores
+    else:
+        print("Physical cores only will be used (User option)")
+        #user just wants physical cores - we still dont know how windows distributes cores so may be virtual anyway
+        Cores_Available=PhysicalCores
+    #final core count available
+    CoresTouse=1
+    #user may have restricted performance to overcome memory errors or to leave system capacity for other tasks
+    if MatchImages.MemoryError_ReduceLoad[0]==True and Cores_Available>1:
+        CoresTouse=min(Cores_Available,MatchImages.MemoryError_ReduceLoad[1])#if user has over-specified cores restrict to cores available
+        print("THROTTLING BY USER - Memory protection: restricting cores to", CoresTouse, ", user option MemoryError_ReduceLoad")
+    else:
+        CoresTouse=Cores_Available
+    #if no restriction by user , leave a core anyway
+    processes=max(CoresTouse-1,1)#rule is thumb is to use number of logical cores minus 1, but always make sure this number >0. Its not a good idea to blast CPU at 100% as this can reduce performance as OS tries to balance the load
     
+    #find how much memory single process uses (windows)
+    Currentprocess = psutil.Process(os.getpid())
+    SingleProcess_Memory=Currentprocess.memory_percent()
+    SystemMemoryUsed=psutil.virtual_memory().percent
+    FreeMemoryBuffer_pc=MatchImages.FreeMemoryBuffer_pc#arbitrary free memory to leave
+    MaxPossibleProcesses=max(math.floor((100-FreeMemoryBuffer_pc-SystemMemoryUsed)/SingleProcess_Memory),0)#can't be lower than zero
+    print(MaxPossibleProcesses,"parallel processes possible at system capacity (leaving",FreeMemoryBuffer_pc,"% memory free)")
+    print("Each process will use ~ ",round(psutil.virtual_memory().total*SingleProcess_Memory/100000000000,1),"gb")#convert bytes to gb
+    #cannot proceed if we can't use even one core
+    if processes<1 or MaxPossibleProcesses<1:
+        print(("Multiprocess Configuration error! Less than 1 process possible - memory or logic error"))
+        raise Exception("Multiprocess Configuration error! Less than 1 process possible - memory or logic error")
+    #check system has enough memory - if not restrict cores used
+    if processes>MaxPossibleProcesses:
+        print("WARNING!! possible memory overflow - restricting number of processes from",processes,"to",MaxPossibleProcesses)
+        processes=MaxPossibleProcesses
+    #user option for process boost
     if MatchImages.BeastMode==False:
         chunksize=processes*3
     else:
         print("WARNING! Beast mode active - this optimisation prohibits any timing feedback")
         chunksize=int(len(MatchImages.ImagesInMem_Pairing)/processes)
-    ProcessesPerCycle=processes*chunksize##how many jobs do we build up to pass off to the multiprocess pool, in this case in theory each core gets 3 stacked tasks
+    #how many jobs do we build up to pass off to the multiprocess pool, in this case in theory each core gets 3 stacked tasks
+    ProcessesPerCycle=processes*chunksize
     
     #experimental with optimisation for multiprocessing
     #currently multiprocesses have staggered finish due to allotment of jobs
     #in this manner we wont have a situation where the first thread has the bigger range of the factorial jobs
     #and all processes more or less have some workload - this can be done more systematically but this
     #gets us most the way there without fiddly code
-    print("Optimising multiprocess load balance (random distribution taskstack")
+    print("Optimising parallel process load balance")
     SacrificialDictionary=copy.deepcopy(MatchImages.ImagesInMem_Pairing)
     ImagesInMem_Pairing_ForThreading=dict()
     while len(SacrificialDictionary)>0:

@@ -198,9 +198,9 @@ def PairWise_Matching(MatchImages,PlotAndSave_2datas,PlotAndSave,ImgCol_InfoShee
     PlotAndSave("MatchMetric_mean_PerList",MatchImages.OutputPairs +"\\MatchMetric_mean_PerList.jpg",MatchMetric_mean_PerList,1)
 
     
-    MatchImages.Endtime= time.time()
-    print("time taken (hrs):",round((MatchImages.Endtime- MatchImages.startTime)/60/60,2))
-    print("time taken (mins):",round((MatchImages.Endtime- MatchImages.startTime)/60,2))
+    #MatchImages.Endtime= time.time()
+    #print("time taken (hrs):",round((MatchImages.Endtime- MatchImages.startTime)/60/60,2))
+    #print("time taken (mins):",round((MatchImages.Endtime- MatchImages.startTime)/60,2))
     exit()
 
 def PrintResults(MatchImages,PlotAndSave_2datas,PlotAndSave):
@@ -318,9 +318,9 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
     PlotAndSave("MatchMetric_all",MatchImages.OutputPairs +"\\MatchMetric_all.jpg",MatchMetric_all,1)
 
 
-    MatchImages.Endtime= time.time()
-    print("time taken (hrs):",round((MatchImages.Endtime- MatchImages.startTime)/60/60,2))
-    print("time taken (mins):",round((MatchImages.Endtime- MatchImages.startTime)/60,2))
+    #MatchImages.Endtime= time.time()
+    #print("time taken (hrs):",round((MatchImages.Endtime- MatchImages.startTime)/60/60,2))
+    #print("time taken (mins):",round((MatchImages.Endtime- MatchImages.startTime)/60,2))
     exit()
 
 def PowerSpectralDensity(image):
@@ -467,8 +467,9 @@ def ProcessSimilarity(Input):
         
         if "HM_data_PowerDensity" in MatchImages.Metrics_dict:
             #HM_data_PowerDensity=random.random()
-            HM_data_PowerDensity=np.correlate(Base_PwrSpectralDensity,Test_PwrSpectralDensity,mode='full')[0]
-            print(np.correlate(Base_PwrSpectralDensity,Test_PwrSpectralDensity,mode='full')[0:10])
+            #HM_data_PowerDensity=np.correlate(Base_PwrSpectralDensity,Test_PwrSpectralDensity,mode='full')[0]
+            #print(np.correlate(Base_PwrSpectralDensity,Test_PwrSpectralDensity,mode='full')[0:10])
+            HM_data_PowerDensity=CompareHistograms(Base_PwrSpectralDensity,Test_PwrSpectralDensity)
             MatchImages.Metrics_dict["HM_data_PowerDensity"][CurrentBaseImage,TestImageList]=HM_data_PowerDensity
         
         #fourier difference metric
