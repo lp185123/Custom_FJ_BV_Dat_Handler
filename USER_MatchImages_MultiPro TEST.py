@@ -180,7 +180,7 @@ class MatchImagesObject():
         #self.InputFolder=r"E:\NCR\TestImages\MixedSets_side"
         
         self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
-        self.SubSetOfData=int(4500)#subset of data
+        self.SubSetOfData=int(45)#subset of data
         self.MemoryError_ReduceLoad=(True,10)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
         self.BeastMode=False# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         #self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
@@ -426,7 +426,7 @@ def main():
         exit()
 
 
-
+    
     #create indexed dictionary of images so we can start combining lists of images
     MatchImages.ImagesInMem_Pairing=dict()
     for Index, img in enumerate(MatchImages.ImagesInMem_to_Process):
