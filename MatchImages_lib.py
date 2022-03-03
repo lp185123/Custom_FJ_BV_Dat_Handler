@@ -42,8 +42,8 @@ def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict
     GrayScale_Resized=PrepareMatchImages.USERFunction_ResizePercent(OriginalImage_GrayScale,100)
     Colour_Resized=PrepareMatchImages.USERFunction_ResizePercent(OriginalImage_col,100)
 
-    GrayScale_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(GrayScale_Resized,(42,83),(53,130))#Y range then X range
-    Colour_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized,(42,83),(53,130))#Y range then X range
+    GrayScale_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(GrayScale_Resized,(90,178),(53,130))#Y range then X range
+    Colour_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized,(90,178),(53,130))#Y range then X range
     if Index<3: ImageReviewDict["Colour_Resized"]=Colour_Resized
 
     #create version for feature matching
@@ -743,6 +743,53 @@ def PrintResults(MatchImages,PlotAndSave_2datas,PlotAndSave):
     FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +("HM_data_MetricDistances_auto") +".jpg"
     PlotAndSave_2datas("HM_data_MetricDistances_auto",FilePath,MatchImages.HM_data_MetricDistances_auto)
 
+
+
+def MatchImagestoInputImages(MatchImages,PlotAndSave_2datas,PlotAndSave):
+    #debug final data
+    MatchImages.HM_data_All=MatchImages.HM_data_MetricDistances
+     #for every image or subsets of images, roll through heatmap finding nearest best match then
+    #cross referencing it
+    OrderedImages=dict()
+    #blank out the self test
+    BlankOut=MatchImages.HM_data_All.max()*2.00000#should be "2" if normalised
+    for item in MatchImages.ImagesInMem_Pairing:
+        MatchImages.HM_data_All[item,item]=0
+    BaseImageList=0#random.choice(list(MatchImages.ImagesInMem_Pairing.keys()))
+    Counter=0
+
+    #generate sequential match metric graphs for each metric stored in dictionary
+    #dictionary of lists
+    MatchMetricGraphDict=dict()
+    for MatchMetric in MatchImages.Metrics_dict:
+        MatchMetricGraphDict[MatchMetric]=[]
+
+    MatchMetric_all=[]
+
+    #images to match should be ordered at start of metrics, so only need to do these
+    for IndexImg,Image in enumerate(MatchImages.List_ImagesToMatchFIlenames):
+
+        #create output folder
+        SetMatchImages_folder=MatchImages.OutputPairs +"\\" + str(IndexImg) + "_" + str(Image.split(".")[-2]) + "\\"
+        _3DVisLabLib. MakeFolder(SetMatchImages_folder)
+
+        #get row of image with similarity of all other images
+        Row=MatchImages.HM_data_All[0:len(MatchImages.ImagesInMem_Pairing),IndexImg]
+        #roll through all results in row, get each min and blank it out for next iteration
+        for RowIndex in range (0,len(Row)):
+            #get minimum value
+            result = np.where(Row == np.amin(Row))
+            #print("result",Row)
+            Element=random.choice(result[0])#incase we have two identical results
+            #blank out similarity element
+            MatchImages.HM_data_All[Element,IndexImg]=BlankOut
+            #save out image
+            FilePath=SetMatchImages_folder + str(IndexImg)+ str(RowIndex) + ".jpg"
+            ImagePath=MatchImages.ImagesInMem_Pairing[Element][0][0]
+            shutil.copyfile(ImagePath, FilePath)
+            
+            
+
 def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
     
     #debug final data
@@ -798,7 +845,6 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
         MatchMetric_all.append(MatchImages.HM_data_All[Element,BaseImageList])
         #add to output images
         
-
         for imgIndex, Images in enumerate (MatchImages.ImagesInMem_Pairing[Element][0]):
             #if len(Images)>1:y
                 #raise Exception("too many images")
@@ -893,8 +939,15 @@ def CompareHistograms(histo_Img1,histo_Img2):
 
 def ProcessSimilarity(Input):
     #print("starting int loop",Input[1])
+
     MatchImages=Input[0]
     CurrentBaseImage=Input[1]
+
+
+    if MatchImages.MatchInputSet==True:
+        if CurrentBaseImage>(len(MatchImages.List_ImagesToMatchFIlenames)+1):
+            return None#return empty dic
+
     #get info for base image
     Base_Image_name=MatchImages.ImagesInMem_Pairing[CurrentBaseImage][1].FirstImage
     Base_Image_Histo=MatchImages.ImagesInMem_to_Process[Base_Image_name].Histogram

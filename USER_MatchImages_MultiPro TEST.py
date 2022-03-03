@@ -176,11 +176,14 @@ class MatchImagesObject():
         #self.InputFolder=r"E:\NCR\TestImages\UK_1000"
         #self.InputFolder=r"E:\NCR\TestImages\Faces\randos"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
-        self.InputFolder=r"E:\NCR\TestImages\Faces\img_align_celeba"
+        self.InputFolder=r"E:\NCR\TestImages\Faces\TestMatchToPerson"
         #self.InputFolder=r"E:\NCR\TestImages\MixedSets_side"
         
         self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
-        self.SubSetOfData=int(45)#subset of data
+
+        self.MatchFindFolder=r"E:\NCR\TestImages\Faces\MatcherFolder"
+
+        self.SubSetOfData=int(4000)#subset of data
         self.MemoryError_ReduceLoad=(True,10)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
         self.BeastMode=False# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         #self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
@@ -189,6 +192,9 @@ class MatchImagesObject():
         #enabled.. needs more testing - also lots of threads will blow out the memory
         #internal variables
         self.FreeMemoryBuffer_pc=25#how much memory % should be reserved while processing
+
+        self.MatchInputSet=True#if a list of input images are provided the system will find similarities only with them, rather than
+        #attempt to match every image sequentially.
 
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
@@ -208,7 +214,7 @@ class MatchImagesObject():
         self.Mean_Std_Per_cyclelist=None
         self.HistogramSelfSimilarityThreshold=0.005#should be zero but incase there is image compression noise
         self.CurrentBaseImage=None
-        
+        self.List_ImagesToMatchFIlenames=None
         #populatemetricDictionary
         self.Metrics_dict=dict()
 
@@ -334,6 +340,50 @@ def main():
     ListAllImages=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
 
 
+    #load images in random order for testing
+    randomdict=dict()
+    for Index, ImagePath in enumerate(ListAllImages):
+        randomdict[ImagePath]=Index
+
+    #user may have specified a subset of data
+    RandomOrder=[]
+    while (len(RandomOrder)<PrepareMatchImages.SubSetOfData) and (len(randomdict)>0):
+        randomchoice_img=random.choice(list(randomdict.keys()))
+        RandomOrder.append(randomchoice_img)
+        del randomdict[randomchoice_img]
+    print("User image reduction, operating on with",len(RandomOrder)," from ",len(ListAllImages),"images")
+
+
+
+     #in this mode we have some input images (part of the input dataset) that we have to match other images to
+    if PrepareMatchImages.MatchInputSet==True:
+        print("Match finding mode")
+        #get all files in input folder
+        InputFiles_match=_3DVisLabLib.GetAllFilesInFolder_Recursive(PrepareMatchImages.MatchFindFolder)
+        #filter out non images
+        ListAllImages_match=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles_match)
+        print(len(ListAllImages_match),"found in match finding folder")
+        #check through main folder of images to see if already in there - if not - add - bear in mind may have different filenames
+        PrepareMatchImages.List_ImagesToMatchFIlenames=dict()
+        #for images we want to match - get their filenames only sans path and place into a dictionary vs full filename and path
+        for FindMatchImage in ListAllImages_match:
+            FileName=FindMatchImage.split("\\")[-1]
+            PrepareMatchImages.List_ImagesToMatchFIlenames[FileName]=FindMatchImage
+            
+        #for each of these filenames without paths, check if exist in the main folder of images, if so - add them to list
+        for Image2Match in PrepareMatchImages.List_ImagesToMatchFIlenames:
+            ImageFoundInDataset=False
+            for FindMatchImage in RandomOrder:
+                FileName=FindMatchImage.split("\\")[-1]
+                if FileName==Image2Match:
+                    ImageFoundInDataset=True
+                    break
+            if ImageFoundInDataset==False:
+                RandomOrder.append(PrepareMatchImages.List_ImagesToMatchFIlenames[Image2Match])
+
+                
+
+
     #get object that links images to dat records
     print("attempting to load image to dat record trace file",PrepareMatchImages.InputFolder + "\\" + PrepareMatchImages.TraceExtractedImg_to_DatRecord)
     try:
@@ -349,18 +399,7 @@ def main():
     #start timer
     PrepareMatchImages.startTime=time.time()
 
-    #load images in random order for testing
-    randomdict=dict()
-    for Index, ImagePath in enumerate(ListAllImages):
-        randomdict[ImagePath]=Index
 
-    #user may have specified a subset of data
-    RandomOrder=[]
-    while (len(RandomOrder)<PrepareMatchImages.SubSetOfData) and (len(randomdict)>0):
-        randomchoice_img=random.choice(list(randomdict.keys()))
-        RandomOrder.append(randomchoice_img)
-        del randomdict[randomchoice_img]
-    print("User image reduction, operating on with",len(RandomOrder)," from ",len(ListAllImages),"images")
     #populate images 
     #load images into memory
 
@@ -425,14 +464,38 @@ def main():
         print("time taken (hrs):",round((MatchImages.Endtime- MatchImages.startTime)/60/60 ),2)
         exit()
 
+    #in this mode we have some input images (part of the input dataset) that we have to match other images to
+    if MatchImages.MatchInputSet==True:#List_ImagesToMatchFIlenames
+        #create indexed dictionary of images so we can start combining lists of images
+        MatchImages.ImagesInMem_Pairing=dict()
+        #add images from list as first images so we can stop processing similarity
+        FirstIndex=0
+        for FirstIndex, Image2match in enumerate(MatchImages.List_ImagesToMatchFIlenames):
+           ImgCol_InfoSheet=ImgCol_InfoSheet_Class()
+           ImgCol_InfoSheet.FirstImage=MatchImages.List_ImagesToMatchFIlenames[Image2match]
+           MatchImages.ImagesInMem_Pairing[FirstIndex]=([MatchImages.List_ImagesToMatchFIlenames[Image2match]],ImgCol_InfoSheet)
+           if MatchImages.List_ImagesToMatchFIlenames[Image2match] not in MatchImages.ImagesInMem_to_Process:
+               raise Exception("images to match not found in images in memory for processing object")
+        for Index, img in enumerate(MatchImages.ImagesInMem_to_Process):
+            OktoAdd=True
+            if Index>FirstIndex:#add after the images to match
+                for Image2Match in MatchImages.List_ImagesToMatchFIlenames:
+                    #dont add image to match twice
+                    if Image2Match.split("\\")[-1]==img.split("\\")[-1]:
+                        OktoAdd=False
+                if OktoAdd==True:
+                    ImgCol_InfoSheet=ImgCol_InfoSheet_Class()
+                    ImgCol_InfoSheet.FirstImage=img
+                    MatchImages.ImagesInMem_Pairing[Index]=([img],ImgCol_InfoSheet)
+                            
 
-    
-    #create indexed dictionary of images so we can start combining lists of images
-    MatchImages.ImagesInMem_Pairing=dict()
-    for Index, img in enumerate(MatchImages.ImagesInMem_to_Process):
-        ImgCol_InfoSheet=ImgCol_InfoSheet_Class()
-        ImgCol_InfoSheet.FirstImage=img
-        MatchImages.ImagesInMem_Pairing[Index]=([img],ImgCol_InfoSheet)
+    else:
+        #create indexed dictionary of images so we can start combining lists of images
+        MatchImages.ImagesInMem_Pairing=dict()
+        for Index, img in enumerate(MatchImages.ImagesInMem_to_Process):
+            ImgCol_InfoSheet=ImgCol_InfoSheet_Class()
+            ImgCol_InfoSheet.FirstImage=img
+            MatchImages.ImagesInMem_Pairing[Index]=([img],ImgCol_InfoSheet)
 
     #initialise metric matrices
     MatchImages.HM_data_MetricDistances = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
@@ -520,12 +583,13 @@ def main():
             ReturnList=(pool.imap_unordered(MatchImages_lib.ProcessSimilarity,listJobs,chunksize=chunksize))
             #populate output metric comparison matrices
             for ReturnObjects in ReturnList:
-                Rtrn_CurrentBaseImage=ReturnObjects["BASEIMAGE"]
-                for returnItem in MatchImages.Metrics_dict:
-                    if returnItem in ReturnObjects:
-                        MatchImages.Metrics_dict[returnItem][Rtrn_CurrentBaseImage,:]=ReturnObjects[returnItem]
-                    else:
-                        print("No match for",returnItem)
+                if ReturnObjects is not None:
+                    Rtrn_CurrentBaseImage=ReturnObjects["BASEIMAGE"]
+                    for returnItem in MatchImages.Metrics_dict:
+                        if returnItem in ReturnObjects:
+                            MatchImages.Metrics_dict[returnItem][Rtrn_CurrentBaseImage,:]=ReturnObjects[returnItem]
+                        else:
+                            print("No match for",returnItem)
 
             CompletedProcesses=CompletedProcesses+len(listJobs)
             #get timings
@@ -631,6 +695,11 @@ def main():
 
     
     MatchImages_lib.PrintResults(MatchImages,PlotAndSave_2datas,PlotAndSave)
+
+    #match images to set of input images
+    MatchImages_lib.MatchImagestoInputImages(copy.deepcopy(MatchImages),PlotAndSave_2datas,PlotAndSave)
+    exit()
+
 
     #sequential matching
     MatchImages_lib.SequentialMatchingPerImage(copy.deepcopy(MatchImages),PlotAndSave_2datas,PlotAndSave)
