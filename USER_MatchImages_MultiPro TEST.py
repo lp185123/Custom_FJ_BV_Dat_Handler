@@ -175,13 +175,13 @@ class MatchImagesObject():
         #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         #self.InputFolder=r"E:\NCR\TestImages\UK_1000"
         #self.InputFolder=r"E:\NCR\TestImages\Faces\randos"
-        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
-        self.InputFolder=r"E:\NCR\TestImages\Faces\TestMatchToPerson"
+        self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
+        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
         #self.InputFolder=r"E:\NCR\TestImages\MixedSets_side"
         
         self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
 
-        self.MatchFindFolder=r"E:\NCR\TestImages\Faces\MatcherFolder"
+        self.MatchFindFolder=r"E:\NCR\TestImages\UK_Side_Small_15sets10_findmatch"
 
         self.SubSetOfData=int(4000)#subset of data
         self.MemoryError_ReduceLoad=(True,10)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
@@ -220,7 +220,7 @@ class MatchImagesObject():
 
         #self.Metrics_dict["HM_data_FM"]=None#slow - maybe cant be hyperthreaded?
         self.Metrics_dict["HM_data_histo"]=None#fast =no idea about hyperthreading
-        #self.Metrics_dict["HM_data_FourierDifference"]=None#fast -hyperthreading yes
+        self.Metrics_dict["HM_data_FourierDifference"]=None#fast -hyperthreading yes
         #self.Metrics_dict["HM_data_PhaseCorrelation"]=None #-hyperthreading yes
         self.Metrics_dict["HM_data_HOG_Dist"]=None#slow -hyperthreading yes
         #self.Metrics_dict["HM_data_EigenVectorDotProd"]=None#fast
@@ -369,17 +369,19 @@ def main():
         for FindMatchImage in ListAllImages_match:
             FileName=FindMatchImage.split("\\")[-1]
             PrepareMatchImages.List_ImagesToMatchFIlenames[FileName]=FindMatchImage
-            
-        #for each of these filenames without paths, check if exist in the main folder of images, if so - add them to list
-        for Image2Match in PrepareMatchImages.List_ImagesToMatchFIlenames:
-            ImageFoundInDataset=False
-            for FindMatchImage in RandomOrder:
-                FileName=FindMatchImage.split("\\")[-1]
-                if FileName==Image2Match:
-                    ImageFoundInDataset=True
-                    break
-            if ImageFoundInDataset==False:
-                RandomOrder.append(PrepareMatchImages.List_ImagesToMatchFIlenames[Image2Match])
+            RandomOrder.append(FindMatchImage)
+
+
+        # #for each of these filenames without paths, check if exist in the main folder of images, if so - add them to list
+        # for Image2Match in PrepareMatchImages.List_ImagesToMatchFIlenames:
+        #     ImageFoundInDataset=False
+        #     for FindMatchImage in RandomOrder:
+        #         FileName=FindMatchImage.split("\\")[-1]
+        #         if FileName==Image2Match:
+        #             ImageFoundInDataset=True
+        #             break
+        #     if ImageFoundInDataset==False:
+        #         RandomOrder.append(PrepareMatchImages.List_ImagesToMatchFIlenames[Image2Match])
 
                 
 
@@ -412,7 +414,7 @@ def main():
 
         if True==True:
         #try:
-            ImageInfo=MatchImages_lib.PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator)
+            ImageInfo=MatchImages_lib.PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator)
             
             #populate dictionary
             PrepareMatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
@@ -477,16 +479,16 @@ def main():
            if MatchImages.List_ImagesToMatchFIlenames[Image2match] not in MatchImages.ImagesInMem_to_Process:
                raise Exception("images to match not found in images in memory for processing object")
         for Index, img in enumerate(MatchImages.ImagesInMem_to_Process):
-            OktoAdd=True
-            if Index>FirstIndex:#add after the images to match
-                for Image2Match in MatchImages.List_ImagesToMatchFIlenames:
-                    #dont add image to match twice
-                    if Image2Match.split("\\")[-1]==img.split("\\")[-1]:
-                        OktoAdd=False
-                if OktoAdd==True:
-                    ImgCol_InfoSheet=ImgCol_InfoSheet_Class()
-                    ImgCol_InfoSheet.FirstImage=img
-                    MatchImages.ImagesInMem_Pairing[Index]=([img],ImgCol_InfoSheet)
+            # OktoAdd=True
+            # if Index>FirstIndex:#add after the images to match
+            #     for Image2Match in MatchImages.List_ImagesToMatchFIlenames:
+            #         #dont add image to match twice
+            #         if Image2Match.split("\\")[-1]==img.split("\\")[-1]:
+            #             OktoAdd=False
+            #     if OktoAdd==True:
+            ImgCol_InfoSheet=ImgCol_InfoSheet_Class()
+            ImgCol_InfoSheet.FirstImage=img
+            MatchImages.ImagesInMem_Pairing[Index+FirstIndex+1]=([img],ImgCol_InfoSheet)
                             
 
     else:
@@ -697,17 +699,17 @@ def main():
     MatchImages_lib.PrintResults(MatchImages,PlotAndSave_2datas,PlotAndSave)
 
     #match images to set of input images
-    MatchImages_lib.MatchImagestoInputImages(copy.deepcopy(MatchImages),PlotAndSave_2datas,PlotAndSave)
-    exit()
+    if MatchImages.MatchInputSet==True:
+        MatchImages_lib.MatchImagestoInputImages(copy.deepcopy(MatchImages),PlotAndSave_2datas,PlotAndSave)
+        exit()
+    else:
+        #sequential matching
+        MatchImages_lib.SequentialMatchingPerImage(copy.deepcopy(MatchImages),PlotAndSave_2datas,PlotAndSave)
 
+        #pairwise matching
+        MatchImages_lib.PairWise_Matching(copy.deepcopy(MatchImages),PlotAndSave_2datas,PlotAndSave,ImgCol_InfoSheet_Class)
 
-    #sequential matching
-    MatchImages_lib.SequentialMatchingPerImage(copy.deepcopy(MatchImages),PlotAndSave_2datas,PlotAndSave)
-
-    #pairwise matching
-    MatchImages_lib.PairWise_Matching(copy.deepcopy(MatchImages),PlotAndSave_2datas,PlotAndSave,ImgCol_InfoSheet_Class)
-
-    
+        
 
 
 

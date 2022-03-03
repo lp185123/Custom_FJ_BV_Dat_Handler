@@ -766,25 +766,34 @@ def MatchImagestoInputImages(MatchImages,PlotAndSave_2datas,PlotAndSave):
 
     MatchMetric_all=[]
 
+    
     #images to match should be ordered at start of metrics, so only need to do these
     for IndexImg,Image in enumerate(MatchImages.List_ImagesToMatchFIlenames):
-
+        counter=0
         #create output folder
         SetMatchImages_folder=MatchImages.OutputPairs +"\\" + str(IndexImg) + "_" + str(Image.split(".")[-2]) + "\\"
         _3DVisLabLib. MakeFolder(SetMatchImages_folder)
+        #save test image first 
+        FilePath=SetMatchImages_folder + "_00" + str(counter) + "_"+ Image
+        ImagePath=MatchImages.List_ImagesToMatchFIlenames[Image]
+        shutil.copyfile(ImagePath, FilePath)
 
         #get row of image with similarity of all other images
         Row=MatchImages.HM_data_All[0:len(MatchImages.ImagesInMem_Pairing),IndexImg]
         #roll through all results in row, get each min and blank it out for next iteration
         for RowIndex in range (0,len(Row)):
+            counter=counter+1
             #get minimum value
             result = np.where(Row == np.amin(Row))
             #print("result",Row)
             Element=random.choice(result[0])#incase we have two identical results
+            #record MatchMetric
+            MatchMetric=round(MatchImages.HM_data_All[Element,IndexImg],3)
             #blank out similarity element
             MatchImages.HM_data_All[Element,IndexImg]=BlankOut
+            MatchImages.HM_data_All[IndexImg,Element]=BlankOut
             #save out image
-            FilePath=SetMatchImages_folder + str(IndexImg)+ str(RowIndex) + ".jpg"
+            FilePath=SetMatchImages_folder + "_00" + str(counter) +" MatchMetric_" + str(MatchMetric)+ "  .jpg"
             ImagePath=MatchImages.ImagesInMem_Pairing[Element][0][0]
             shutil.copyfile(ImagePath, FilePath)
             
