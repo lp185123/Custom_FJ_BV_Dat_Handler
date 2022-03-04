@@ -171,20 +171,33 @@ class MatchImagesObject():
     def __init__(self):
         #USER VARS
         #self.InputFolder=r"E:\NCR\TestImages\Faces\img_align_celeba"
+        self.InputFolder=r"E:\NCR\TestImages\Furniture"
         #self.InputFolder=r"E:\NCR\TestImages\Goodfellas_longshot_Random"
         #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         #self.InputFolder=r"E:\NCR\TestImages\UK_1000"
         #self.InputFolder=r"E:\NCR\TestImages\Faces\randos"
-        self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
+        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
         #self.InputFolder=r"E:\NCR\TestImages\MixedSets_side"
-        
-        self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
 
-        self.MatchFindFolder=r"E:\NCR\TestImages\UK_Side_Small_15sets10_findmatch"
 
-        self.SubSetOfData=int(4000)#subset of data
-        self.MemoryError_ReduceLoad=(True,10)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
+        self.SubSetOfData=int(20)#subset of data
+
+        #images have to be prepared in application specific ways - choose function here
+        self.PrepareImagesFunction=MatchImages_lib.PrepareImageMetrics_FacesFurniture
+
+        #what metrics to use
+        self.Use__FeatureMatch=False#match detailed areas of image - quite slow
+        self.Use__histogram=True#match how close the image colour distribution is - structure does not matter
+        self.Use__FourierDifference=True#only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
+        self.Use__PhaseCorrelation=False#not developed yet
+        self.Use__HOG_featureMatch=True#dense feature match - good for small images
+        self.Use__EigenVectorDotProd=False#how close are principle components orientated- doesnt seem to work correctly yet
+        self.Use__EigenValueDifference=True#how close are principle component lengths - works pretty well
+        self.Use__FourierPowerDensity=True#histogram of frequencies found in image - works well
+
+        #set this to "2" to force inline processing
+        self.MemoryError_ReduceLoad=(False,2)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
         self.BeastMode=False# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         #self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
         self.HyperThreading=True#Experimental - hyperthreads are virtual cores - so if you see multiprocesses not maxed out for their
@@ -193,9 +206,14 @@ class MatchImagesObject():
         #internal variables
         self.FreeMemoryBuffer_pc=25#how much memory % should be reserved while processing
 
+        self.MatchFindFolder = r"E:\NCR\TestImages\Faces\MatcherFolder"
         self.MatchInputSet=True#if a list of input images are provided the system will find similarities only with them, rather than
         #attempt to match every image sequentially.
 
+
+
+        #END USER OPTIONS
+        self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
         self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
         self.OutputPairs=self.Outputfolder + "\\Pairs\\"
         self.OutputDuplicates=self.Outputfolder + "\\Duplicates\\"
@@ -217,15 +235,19 @@ class MatchImagesObject():
         self.List_ImagesToMatchFIlenames=None
         #populatemetricDictionary
         self.Metrics_dict=dict()
+        
 
-        #self.Metrics_dict["HM_data_FM"]=None#slow - maybe cant be hyperthreaded?
-        self.Metrics_dict["HM_data_histo"]=None#fast =no idea about hyperthreading
-        self.Metrics_dict["HM_data_FourierDifference"]=None#fast -hyperthreading yes
-        #self.Metrics_dict["HM_data_PhaseCorrelation"]=None #-hyperthreading yes
-        self.Metrics_dict["HM_data_HOG_Dist"]=None#slow -hyperthreading yes
-        #self.Metrics_dict["HM_data_EigenVectorDotProd"]=None#fast
-        self.Metrics_dict["HM_data_EigenValueDifference"]=None#fast #-hyperthreading yes
-        self.Metrics_dict["HM_data_FourierPowerDensity"]=None#fast #-hyperthreading yes
+        if self.Use__FeatureMatch: self.Metrics_dict["HM_data_FM"]=None#slow - maybe cant be hyperthreaded?
+        if self.Use__histogram:self.Metrics_dict["HM_data_histo"]=None#fast =no idea about hyperthreading
+        if self.Use__FourierDifference:self.Metrics_dict["HM_data_FourierDifference"]=None#fast -hyperthreading yes
+        if self.Use__PhaseCorrelation:self.Metrics_dict["HM_data_PhaseCorrelation"]=None #-hyperthreading yes
+        if self.Use__HOG_featureMatch:self.Metrics_dict["HM_data_HOG_Dist"]=None#slow -hyperthreading yes
+        if self.Use__EigenVectorDotProd:self.Metrics_dict["HM_data_EigenVectorDotProd"]=None#fast
+        if self.Use__EigenValueDifference:self.Metrics_dict["HM_data_EigenValueDifference"]=None#fast #-hyperthreading yes
+        if self.Use__FourierPowerDensity:self.Metrics_dict["HM_data_FourierPowerDensity"]=None#fast #-hyperthreading yes
+        for metrix in self.Metrics_dict:
+            print("Using metrics",metrix)
+
     class FeatureMatch_Dict_Common:
 
         SIFT_default=dict(nfeatures=0,nOctaveLayers=3,contrastThreshold=0.04,edgeThreshold=10)
@@ -412,22 +434,20 @@ def main():
     for Index, ImagePath in enumerate(RandomOrder):
         if Index%30==0: print("Image load",Index,"/",len(RandomOrder))
 
-        if True==True:
-        #try:
-            ImageInfo=MatchImages_lib.PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator)
-            
+        #if True==True:
+        try:
+            ImageInfo=PrepareMatchImages.PrepareImagesFunction(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator)
             #populate dictionary
             PrepareMatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
-            
-        #except:
-        #    print("error with image, skipping",ImagePath)
+        except:
+            print("error with image, skipping",ImagePath)
 
     #need this to copy the keypoints for some reason - incompatible with pickle which means
     #any multiprocessing wont work either
     copyreg.pickle(cv2.KeyPoint().__class__, _pickle_keypoints)
     #need this test to see if we can pickle the object - if we cant then multiprocessing wont work
     MatchImages=copy.deepcopy(PrepareMatchImages)
-
+    PrepareMatchImages=None#clean this out incase garbage collector doesnt 
 
     #build dictionary to remove items from
     for Index, img in enumerate(MatchImages.ImagesInMem_to_Process):
@@ -525,7 +545,7 @@ def main():
     #user may have restricted performance to overcome memory errors or to leave system capacity for other tasks
     if MatchImages.MemoryError_ReduceLoad[0]==True and Cores_Available>1:
         CoresTouse=min(Cores_Available,MatchImages.MemoryError_ReduceLoad[1])#if user has over-specified cores restrict to cores available
-        print("THROTTLING BY USER - Memory protection: restricting cores to", CoresTouse, ", user option MemoryError_ReduceLoad")
+        print("THROTTLING BY USER - Memory protection: restricting cores to", CoresTouse, "or less, user option MemoryError_ReduceLoad")
     else:
         CoresTouse=Cores_Available
     #if no restriction by user , leave a core anyway
@@ -556,20 +576,33 @@ def main():
     #how many jobs do we build up to pass off to the multiprocess pool, in this case in theory each core gets 3 stacked tasks
     ProcessesPerCycle=processes*chunksize
     
+
+
+    
     #experimental with optimisation for multiprocessing
     #currently multiprocesses have staggered finish due to allotment of jobs
     #in this manner we wont have a situation where the first thread has the bigger range of the factorial jobs
     #and all processes more or less have some workload - this can be done more systematically but this
     #gets us most the way there without fiddly code
-    print("Optimising parallel process load balance")
-    SacrificialDictionary=copy.deepcopy(MatchImages.ImagesInMem_Pairing)
-    ImagesInMem_Pairing_ForThreading=dict()
-    while len(SacrificialDictionary)>0:
-        RandomItem=random.choice(list(SacrificialDictionary.keys()))
-        ImagesInMem_Pairing_ForThreading[RandomItem]=MatchImages.ImagesInMem_Pairing[RandomItem]
-        del SacrificialDictionary[RandomItem]
+    print("Optimising parallel process load balance for",processes)
+
+    #different strategies if we are matching images from input folder - dont need to load balance as will have much smaller subset of
+    #images to test
+    if MatchImages.MatchInputSet==False:
+        SacrificialDictionary=copy.deepcopy(MatchImages.ImagesInMem_Pairing)
+        ImagesInMem_Pairing_ForThreading=dict()
+        while len(SacrificialDictionary)>0:
+            RandomItem=random.choice(list(SacrificialDictionary.keys()))
+            ImagesInMem_Pairing_ForThreading[RandomItem]=MatchImages.ImagesInMem_Pairing[RandomItem]
+            del SacrificialDictionary[RandomItem]
+    else:#
+        ImagesInMem_Pairing_ForThreading=dict()
+        for Indexer, Image2match in enumerate((MatchImages.List_ImagesToMatchFIlenames)):
+            ImagesInMem_Pairing_ForThreading[Indexer]=MatchImages.ImagesInMem_Pairing[Indexer]
+            
     
-    print("[Multiprocess start]","Taskstack per core:",chunksize,"  Taskpool size:",ProcessesPerCycle,"  Physical cores used:",processes,"   Images:",len(MatchImages.ImagesInMem_Pairing))
+
+    
     pool = multiprocessing.Pool(processes=processes)
     listJobs=[]
     CompletedProcesses=0
@@ -579,78 +612,100 @@ def main():
     listAvgTime=[]
     ProcessOnly_start = time.perf_counter()
     t1_start = time.perf_counter()
-    for Index, BaseImageList in enumerate(ImagesInMem_Pairing_ForThreading):
-        listJobs.append((MatchImages,BaseImageList))
-        if (Index%ProcessesPerCycle==0 and Index!=0) or Index==len(MatchImages.ImagesInMem_Pairing)-1:
-            ReturnList=(pool.imap_unordered(MatchImages_lib.ProcessSimilarity,listJobs,chunksize=chunksize))
-            #populate output metric comparison matrices
-            for ReturnObjects in ReturnList:
-                if ReturnObjects is not None:
-                    Rtrn_CurrentBaseImage=ReturnObjects["BASEIMAGE"]
-                    for returnItem in MatchImages.Metrics_dict:
-                        if returnItem in ReturnObjects:
-                            MatchImages.Metrics_dict[returnItem][Rtrn_CurrentBaseImage,:]=ReturnObjects[returnItem]
+    if processes>1:
+        print("[Multiprocess start]","Taskstack per core:",chunksize,"  Taskpool size:",ProcessesPerCycle,"  Physical cores used:",processes,"   Images:",len(MatchImages.ImagesInMem_Pairing))
+        for Index, BaseImageList in enumerate(ImagesInMem_Pairing_ForThreading):
+            
+
+            listJobs.append((MatchImages,BaseImageList))
+
+            if (Index%ProcessesPerCycle==0 and Index!=0) or Index==len(ImagesInMem_Pairing_ForThreading)-1:#before was matches.imagepairinginmemory incase this breaks
+                ReturnList=(pool.imap_unordered(MatchImages_lib.ProcessSimilarity,listJobs,chunksize=chunksize))
+                #populate output metric comparison matrices
+                for ReturnObjects in ReturnList:
+                    if ReturnObjects is not None:
+                        Rtrn_CurrentBaseImage=ReturnObjects["BASEIMAGE"]
+                        for returnItem in MatchImages.Metrics_dict:
+                            if returnItem in ReturnObjects:
+                                MatchImages.Metrics_dict[returnItem][Rtrn_CurrentBaseImage,:]=ReturnObjects[returnItem]
+                            else:
+                                print("No match for",returnItem)
+
+                CompletedProcesses=CompletedProcesses+len(listJobs)
+                try:
+                    #get timings
+                    listTimings.append(round(time.perf_counter()-t1_start,2))
+                    listCounts.append(len(listJobs))
+                    listAvgTime.append(round(listTimings[-1]/listCounts[-1],3))
+                    #start timer again
+                    t1_start = time.perf_counter()
+                    print("Jobs done:", CompletedProcesses,"/",len(MatchImages.ImagesInMem_Pairing))
+                    #clear list of jobs
+                    listJobs=[]
+                
+                    if len(listTimings)>3:
+                        Diffy=listTimings[-1]-listTimings[1]
+                        Diffx=len(listTimings)-1
+                        m=Diffy/Diffx
+                        _C=listTimings[1]-(m*1)
+                        #playing around with time estimation
+                        TaskLots=(len(MatchImages.ImagesInMem_Pairing)/ProcessesPerCycle)
+                        TimeEstimate_sum=[]
+                        TimeEstimateLeft_sum=[]
+                        TimeEstimate_sum.append(listTimings[0])#first one is always non uniform
+                        CurrentPosition=round(Index/ProcessesPerCycle)
+                        for counter in range (1,int(TaskLots)):
+                            _Y=(m*counter)+_C
+                            if counter<CurrentPosition:
+                                TimeEstimate_sum.append(listTimings[counter])
+                            if counter>=CurrentPosition:
+                                TimeEstimate_sum.append(round(_Y,2))
+                                TimeEstimateLeft_sum.append(round(_Y,2))
+                        # if len(listTimings)<7:
+                        #     print("(more samples needed) Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
+                        #     print("(more samples needed) Estimated Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
+                        # else:
+                        #     print("Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
+                        #     print("Estimated Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
+                        #second time estimate
+                        slope, intercept, r_value, p_value, std_err = stats.linregress(range(0,len(listTimings[1:-1])),listTimings[1:-1])
+                        TimeEstimate_sum=[]
+                        TimeEstimateLeft_sum=[]
+                        TimeEstimate_sum.append(listTimings[0])#first one is always non uniform
+                        for counter in range (1,int(TaskLots)):
+                            _Y=(slope*counter)+intercept
+                            if counter<CurrentPosition:
+                                TimeEstimate_sum.append(listTimings[counter])
+                            if counter>=CurrentPosition:
+                                TimeEstimate_sum.append(round(_Y,2))
+                                TimeEstimateLeft_sum.append(round(_Y,2))
+                        if len(listTimings)<7:
+                            print("(More time samples needed) Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
+                            print("(More time samples needed) Estimated Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
                         else:
-                            print("No match for",returnItem)
+                            print("Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
+                            print("Estimated Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
+                except:
+                    print("Problem with time estimate code")
 
-            CompletedProcesses=CompletedProcesses+len(listJobs)
-            #get timings
-            listTimings.append(round(time.perf_counter()-t1_start,2))
-            listCounts.append(len(listJobs))
-            listAvgTime.append(round(listTimings[-1]/listCounts[-1],3))
-            #start timer again
-            t1_start = time.perf_counter()
-            print("Jobs done:", CompletedProcesses,"/",len(MatchImages.ImagesInMem_Pairing))
-            #clear list of jobs
-            listJobs=[]
-            try:
-                if len(listTimings)>3:
-                    Diffy=listTimings[-1]-listTimings[1]
-                    Diffx=len(listTimings)-1
-                    m=Diffy/Diffx
-                    _C=listTimings[1]-(m*1)
-                    #playing around with time estimation
-                    TaskLots=(len(MatchImages.ImagesInMem_Pairing)/ProcessesPerCycle)
-                    TimeEstimate_sum=[]
-                    TimeEstimateLeft_sum=[]
-                    TimeEstimate_sum.append(listTimings[0])#first one is always non uniform
-                    CurrentPosition=round(Index/ProcessesPerCycle)
-                    for counter in range (1,int(TaskLots)):
-                        _Y=(m*counter)+_C
-                        if counter<CurrentPosition:
-                            TimeEstimate_sum.append(listTimings[counter])
-                        if counter>=CurrentPosition:
-                            TimeEstimate_sum.append(round(_Y,2))
-                            TimeEstimateLeft_sum.append(round(_Y,2))
-                    # if len(listTimings)<7:
-                    #     print("(more samples needed) Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
-                    #     print("(more samples needed) Estimated Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
-                    # else:
-                    #     print("Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
-                    #     print("Estimated Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
-                    #second time estimate
-                    slope, intercept, r_value, p_value, std_err = stats.linregress(range(0,len(listTimings[1:-1])),listTimings[1:-1])
-                    TimeEstimate_sum=[]
-                    TimeEstimateLeft_sum=[]
-                    TimeEstimate_sum.append(listTimings[0])#first one is always non uniform
-                    for counter in range (1,int(TaskLots)):
-                        _Y=(slope*counter)+intercept
-                        if counter<CurrentPosition:
-                            TimeEstimate_sum.append(listTimings[counter])
-                        if counter>=CurrentPosition:
-                            TimeEstimate_sum.append(round(_Y,2))
-                            TimeEstimateLeft_sum.append(round(_Y,2))
-                    if len(listTimings)<7:
-                        print("(More time samples needed) Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
-                        print("(More time samples needed) Estimated Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
+
+
+    if processes==1:
+        print("[singleprocess start] inline process started:"),
+        for Index, BaseImageList in enumerate(ImagesInMem_Pairing_ForThreading):
+            print("starting",Index,"/",len(ImagesInMem_Pairing_ForThreading))
+            ReturnObjects=MatchImages_lib.ProcessSimilarity((MatchImages,BaseImageList))
+            if ReturnObjects is not None:
+                Rtrn_CurrentBaseImage=ReturnObjects["BASEIMAGE"]
+                for returnItem in MatchImages.Metrics_dict:
+                    if returnItem in ReturnObjects:
+                        MatchImages.Metrics_dict[returnItem][Rtrn_CurrentBaseImage,:]=ReturnObjects[returnItem]
                     else:
-                        print("Estimated total time=",str(datetime.timedelta(seconds=sum(TimeEstimate_sum))))
-                        print("Estimated Time left=",str(datetime.timedelta(seconds=sum(TimeEstimateLeft_sum))))
-            except:
-                print("Problem with time estimate code")
+                        print("No match for",returnItem)
 
+    
     print("Total process only time:",str(datetime.timedelta(seconds= time.perf_counter()-ProcessOnly_start)))
-
+    print("Conforming data..")
     #create diagonally symetrical matrix
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
         for testImageList in MatchImages.ImagesInMem_Pairing:
