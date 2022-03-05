@@ -39,29 +39,123 @@ from sklearn.decomposition import PCA
 import matplotlib
 #matplotlib.use('Agg')#can get "Tcl_AsyncDelete: async handler deleted by the wrong thread" crashes otherwise
 import matplotlib.pyplot as plt
-def HM_data_MetricDistances():
-    print("plop")
-
-def PlotAndSave_2datas(Title,Filepath,Data1):
-    
-    #this causes crashes
-    #save out plot of 1D data
-    try:
-        #Data1=np.random.rand(30,22)
-        plt.pcolormesh((Data1), cmap = 'autumn')
-        #plt.plot(Data1,Data2,'bo')#bo will draw dots instead of connected line
-        plt.ylabel(Title)
-        #plt.ylim([0, max(Data1)])
-        #plt.ylim([0, max(Data2)])
-        plt.savefig(Filepath)
-        plt.cla()
-        plt.clf()
-        plt.close()
-    except Exception as e:
-        print("Error with matpyplot",e)
 
 class MatchImagesObject():
-    
+
+    def __init__(self):
+        # USER OPTIONS
+        ##################################################
+        ##set input folder here
+        ##################################################
+        #self.InputFolder=r"E:\NCR\TestImages\Faces\img_align_celeba"
+        #self.InputFolder = r"E:\NCR\TestImages\Furniture"
+        #self.InputFolder=r"E:\NCR\TestImages\Food"
+        # self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
+        # self.InputFolder=r"E:\NCR\TestImages\UK_1000"
+        #self.InputFolder=r"E:\NCR\TestImages\Food\images"
+        self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
+        # self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
+        # self.InputFolder=r"E:\NCR\TestImages\MixedSets_side"
+        ##################################################
+        ##set subset of data - will select random images
+        ##if cross checking for similarity will be in O (n/2) time complexity
+        ##################################################
+        self.SubSetOfData = int(26000)  # subset of data
+        ################################################################
+        ##select what function will be used, which will load image,crop,resize
+        ##etc for all analytical procesess
+        ###################################################################
+        # images have to be prepared in application specific ways - choose function here - don't leave the "()"!!!!
+        self.PrepareImagesFunction = MatchImages_lib.PrepareImageMetrics_NotesSide
+        ######################################################################
+        ##turn on and off which analytics to use, some will add noise rather
+        ##than useful metrics depending on images to analyse
+        ######################################################################
+        # what metrics to use
+        self.Use__FeatureMatch = False  # match detailed areas of image - quite slow
+        self.Use__histogram = False  # match how close the image colour distribution is - structure does not matter
+        self.Use__FourierDifference = False  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
+        self.Use__PhaseCorrelation = False  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
+        #in theory can convert for instance fourier magnitude image, polar unwrap it and check using phase correlation - but has to be proven
+        self.Use__HOG_featureMatch = False  # dense feature match - good for small images - very effective for mm side
+        self.Use__EigenVectorDotProd = False  # how close are principle components orientated- doesnt seem to work correctly yet - MUST BE SQUARE!
+        self.Use__EigenValueDifference = False  # how close are principle component lengths - works pretty well - still needs a look at in how to package up matrix, and if using non -square do we use SVD instead?
+        self.Use__FourierPowerDensity = False  # histogram of frequencies found in image - works very well
+        self.Use__MacroStructure=True#3*3 image to compare macrostructure - experimental
+        self.Use__StructuralPCA_dotProd=False#Principle component analysis on binarised image - a geometrical PCA
+        self.Use__StructuralPCA_VectorValue = False  # Principle component analysis on binarised image - a geometrical PCA
+        ######################################################
+        ##set multi process behaviour - can force no threading if memory issues are encountered
+        #######################################################
+        # set this to "1" to force inline processing, otherwise to limit cores set to the cores you wish to use then add one (as system will remove one for safety regardless)
+        self.MemoryError_ReduceLoad = (True,1)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
+        self.BeastMode = False  # Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
+        # self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
+        self.HyperThreading = True  # Experimental - hyperthreads are virtual cores so may not work for metrics like Feature Matching (except HOG)
+        #but its not possible to predict how windows will distribute processes to which cores
+        #set buffer for memory that should remain - this is not definitive as its not possible to get an accurate size of the python process
+        self.FreeMemoryBuffer_pc = 25  # how much memory % should be reserved while processing
+        ##################################################
+        ## input image matching mode - for ecah image in
+        ## input image folder will try and find top 20
+        ## matches from images in main input folder.
+        ## will be in ON time complexity
+        ##################################################
+        self.MatchFindFolder = r"E:\NCR\TestImages\Faces\MatcherFolder"
+        #self.MatchFindFolder = r"E:\NCR\TestImages\FurnitureToMAtch"
+        self.MatchInputSet = False  # if a list of input images are provided the system will find similarities only with them, rather than
+        # attempt to match every image sequentially.
+
+
+
+
+
+
+
+
+
+        # END USER OPTIONS
+        self.Outputfolder = r"E:\NCR\TestImages\MatchOutput"
+        self.TraceExtractedImg_to_DatRecord = "TraceImg_to_DatRecord.json"
+        self.OutputPairs = self.Outputfolder + "\\Pairs\\"
+        self.OutputDuplicates = self.Outputfolder + "\\Duplicates\\"
+        self.ImagesInMem_Pairing = dict()
+        self.GetDuplicates = False
+        self.startTime = None
+        self.Endtime = None
+        self.HM_data_MetricDistances = None
+        self.HM_data_MetricDistances_auto = None
+        self.DummyMinValue = -9999923
+        self.MetricDictionary = dict()
+        self.TraceExtractedImg_to_DatRecordObj = None
+        self.ImagesInMem_to_Process = dict()
+        self.DuplicatesToCheck = dict()
+        self.DuplicatesFound = []
+        self.Mean_Std_Per_cyclelist = None
+        self.HistogramSelfSimilarityThreshold = 0.005  # should be zero but incase there is image compression noise
+        self.CurrentBaseImage = None
+        self.List_ImagesToMatchFIlenames = []
+        # populatemetricDictionary
+        self.Metrics_dict = dict()
+
+        if self.Use__FeatureMatch: self.Metrics_dict["HM_data_FM"] = None  # slow - maybe cant be hyperthreaded?
+        if self.Use__histogram: self.Metrics_dict["HM_data_histo"] = None  # fast =no idea about hyperthreading
+        if self.Use__FourierDifference: self.Metrics_dict[
+            "HM_data_FourierDifference"] = None  # fast -hyperthreading yes
+        if self.Use__PhaseCorrelation: self.Metrics_dict["HM_data_PhaseCorrelation"] = None  # -hyperthreading yes
+        if self.Use__HOG_featureMatch: self.Metrics_dict["HM_data_HOG_Dist"] = None  # slow -hyperthreading yes
+        if self.Use__EigenVectorDotProd: self.Metrics_dict["HM_data_EigenVectorDotProd"] = None  # fast
+        if self.Use__EigenValueDifference: self.Metrics_dict[
+            "HM_data_EigenValueDifference"] = None  # fast #-hyperthreading yes
+        if self.Use__FourierPowerDensity: self.Metrics_dict[
+            "HM_data_FourierPowerDensity"] = None  # fast #-hyperthreading yes
+        if self.Use__MacroStructure: self.Metrics_dict["HM_data_MacroStructure"] = None
+        if self.Use__StructuralPCA_dotProd: self.Metrics_dict["HM_data_StructuralPCA_dotProd"] = None
+        if self.Use__StructuralPCA_VectorValue: self.Metrics_dict["HM_data_StructuralPCA_VectorValue"] = None
+
+        for metrix in self.Metrics_dict:
+            print("Using metrics",metrix)
+
     def ForceNormalise_forHOG(self,image1):
         #TODO cannot figure out why normal normalising makes this (visibly) normalised
         #while other methods leave it blown out - it may not be significant statistically but
@@ -168,85 +262,6 @@ class MatchImagesObject():
         DoubleUp="DoubleUp"
 
     """Class to hold information for image sorting & match process"""
-    def __init__(self):
-        #USER VARS
-        #self.InputFolder=r"E:\NCR\TestImages\Faces\img_align_celeba"
-        self.InputFolder=r"E:\NCR\TestImages\Furniture"
-        #self.InputFolder=r"E:\NCR\TestImages\Goodfellas_longshot_Random"
-        #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
-        #self.InputFolder=r"E:\NCR\TestImages\UK_1000"
-        #self.InputFolder=r"E:\NCR\TestImages\Faces\randos"
-        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
-        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
-        #self.InputFolder=r"E:\NCR\TestImages\MixedSets_side"
-
-
-        self.SubSetOfData=int(20)#subset of data
-
-        #images have to be prepared in application specific ways - choose function here
-        self.PrepareImagesFunction=MatchImages_lib.PrepareImageMetrics_FacesFurniture
-
-        #what metrics to use
-        self.Use__FeatureMatch=False#match detailed areas of image - quite slow
-        self.Use__histogram=True#match how close the image colour distribution is - structure does not matter
-        self.Use__FourierDifference=True#only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
-        self.Use__PhaseCorrelation=False#not developed yet
-        self.Use__HOG_featureMatch=True#dense feature match - good for small images
-        self.Use__EigenVectorDotProd=False#how close are principle components orientated- doesnt seem to work correctly yet
-        self.Use__EigenValueDifference=True#how close are principle component lengths - works pretty well
-        self.Use__FourierPowerDensity=True#histogram of frequencies found in image - works well
-
-        #set this to "2" to force inline processing
-        self.MemoryError_ReduceLoad=(False,2)#fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
-        self.BeastMode=False# Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
-        #self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
-        self.HyperThreading=True#Experimental - hyperthreads are virtual cores - so if you see multiprocesses not maxed out for their
-        #share of CPU - potentially this might mean they could be hyperthreaded - but feature matching may not work as well like this if
-        #enabled.. needs more testing - also lots of threads will blow out the memory
-        #internal variables
-        self.FreeMemoryBuffer_pc=25#how much memory % should be reserved while processing
-
-        self.MatchFindFolder = r"E:\NCR\TestImages\Faces\MatcherFolder"
-        self.MatchInputSet=True#if a list of input images are provided the system will find similarities only with them, rather than
-        #attempt to match every image sequentially.
-
-
-
-        #END USER OPTIONS
-        self.Outputfolder=r"E:\NCR\TestImages\MatchOutput"
-        self.TraceExtractedImg_to_DatRecord="TraceImg_to_DatRecord.json"
-        self.OutputPairs=self.Outputfolder + "\\Pairs\\"
-        self.OutputDuplicates=self.Outputfolder + "\\Duplicates\\"
-        self.ImagesInMem_Pairing=dict()
-        self.GetDuplicates=False
-        self.startTime =None
-        self.Endtime =None
-        self.HM_data_MetricDistances=None
-        self.HM_data_MetricDistances_auto=None
-        self.DummyMinValue=-9999923
-        self.MetricDictionary=dict()
-        self.TraceExtractedImg_to_DatRecordObj=None
-        self.ImagesInMem_to_Process=dict()
-        self.DuplicatesToCheck=dict()
-        self.DuplicatesFound=[]
-        self.Mean_Std_Per_cyclelist=None
-        self.HistogramSelfSimilarityThreshold=0.005#should be zero but incase there is image compression noise
-        self.CurrentBaseImage=None
-        self.List_ImagesToMatchFIlenames=None
-        #populatemetricDictionary
-        self.Metrics_dict=dict()
-        
-
-        if self.Use__FeatureMatch: self.Metrics_dict["HM_data_FM"]=None#slow - maybe cant be hyperthreaded?
-        if self.Use__histogram:self.Metrics_dict["HM_data_histo"]=None#fast =no idea about hyperthreading
-        if self.Use__FourierDifference:self.Metrics_dict["HM_data_FourierDifference"]=None#fast -hyperthreading yes
-        if self.Use__PhaseCorrelation:self.Metrics_dict["HM_data_PhaseCorrelation"]=None #-hyperthreading yes
-        if self.Use__HOG_featureMatch:self.Metrics_dict["HM_data_HOG_Dist"]=None#slow -hyperthreading yes
-        if self.Use__EigenVectorDotProd:self.Metrics_dict["HM_data_EigenVectorDotProd"]=None#fast
-        if self.Use__EigenValueDifference:self.Metrics_dict["HM_data_EigenValueDifference"]=None#fast #-hyperthreading yes
-        if self.Use__FourierPowerDensity:self.Metrics_dict["HM_data_FourierPowerDensity"]=None#fast #-hyperthreading yes
-        for metrix in self.Metrics_dict:
-            print("Using metrics",metrix)
 
     class FeatureMatch_Dict_Common:
 
@@ -284,6 +299,9 @@ class MatchImagesObject():
             self.DebugImage=None
             self.OriginalImageFilePath=None
             self.PwrSpectralDensity=None
+            self.MacroStructure_img=None
+            self.PCA_Struct_EigenVecs=None
+            self.PCA_Struct_EigenVals=None
             
 def PlotAndSave(Title,Filepath,Data,maximumvalue):
     
@@ -312,6 +330,28 @@ def PlotAndSaveHistogram(Title,Filepath,Data,maximumvalue,bins):
         plt.close()
     except Exception as e:
         print("Error with matpyplot",e)
+
+
+def HM_data_MetricDistances():
+    print("plop")
+
+
+def PlotAndSave_2datas(Title, Filepath, Data1):
+    # this causes crashes
+    # save out plot of 1D data
+    try:
+        # Data1=np.random.rand(30,22)
+        plt.pcolormesh((Data1), cmap='autumn')
+        # plt.plot(Data1,Data2,'bo')#bo will draw dots instead of connected line
+        plt.ylabel(Title)
+        # plt.ylim([0, max(Data1)])
+        # plt.ylim([0, max(Data2)])
+        plt.savefig(Filepath)
+        plt.cla()
+        plt.clf()
+        plt.close()
+    except Exception as e:
+        print("Error with matpyplot", e)
 
 
 def GetAverageOfMatches(List,Span):
@@ -351,16 +391,17 @@ def main():
         _3DVisLabLib. MakeFolder( PrepareMatchImages.OutputPairs)
         _3DVisLabLib. MakeFolder(PrepareMatchImages.OutputDuplicates)
 
+
     #ask if user wants to check for duplicates
     print("Get duplicates only?? - this will be in ~o^(2/N) complexity time (very long)!!!")
     PrepareMatchImages.GetDuplicates= _3DVisLabLib.yesno("?")
 
+    print("filtering nested images from", PrepareMatchImages.InputFolder,"this can several minutes if N>10,000")
     #get all files in input folder
     InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(PrepareMatchImages.InputFolder)
 
     #filter out non images
     ListAllImages=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
-
 
     #load images in random order for testing
     randomdict=dict()
@@ -418,8 +459,8 @@ def main():
             PrepareMatchImages.TraceExtractedImg_to_DatRecordObj
     except Exception as e:
         print("JSON_Open error attempting to open json file " + str(PrepareMatchImages.InputFolder + "\\" + PrepareMatchImages.TraceExtractedImg_to_DatRecord) + " " + str(e))
-        if _3DVisLabLib.yesno("Continue operation? No image to dat record trace will be possible so only image matching & sorting")==False:
-            raise Exception("User declined to continue after JSOn image vs dat record file not found")
+        #if _3DVisLabLib.yesno("Continue operation? No image to dat record trace will be possible so only image matching & sorting")==False:
+        #    raise Exception("User declined to continue after JSOn image vs dat record file not found")
     #start timer
     PrepareMatchImages.startTime=time.time()
 
@@ -435,12 +476,12 @@ def main():
         if Index%30==0: print("Image load",Index,"/",len(RandomOrder))
 
         #if True==True:
-        try:
-            ImageInfo=PrepareMatchImages.PrepareImagesFunction(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator)
-            #populate dictionary
-            PrepareMatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
-        except:
-            print("error with image, skipping",ImagePath)
+        #try:
+        ImageInfo=PrepareMatchImages.PrepareImagesFunction(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator)
+        #populate dictionary
+        PrepareMatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
+        #except:
+        #    print("error with image, skipping",ImagePath)
 
     #need this to copy the keypoints for some reason - incompatible with pickle which means
     #any multiprocessing wont work either
@@ -632,6 +673,7 @@ def main():
                                 print("No match for",returnItem)
 
                 CompletedProcesses=CompletedProcesses+len(listJobs)
+                print("Jobs done:", CompletedProcesses, "/", len(MatchImages.ImagesInMem_Pairing))
                 try:
                     #get timings
                     listTimings.append(round(time.perf_counter()-t1_start,2))
@@ -639,7 +681,7 @@ def main():
                     listAvgTime.append(round(listTimings[-1]/listCounts[-1],3))
                     #start timer again
                     t1_start = time.perf_counter()
-                    print("Jobs done:", CompletedProcesses,"/",len(MatchImages.ImagesInMem_Pairing))
+
                     #clear list of jobs
                     listJobs=[]
                 
@@ -709,16 +751,26 @@ def main():
     #create diagonally symetrical matrix
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
         for testImageList in MatchImages.ImagesInMem_Pairing:
+            if MatchImages.MatchInputSet == True:
+                if (testImageList > len(MatchImages.List_ImagesToMatchFIlenames)) and (BaseImageList > len(MatchImages.List_ImagesToMatchFIlenames)):
+                    continue
             if testImageList<BaseImageList:
                 for MatchMetric in MatchImages.Metrics_dict:
                     MatchImages.Metrics_dict[MatchMetric][BaseImageList,testImageList]=MatchImages.Metrics_dict[MatchMetric][testImageList,BaseImageList]
+
     #fix any bad numbers
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
         for testImageList in MatchImages.ImagesInMem_Pairing:
+            if MatchImages.MatchInputSet == True:
+                if (testImageList > len(MatchImages.List_ImagesToMatchFIlenames)) and (BaseImageList > len(MatchImages.List_ImagesToMatchFIlenames)):
+                    continue
+
             for MatchMetric in MatchImages.Metrics_dict:
                 if math.isnan( MatchImages.Metrics_dict[MatchMetric][BaseImageList,testImageList]):
                     MatchImages.Metrics_dict[MatchMetric][BaseImageList,testImageList]=MatchImages.DummyMinValue
                     print("Bad value found, ",MatchMetric)
+
+
 
     #normalize
     for MatchMetric in MatchImages.Metrics_dict:
@@ -730,6 +782,10 @@ def main():
             if TestImageList<BaseImageList:
                 #data is diagonally symmetrical
                 continue
+            #special case if matching input images - dont need to complete similarity matrix
+            if MatchImages.MatchInputSet == True:
+                if (testImageList > len(MatchImages.List_ImagesToMatchFIlenames)) and (BaseImageList > len(MatchImages.List_ImagesToMatchFIlenames)):
+                    continue
             #create total of all metrics
             BuildUpTotals=[]
             for MatchMetric in MatchImages.Metrics_dict:
@@ -755,14 +811,14 @@ def main():
 
     #match images to set of input images
     if MatchImages.MatchInputSet==True:
-        MatchImages_lib.MatchImagestoInputImages(copy.deepcopy(MatchImages),PlotAndSave_2datas,PlotAndSave)
+        MatchImages_lib.MatchImagestoInputImages(MatchImages,PlotAndSave_2datas,PlotAndSave)
         exit()
     else:
         #sequential matching
-        MatchImages_lib.SequentialMatchingPerImage(copy.deepcopy(MatchImages),PlotAndSave_2datas,PlotAndSave)
+        MatchImages_lib.SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave)
 
         #pairwise matching
-        MatchImages_lib.PairWise_Matching(copy.deepcopy(MatchImages),PlotAndSave_2datas,PlotAndSave,ImgCol_InfoSheet_Class)
+        MatchImages_lib.PairWise_Matching(MatchImages,PlotAndSave_2datas,PlotAndSave,ImgCol_InfoSheet_Class)
 
         
 
