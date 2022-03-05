@@ -53,39 +53,40 @@ class MatchImagesObject():
         # self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         # self.InputFolder=r"E:\NCR\TestImages\UK_1000"
         #self.InputFolder=r"E:\NCR\TestImages\Food\images"
-        self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
+        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         # self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
-        # self.InputFolder=r"E:\NCR\TestImages\MixedSets_side"
+        self.InputFolder=r"E:\NCR\TestImages\Food\images\cup_cakes"
         ##################################################
         ##set subset of data - will select random images
         ##if cross checking for similarity will be in O (n/2) time complexity
         ##################################################
-        self.SubSetOfData = int(26000)  # subset of data
+        self.SubSetOfData = int(50)  # subset of data
         ################################################################
         ##select what function will be used, which will load image,crop,resize
         ##etc for all analytical procesess
         ###################################################################
         # images have to be prepared in application specific ways - choose function here - don't leave the "()"!!!!
-        self.PrepareImagesFunction = MatchImages_lib.PrepareImageMetrics_NotesSide
+        self.PrepareImagesFunction = MatchImages_lib.PrepareImageMetrics_FacesFurniture
+        self.PreviewImagePrep=True#preview image processing functions
         ######################################################################
         ##turn on and off which analytics to use, some will add noise rather
         ##than useful metrics depending on images to analyse
         ######################################################################
         # what metrics to use
         self.Use__FeatureMatch = False  # match detailed areas of image - quite slow
-        self.Use__histogram = False  # match how close the image colour distribution is - structure does not matter
+        self.Use__histogram = True  # match how close the image colour distribution is - structure does not matter
         self.Use__FourierDifference = False  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
-        self.Use__PhaseCorrelation = False  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
+        self.Use__PhaseCorrelation = True  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
         #in theory can convert for instance fourier magnitude image, polar unwrap it and check using phase correlation - but has to be proven
-        self.Use__HOG_featureMatch = False  # dense feature match - good for small images - very effective for mm side
+        self.Use__HOG_featureMatch = True  # dense feature match - good for small images - very effective for mm side
         self.Use__EigenVectorDotProd = False  # how close are principle components orientated- doesnt seem to work correctly yet - MUST BE SQUARE!
-        self.Use__EigenValueDifference = False  # how close are principle component lengths - works pretty well - still needs a look at in how to package up matrix, and if using non -square do we use SVD instead?
+        self.Use__EigenValueDifference = True  # how close are principle component lengths - works pretty well - still needs a look at in how to package up matrix, and if using non -square do we use SVD instead?
         self.Use__FourierPowerDensity = False  # histogram of frequencies found in image - works very well
-        self.Use__MacroStructure=True#3*3 image to compare macrostructure - experimental
+        self.Use__MacroStructure=True#6*6 image to compare macrostructure - experimental
         self.Use__StructuralPCA_dotProd=False#Principle component analysis on binarised image - a geometrical PCA
-        self.Use__StructuralPCA_VectorValue = False  # Principle component analysis on binarised image - a geometrical PCA
+        self.Use__StructuralPCA_VectorValue = True  # Principle component analysis on binarised image - a geometrical PCA
         ######################################################
-        ##set multi process behaviour - can force no threading if memory issues are encountered
+        ##set multi process behaviour - can force no threading if memory issues are encountered (imgs > 3000)
         #######################################################
         # set this to "1" to force inline processing, otherwise to limit cores set to the cores you wish to use then add one (as system will remove one for safety regardless)
         self.MemoryError_ReduceLoad = (True,1)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
@@ -103,7 +104,7 @@ class MatchImagesObject():
         ##################################################
         self.MatchFindFolder = r"E:\NCR\TestImages\Faces\MatcherFolder"
         #self.MatchFindFolder = r"E:\NCR\TestImages\FurnitureToMAtch"
-        self.MatchInputSet = False  # if a list of input images are provided the system will find similarities only with them, rather than
+        self.MatchInputSet = True  # if a list of input images are provided the system will find similarities only with them, rather than
         # attempt to match every image sequentially.
 
 
@@ -476,12 +477,12 @@ def main():
         if Index%30==0: print("Image load",Index,"/",len(RandomOrder))
 
         #if True==True:
-        #try:
-        ImageInfo=PrepareMatchImages.PrepareImagesFunction(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator)
+        try:
+            ImageInfo=PrepareMatchImages.PrepareImagesFunction(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator)
         #populate dictionary
-        PrepareMatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
-        #except:
-        #    print("error with image, skipping",ImagePath)
+            PrepareMatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
+        except:
+            print("error with image, skipping",ImagePath)
 
     #need this to copy the keypoints for some reason - incompatible with pickle which means
     #any multiprocessing wont work either

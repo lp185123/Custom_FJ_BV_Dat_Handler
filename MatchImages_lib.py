@@ -84,22 +84,27 @@ def PrepareImageMetrics_FacesFurniture(PrepareMatchImages,ImagePath,Index,ImageR
     #special case - don't crop the main set of images, but crop the incoming faces
     if ImagePath in PrepareMatchImages.List_ImagesToMatchFIlenames.values():
         #if faces - crop
-        GrayScale_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(GrayScale_Resized,(44,184),(40,135))#Y range then X range
-        Colour_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized,(44,184),(40,135))#Y range then X range
-
+        GrayScale_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(GrayScale_Resized,(44,184),(35,140))#Y range then X range
+        Colour_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized,(44,184),(35,140))#Y range then X range
         if Index<3: ImageReviewDict["Colour_Resized_FACE"]=Colour_Resized
+
     else:
         #otherwise, just resize - might want to keep aspect ratio somehow
         #dummy image is so we can paste in the above
-        DummyImage = PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized, (44, 184),(40,135))  # Y range then X range
+        DummyImage = PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized, (44, 184),(35,140))  # Y range then X range
         GrayScale_Resized=cv2.resize(GrayScale_Resized,(DummyImage.shape[1] ,DummyImage.shape[0]))
         Colour_Resized = cv2.resize(Colour_Resized, (DummyImage.shape[1], DummyImage.shape[0]))
         if Index < 3: ImageReviewDict["Colour_Resized_ ITEM"] = Colour_Resized
 
     #get small image to experiment with macro structure matching
-    MacroStructure_img = cv2.resize(Colour_Resized,(6,6))
+    MacroStructure_img = cv2.resize(Colour_Resized,(7,7))
     if Index < 3: ImageReviewDict["MacroStructure_img"] =  cv2.resize(MacroStructure_img,(270,270))#blow it up so we can see the preview- will be tiny otherwise
 
+    #get PCA for structure
+    image_result,angle_list,eigenvectors_list,eigenvalues_list=PCA_Structure(GrayScale_Resized)
+    if Index < 3: ImageReviewDict["get PCA for structure"] = image_result
+    PCA_Struct_EigenVecs=eigenvectors_list
+    PCA_Struct_EigenVals=eigenvalues_list
 
 
     #create version for feature matching
@@ -181,84 +186,29 @@ def PrepareImageMetrics_FacesFurniture(PrepareMatchImages,ImagePath,Index,ImageR
     #get a version of the Fourier magnitude that will work with the opencv phase correlation function to get similarity metric
     #this works with the fourier as it is positioned in the centre of the image - this wouldnt work well with
     #images that have translation and rotation differences
-    PhaseCorrelate_FourierMagImg=GetPhaseCorrelationReadyImage(FFT_magnitude_spectrum)
-    if Index<3: ImageReviewDict["PhaseCorrelate_FourierMagImg visualise"]=cv2.convertScaleAbs(PhaseCorrelate_FourierMagImg)
+    #PhaseCorrelate_FourierMagImg=GetPhaseCorrelationReadyImage(FFT_magnitude_spectrum)
+    #PhaseCorrelate_FourierMagImg = np.float32(PhaseCorrelate_FourierMagImg)
+    #if Index < 3: ImageReviewDict["PhaseCorrelate_FourierMagImg visualise"] = cv2.convertScaleAbs(PhaseCorrelate_FourierMagImg)
 
 
-    PhaseCorrelate_Std=PrepareMatchImages.USERFunction_ResizePercent(GrayScale_Resized,40)
+    PhaseCorrelate_Std=cv2.resize(Colour_Resized,(45,45))#PrepareMatchImages.USERFunction_ResizePercent(GrayScale_Resized,40)
     #if we are using an image we hvae to convert to float
-    PhaseCorrelate_Std = PhaseCorrelate_Std.astype("float32")
+    #can only do grayscale images
+    if len(PhaseCorrelate_Std.shape)==3:
+        PhaseCorrelate_Std=cv2.cvtColor(PhaseCorrelate_Std, cv2.COLOR_BGR2GRAY)
+    PhaseCorrelate_Std = np.float32(PhaseCorrelate_Std)
     #PhaseCorrelate_Std=GetPhaseCorrelationReadyImage(PhaseCorrelate_Std)
-    if Index<3: ImageReviewDict["PhaseCorrelate_Std visualise"]=cv2.convertScaleAbs(PhaseCorrelate_Std)
+    if Index<3: ImageReviewDict["PhaseCorrelate_Std visualise"]=cv2.resize(cv2.convertScaleAbs(PhaseCorrelate_Std),(300,300))
 
-
-    DebugImage=PrepareMatchImages.StackTwoimages(Colour_Resized,FFT_magnitude_spectrum_visualise)
-
-    if Index==-1:
+    if PrepareMatchImages.PreviewImagePrep==True and Index<1:
         #on first loop show image to user
         FM_DrawnKeypoints=_3DVisLabLib.draw_keypoints_v2(StackedColour_AndGradient_img.copy(),keypoints)
         ImageReviewDict["FM_DrawnKeypoints"]=FM_DrawnKeypoints
-
 
         for imagereviewimg in ImageReviewDict:
             Img=ImageReviewDict[imagereviewimg]
             print(imagereviewimg)
             _3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(Img,(Img.shape[1]*1,Img.shape[0]*1)),0,True,True)
-        
-
-    #get fourier transform
-    #dft = cv2.dft(np.float32(OriginalImage_GrayScale),flags = cv2.DFT_COMPLEX_OUTPUT)
-    #dft_shift = np.fft.fftshift(dft)
-    #magnitude = cv2.magnitude(dft_shift[:,:,0],dft_shift[:,:,1])
-    #product = 20*np.log(magnitude)
-    
-
-
-    #magnitude_spectrum_normed=PrepareMatchImages.ForceNormalise_forHOG(magnitude_spectrum)
-    #print("forced magnitude_spectrum_normed")
-    #_3DVisLabLib.ImageViewer_Quick_no_resize(magnitude_spectrum_normed,0,True,True)
-
-
-    #get eigenvectors and values for image
-    #have to use grayscale at the moment
-    #convert using opencv converter to comply with example code
-    #https://docs.opencv.org/3.4/d1/dee/tutorial_introduction_to_pca.html
-    #ImageforPCA=cv2.cvtColor(Pod1Image_col, cv2.COLOR_BGR2GRAY)
-    # Convert image to binary
-    #_, bw = cv2.threshold(ImageforPCA, 50, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-    #adaptive threshold
-    #bw = cv2.adaptiveThreshold(ImageforPCA,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,11,2)
-    # Find all the contours in the thresholded image
-    # _, contours = cv2.findContours(bw, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-    # for i, c in enumerate(contours):
-    #     # Calculate the area of each contour
-    #     area = cv2.contourArea(c)
-    #     # Ignore contours that are too small or too large
-    #     if area < 1e2 or 1e5 < area:
-    #         continue
-    #     # Draw each contour only for visualisation purposes
-    #     cv2.drawContours(ImageforPCA, contours, i, (0, 0, 255), 2)
-    #     # Find the orientation of each shape
-    #     _3DVisLabLib.Get_PCA_getOrientation(c, ImageforPCA)
-
-    #_3DVisLabLib.ImageViewer_Quick_no_resize(bw,0,True,True)
-    # Find the orientation of each shape
-    #_3DVisLabLib.Get_PCA_getOrientation(bw, ImageforPCA)
-    #_3DVisLabLib.ImageViewer_Quick_no_resize(ImageforPCA,0,True,True)
-    #https://towardsdatascience.com/principal-component-analysis-in-depth-understanding-through-image-visualization-892922f77d9f
-    #in_matrix = None 
-    #vec = OriginalImage_GrayScale.reshape(OriginalImage_GrayScale.shape[0] * OriginalImage_GrayScale.shape[1])
-    #in_matrix = vec
-    #can also stack images if we want
-    #n_matrix = np.vstack((in_matrix, vec))'
-    #mean, eigenvectors = cv2.PCACompute(in_matrix, np.mean(in_matrix, axis=0).reshape(1,-1))
-    #np.set_printoptions(precision=3)
-    #cov = np.cov(MB_matrix.transpose())
-
-    
-
-
-    #save PCA into image info object
 
 
     #load into image object
@@ -277,11 +227,13 @@ def PrepareImageMetrics_FacesFurniture(PrepareMatchImages,ImagePath,Index,ImageR
     ImageInfo.HOG_Mag=None#HOG_mag
     ImageInfo.HOG_Angle=None#HOG_angle
     ImageInfo.OPENCV_hog_descriptor=OPENCV_hog_descriptor
-    ImageInfo.PhaseCorrelate_FourierMagImg=None#PhaseCorrelate_Std
+    ImageInfo.PhaseCorrelate_FourierMagImg=PhaseCorrelate_Std
     ImageInfo.DebugImage=None#DebugImage
     ImageInfo.OriginalImageFilePath=ImagePath
     ImageInfo.PwrSpectralDensity=PwrSpectralDensity
     ImageInfo.MacroStructure_img=MacroStructure_img
+    ImageInfo.PCA_Struct_EigenVecs = PCA_Struct_EigenVecs
+    ImageInfo.PCA_Struct_EigenVals = PCA_Struct_EigenVals
     return ImageInfo
 
 def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator):
@@ -319,9 +271,14 @@ def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict
     if Index<3: ImageReviewDict["Colour_Resized"]=Colour_Resized
 
     #get small image to experiment with macro structure matching
-    MacroStructure_img = cv2.resize(Colour_Resized,(6,6))
+    MacroStructure_img = cv2.resize(Colour_Resized,(7,7))
     if Index < 3: ImageReviewDict["MacroStructure_img"] =  cv2.resize(MacroStructure_img,(270,270))#blow it up so we can see the preview- will be tiny otherwise
 
+    # get PCA for structure
+    image_result, angle_list, eigenvectors_list, eigenvalues_list = PCA_Structure(Colour_Resized)
+    if Index < 3: ImageReviewDict["get PCA for structure"] = image_result
+    PCA_Struct_EigenVecs = eigenvectors_list
+    PCA_Struct_EigenVals = eigenvalues_list
 
     #create version for feature matching
     Image_For_FM=Colour_Resized.copy()#PrepareMatchImages.USERFunction_CropForFM(CoFlour_Resized)
@@ -503,6 +460,9 @@ def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict
     ImageInfo.OriginalImageFilePath=ImagePath
     ImageInfo.PwrSpectralDensity=PwrSpectralDensity
     ImageInfo.MacroStructure_img = MacroStructure_img
+    ImageInfo.PCA_Struct_EigenVecs = PCA_Struct_EigenVecs
+    ImageInfo.PCA_Struct_EigenVals = PCA_Struct_EigenVals
+
     return ImageInfo
 
 def PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator):
@@ -1049,8 +1009,6 @@ def PrintResults(MatchImages,PlotAndSave_2datas,PlotAndSave):
     FilePath=MatchImages.OutputPairs +"\\" + str("NoLoop") +("HM_data_MetricDistances_auto") +".jpg"
     PlotAndSave_2datas("HM_data_MetricDistances_auto",FilePath,MatchImages.HM_data_MetricDistances)
 
-
-
 def MatchImagestoInputImages(MatchImages,PlotAndSave_2datas,PlotAndSave):
     #debug final data
     MatchImages.HM_data_All=MatchImages.HM_data_MetricDistances
@@ -1069,6 +1027,8 @@ def MatchImagestoInputImages(MatchImages,PlotAndSave_2datas,PlotAndSave):
     #images to match should be ordered at start of metrics, so only need to do these
     for IndexImg,Image in enumerate(MatchImages.List_ImagesToMatchFIlenames):
         counter=0
+        MaxMatches=30
+        MatchCounter=0
         #create output folder
         SetMatchImages_folder=MatchImages.OutputPairs +"\\" + str(IndexImg) + "_" + str(Image.split(".")[-2]) + "\\"
         _3DVisLabLib. MakeFolder(SetMatchImages_folder)
@@ -1080,12 +1040,41 @@ def MatchImagestoInputImages(MatchImages,PlotAndSave_2datas,PlotAndSave):
         #get row of image with similarity of all other images
         Row=MatchImages.HM_data_All[0:len(MatchImages.ImagesInMem_Pairing),IndexImg]
 
+
+
+
+
         # generate sequential match metric graphs for each metric stored in dictionary
         # dictionary of lists
         MatchMetricGraphDict = dict()
         for MatchMetric in MatchImages.Metrics_dict:
             MatchMetricGraphDict[MatchMetric] = []
+        #manually add overall score
+        MatchMetricGraphDict["MatchMetric_all"]=[]
         MatchMetric_all = []
+
+        # get best match for each metric used
+        for MatchMetric in MatchImages.Metrics_dict:
+            if MatchMetric=="MatchMetric_all": continue #not a good idea putting this in with the other metrics
+
+            TestRow = MatchImages.Metrics_dict[MatchMetric][0:len(MatchImages.ImagesInMem_Pairing), IndexImg]
+
+            # make sure no input images are used for analysis - unmem this to check all metrics are working correctly
+            # (same image should be found for each metric as will have best match)
+            for RowIndex, TestImage in enumerate(TestRow):
+                TestImagePath = MatchImages.ImagesInMem_Pairing[RowIndex][0][0]
+                # if an image from folder of images to match to main folder - blank out value (so no match)
+                if TestImagePath in MatchImages.List_ImagesToMatchFIlenames.values():
+                    TestRow[RowIndex] = BlankOut
+
+            # get minimum value
+            Testresult = np.where(TestRow == np.amin(TestRow))
+            TestElement = random.choice(Testresult[0])  # incase we have two identical results
+            # record MatchMetric
+            TestMatchMetric_figure = round(TestRow[TestElement], 6)
+            FilePath=SetMatchImages_folder + "____BEST_" + str(MatchMetric) + ".jpg"
+            ImagePath = MatchImages.ImagesInMem_Pairing[TestElement][0][0]
+            shutil.copyfile(ImagePath, FilePath)
 
 
         #roll through all results in row, get each min and blank it out for next iteration
@@ -1097,9 +1086,8 @@ def MatchImagestoInputImages(MatchImages,PlotAndSave_2datas,PlotAndSave):
             Element=random.choice(result[0])#incase we have two identical results
             #record MatchMetric
             MatchMetric_figure=round(MatchImages.HM_data_All[Element,IndexImg],3)
-            # populate dynamic match metrics
-            for MatchMetric in MatchMetricGraphDict:
-                MatchMetricGraphDict[MatchMetric].append(MatchImages.Metrics_dict[MatchMetric][Element, IndexImg])
+
+
             #blank out similarity element
             MatchImages.HM_data_All[Element,IndexImg]=BlankOut
             MatchImages.HM_data_All[IndexImg,Element]=BlankOut
@@ -1107,16 +1095,27 @@ def MatchImagestoInputImages(MatchImages,PlotAndSave_2datas,PlotAndSave):
             FilePath=SetMatchImages_folder + "_00" + str(counter) +" MatchMetric_" + str(MatchMetric_figure) + "  .jpg"
             ImagePath=MatchImages.ImagesInMem_Pairing[Element][0][0]
             #save top matches and worst matches
-            #worst matches will saturate early so doesnt mean much but add for fun anyway
-            if RowIndex<30 or RowIndex> (len(Row)-10):
+            if MatchCounter<=MaxMatches:
                 #beyond first image we dont want other items in the match image folder to be used
                 if not ImagePath in MatchImages.List_ImagesToMatchFIlenames.values():
+                    MatchCounter=MatchCounter+1
                     shutil.copyfile(ImagePath, FilePath)
+                    # populate dynamic match metrics
+                    #dont update if we are skipping images or will confuse debugging
+                    for MatchMetric in MatchMetricGraphDict:
+                        if MatchMetric == "MatchMetric_all":
+                            # special case for aggregate
+                            MatchMetricGraphDict["MatchMetric_all"].append(MatchMetric_figure)
+                        else:
+                            MatchMetricGraphDict[MatchMetric].append(
+                                MatchImages.Metrics_dict[MatchMetric][Element, IndexImg])
+            else:
+                #dont need to process the rest if we have our matches
+                break
 
         # save out dynamic match metrics
         for MatchMetric in MatchMetricGraphDict:
             PlotAndSave(MatchMetric, SetMatchImages_folder + str(MatchMetric) + "_AUTO.jpg", MatchMetricGraphDict[MatchMetric], 1)
-
 
 def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
     
@@ -1316,11 +1315,28 @@ def ProcessSimilarity(Input):
         if "HM_data_MacroStructure" in MatchImages.Metrics_dict:
             #very small image (3*3) used to check macro structure
             diff = cv2.absdiff(Test_MacroStruct_img, Base_MacroStruct_img)
-
             MatchImages.Metrics_dict["HM_data_MacroStructure"][CurrentBaseImage, TestImageList] = diff.sum()
 
-        if         if self.Use__StructuralPCA_dotProd: self.Metrics_dict["HM_data_StructuralPCA_dotProd"] = None
-        if self.Use__StructuralPCA_VectorValue: self.Metrics_dict["HM_data_StructuralPCA_VectorValue"] = None
+        if "HM_data_StructuralPCA_dotProd" in MatchImages.Metrics_dict:
+            ListEigenDots = []
+            MaxRange = min(len(Test_PCA_Struct_EigenVecs), len(Base_PCA_Struct_EigenVecs))
+            for EVector in range(MaxRange):
+                # if unit vector, same direction =1 , opposite = -1,perpendicular=0
+                RawDotProd = Test_PCA_Struct_EigenVecs[EVector] @ Base_PCA_Struct_EigenVecs[EVector]
+                if RawDotProd<-1.001 or RawDotProd>1.001:#rounding errors
+                    print("ERROR HM_data_StructuralPCA_dotProd, dot product should be between -1 and 1",RawDotProd)
+                #move into positive numbers just in case
+                RawDotProd=RawDotProd+1
+                ListEigenDots.append(abs(2-RawDotProd))
+            EigenVectorDotProd_struct = sum(ListEigenDots)  # round((Base_Image_EigenVectors[0] @ Test_Image_EigenVectors[0]),5)
+            MatchImages.Metrics_dict["HM_data_StructuralPCA_dotProd"][CurrentBaseImage, TestImageList] = EigenVectorDotProd_struct
+
+        if "HM_data_StructuralPCA_VectorValue" in MatchImages.Metrics_dict:
+            Diff=0
+            MaxRange=min(len(Test_PCA_Struct_EigenVals),len(Base_PCA_Struct_EigenVals))
+            for eigenelem in range(MaxRange):
+                Diff=Diff+(Test_PCA_Struct_EigenVals[eigenelem]-Base_PCA_Struct_EigenVals[eigenelem])**2
+            MatchImages.Metrics_dict["HM_data_StructuralPCA_VectorValue"][CurrentBaseImage,TestImageList]=Diff
 
         if "HM_data_EigenValueDifference" in MatchImages.Metrics_dict:
             
@@ -1425,15 +1441,6 @@ def ProcessSimilarity(Input):
         #StackTwoimages=MatchImages.StackTwoimages(Base_Image_FM,Test_Image_FM)
         #_3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(StackTwoimages,(StackTwoimages.shape[1]*1,StackTwoimages.shape[0]*1)),0,True,True)
         #populate output metric comparison matrices
-
-        
-        
-        
-        
-        
-        
-
-
 
         #make data symmetrical for visualisation
         for MatchMetric in MatchImages.Metrics_dict:
