@@ -53,9 +53,9 @@ class MatchImagesObject():
         # self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         # self.InputFolder=r"E:\NCR\TestImages\UK_1000"
         #self.InputFolder=r"E:\NCR\TestImages\Food\images"
-        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
-        # self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
-        self.InputFolder=r"E:\NCR\TestImages\Food\images\cup_cakes"
+        self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
+        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
+        #self.InputFolder=r"E:\NCR\TestImages\Randos"
         #self.InputFolder=r"E:\NCR\TestImages\Faces\MatcherFolder"
 
         
@@ -63,20 +63,20 @@ class MatchImagesObject():
         ##set subset of data - will select random images
         ##if cross checking for similarity will be in O (n/2) time complexity
         ##################################################
-        self.SubSetOfData = int(4)  # subset of data
+        self.SubSetOfData = int(200)  # subset of data
         ################################################################
         ##select what function will be used, which will load image,crop,resize
         ##etc for all analytical procesess
         ###################################################################
         # images have to be prepared in application specific ways - choose function here - don't leave the "()"!!!!
-        self.PrepareImagesFunction = MatchImages_lib.PrepareImageMetrics_FacesRandomObjects
-        self.PreviewImagePrep=False#preview image processing functions
+        self.PrepareImagesFunction = MatchImages_lib.PrepareImageMetrics_NotesSide
+        self.PreviewImagePrep=True#preview image processing functions
         ######################################################################
         ##turn on and off which analytics to use, some will add noise rather
         ##than useful metrics depending on images to analyse
         ######################################################################
         # what metrics to use
-        self.Use__FeatureMatch = False  # match detailed areas of image - quite slow
+        self.Use__FeatureMatch = True  # match detailed areas of image - quite slow
         self.Use__histogram = True  # match how close the image colour distribution is - structure does not matter
         self.Use__FourierDifference = True  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
         self.Use__PhaseCorrelation = True  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
@@ -88,17 +88,18 @@ class MatchImagesObject():
         self.Use__MacroStructure=True#very small image to compare macrostructure - experimental
         self.Use__StructuralPCA_dotProd=True#Principle component analysis on binarised image - a geometrical PCA
         self.Use__StructuralPCA_VectorValue = True  # for STRUCTURE Principle component analysis on binarised image - a geometrical PCA
+        #self.Use__QuiltScan==True
         ######################################################
         ##set multi process behaviour - can force no threading if memory issues are encountered (imgs > 3000)
         #######################################################
         # set this to "1" to force inline processing, otherwise to limit cores set to the cores you wish to use then add one (as system will remove one for safety regardless)
-        self.MemoryError_ReduceLoad = (True,1)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
+        self.MemoryError_ReduceLoad = (False,1)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
         self.BeastMode = False  # Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         # self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
         self.HyperThreading = True  # Experimental - hyperthreads are virtual cores so may not work for metrics like Feature Matching (except HOG)
         #but its not possible to predict how windows will distribute processes to which cores
         #set buffer for memory that should remain - this is not definitive as its not possible to get an accurate size of the python process
-        self.FreeMemoryBuffer_pc = 25  # how much memory % should be reserved while processing
+        self.FreeMemoryBuffer_pc = 50  # how much memory % should be reserved while processing
         ##################################################
         ## input image matching mode - for ecah image in
         ## input image folder will try and find top 20
@@ -107,18 +108,12 @@ class MatchImagesObject():
         ##################################################
         self.MatchFindFolder = r"E:\NCR\TestImages\Faces\MatcherFolder"
         #self.MatchFindFolder = r"E:\NCR\TestImages\UK_Side_Small_15sets10_findmatch"
-        self.MatchInputSet = True  # if a list of input images are provided the system will find similarities only with them, rather than
+        self.MatchInputSet = False  # if a list of input images are provided the system will find similarities only with them, rather than
         # attempt to match every image sequentially.
 
 
 
-
-
-
-
-
-
-        # END USER OPTIONS
+        #END USER OPTIONS
         self.Outputfolder = r"E:\NCR\TestImages\MatchOutput"
         self.TraceExtractedImg_to_DatRecord = "TraceImg_to_DatRecord.json"
         self.OutputPairs = self.Outputfolder + "\\Pairs\\"
@@ -130,6 +125,7 @@ class MatchImagesObject():
         self.HM_data_MetricDistances = None
         self.HM_data_MetricDistances_auto = None
         self.DummyMinValue = -9999923
+        self.DummyMaxValue=9999999999
         self.MetricDictionary = dict()
         self.TraceExtractedImg_to_DatRecordObj = None
         self.ImagesInMem_to_Process = dict()
@@ -138,7 +134,8 @@ class MatchImagesObject():
         self.Mean_Std_Per_cyclelist = None
         self.HistogramSelfSimilarityThreshold = 0.005  # should be zero but incase there is image compression noise
         self.CurrentBaseImage = None
-        self.List_ImagesToMatchFIlenames = []
+        self.List_ImagesToMatchFIlenames = dict()
+
         # populatemetricDictionary
         self.Metrics_dict = dict()
 
@@ -156,6 +153,7 @@ class MatchImagesObject():
         if self.Use__MacroStructure: self.Metrics_dict["HM_data_MacroStructure"] = None
         if self.Use__StructuralPCA_dotProd: self.Metrics_dict["HM_data_StructuralPCA_dotProd"] = None
         if self.Use__StructuralPCA_VectorValue: self.Metrics_dict["HM_data_StructuralPCA_VectorValue"] = None
+        #if self.Use__QuiltScan: self.Metrics_dict["HM_data_QuiltScan"] = None
 
         for metrix in self.Metrics_dict:
             print("Using metrics",metrix)
@@ -615,7 +613,10 @@ def main():
     #cannot proceed if we can't use even one core
     if processes<1 or MaxPossibleProcesses<1:
         print(("Multiprocess Configuration error! Less than 1 process possible - memory or logic error"))
-        raise Exception("Multiprocess Configuration error! Less than 1 process possible - memory or logic error")
+        processes=1
+        MaxPossibleProcesses=1
+        print("Forcing processors =1, may cause memory error")
+        #raise Exception("Multiprocess Configuration error! Less than 1 process possible - memory or logic error")
     #check system has enough memory - if not restrict cores used
     if processes>MaxPossibleProcesses:
         print("WARNING!! possible memory overflow - restricting number of processes from",processes,"to",MaxPossibleProcesses)
