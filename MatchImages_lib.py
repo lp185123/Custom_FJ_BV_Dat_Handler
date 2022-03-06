@@ -47,7 +47,7 @@ def PCA_Structure(Image):
     return image_result,angle_list,eigenvectors_list,eigenvalues_list
 
 
-def PrepareImageMetrics_FacesFurniture(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator):
+def PrepareImageMetrics_FacesRandomObjects(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator):
     #create class object for each image
     ImageInfo=PrepareMatchImages.ImageInfo()
 
@@ -65,6 +65,7 @@ def PrepareImageMetrics_FacesFurniture(PrepareMatchImages,ImagePath,Index,ImageR
         OriginalImage_GrayScale[:,:,0]=OriginalImage_GrayScale_temp
         OriginalImage_GrayScale[:,:,1]=OriginalImage_GrayScale_temp
         OriginalImage_GrayScale[:,:,2]=OriginalImage_GrayScale_temp
+        #OriginalImage_GrayScale = cv2.cvtColor(OriginalImage_col, cv2.COLOR_BGR2GRAY)
 
     #OriginalImage_col=OriginalImage_GrayScale.copy()
 
@@ -81,27 +82,36 @@ def PrepareImageMetrics_FacesFurniture(PrepareMatchImages,ImagePath,Index,ImageR
     GrayScale_Resized=cv2.resize(GrayScale_Resized,(178 ,218))
     Colour_Resized=cv2.resize(Colour_Resized,(178 ,218))
 
+
+
+    Resized_Img_RetainRatio=Resize_toPixel_keepRatio(OriginalImage_col,218,178)
+    CreateCropInMatrixOfImage(Resized_Img_RetainRatio,100,70,5)
+
     #special case - don't crop the main set of images, but crop the incoming faces
     if ImagePath in PrepareMatchImages.List_ImagesToMatchFIlenames.values():
         #if faces - crop
-        GrayScale_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(GrayScale_Resized,(44,184),(35,140))#Y range then X range
-        Colour_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized,(44,184),(35,140))#Y range then X range
+        GrayScale_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(GrayScale_Resized,(44,184),(30,145))#Y range then X range
+        Colour_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized,(44,184),(30,145))#Y range then X range
         if Index<3: ImageReviewDict["Colour_Resized_FACE"]=Colour_Resized
 
     else:
         #otherwise, just resize - might want to keep aspect ratio somehow
         #dummy image is so we can paste in the above
-        DummyImage = PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized, (44, 184),(35,140))  # Y range then X range
+        DummyImage = PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized, (44, 184),(30,145))  # Y range then X range
         GrayScale_Resized=cv2.resize(GrayScale_Resized,(DummyImage.shape[1] ,DummyImage.shape[0]))
         Colour_Resized = cv2.resize(Colour_Resized, (DummyImage.shape[1], DummyImage.shape[0]))
         if Index < 3: ImageReviewDict["Colour_Resized_ ITEM"] = Colour_Resized
 
+    Colour_Resized_blurred = cv2.blur(src=Colour_Resized, ksize=(15, 15))
+    GrayScale_Resized_blurred = cv2.blur(src=GrayScale_Resized, ksize=(15, 15))
+
     #get small image to experiment with macro structure matching
-    MacroStructure_img = cv2.resize(Colour_Resized,(7,7))
+    MacroStructure_img = cv2.blur(src=Colour_Resized, ksize=(20, 20))
+    #MacroStructure_img = cv2.resize(Colour_Resized,(8,8))
     if Index < 3: ImageReviewDict["MacroStructure_img"] =  cv2.resize(MacroStructure_img,(270,270))#blow it up so we can see the preview- will be tiny otherwise
 
     #get PCA for structure
-    image_result,angle_list,eigenvectors_list,eigenvalues_list=PCA_Structure(GrayScale_Resized)
+    image_result,angle_list,eigenvectors_list,eigenvalues_list=PCA_Structure(GrayScale_Resized_blurred)
     if Index < 3: ImageReviewDict["get PCA for structure"] = image_result
     PCA_Struct_EigenVecs=eigenvectors_list
     PCA_Struct_EigenVals=eigenvalues_list
@@ -152,7 +162,7 @@ def PrepareImageMetrics_FacesFurniture(PrepareMatchImages,ImagePath,Index,ImageR
     #has to have shape=3 (colour image)
     #Y range then X range
     #Image_For_PCA=PrepareMatchImages.USERFunction_Crop_Pixels(OriginalImage_col,(42,177),(59,119))
-    Image_For_PCA=PrepareMatchImages.USERFunction_ResizePercent(Colour_Resized,90)
+    Image_For_PCA=PrepareMatchImages.USERFunction_ResizePercent(Colour_Resized_blurred,90)
     PC,EigVal,EigVec=Get_PCA_(Image_For_PCA)
     if Index<3: ImageReviewDict["Image_For_PCA"]=Image_For_PCA
 
@@ -179,8 +189,8 @@ def PrepareImageMetrics_FacesFurniture(PrepareMatchImages,ImagePath,Index,ImageR
     
 
     #get power spectral density 1d array
-
-    PwrSpectralDensity= GetPwrSpcDensity(Image_For_PCA)
+    PwrSpectralDensity=cv2.cvtColor(Colour_Resized, cv2.COLOR_BGR2GRAY)
+    PwrSpectralDensity = GetPwrSpcDensity(PwrSpectralDensity)
     #if Index<3: ImageReviewDict["PwrSpectralDensity_visualise"]=PwrSpectralDensity
 
     #get a version of the Fourier magnitude that will work with the opencv phase correlation function to get similarity metric
@@ -191,7 +201,7 @@ def PrepareImageMetrics_FacesFurniture(PrepareMatchImages,ImagePath,Index,ImageR
     #if Index < 3: ImageReviewDict["PhaseCorrelate_FourierMagImg visualise"] = cv2.convertScaleAbs(PhaseCorrelate_FourierMagImg)
 
 
-    PhaseCorrelate_Std=cv2.resize(Colour_Resized,(45,45))#PrepareMatchImages.USERFunction_ResizePercent(GrayScale_Resized,40)
+    PhaseCorrelate_Std=cv2.resize(Colour_Resized_blurred,(40,40))#PrepareMatchImages.USERFunction_ResizePercent(GrayScale_Resized,40)
     #if we are using an image we hvae to convert to float
     #can only do grayscale images
     if len(PhaseCorrelate_Std.shape)==3:
@@ -199,6 +209,11 @@ def PrepareImageMetrics_FacesFurniture(PrepareMatchImages,ImagePath,Index,ImageR
     PhaseCorrelate_Std = np.float32(PhaseCorrelate_Std)
     #PhaseCorrelate_Std=GetPhaseCorrelationReadyImage(PhaseCorrelate_Std)
     if Index<3: ImageReviewDict["PhaseCorrelate_Std visualise"]=cv2.resize(cv2.convertScaleAbs(PhaseCorrelate_Std),(300,300))
+
+
+
+
+
 
     if PrepareMatchImages.PreviewImagePrep==True and Index<1:
         #on first loop show image to user
@@ -266,16 +281,18 @@ def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict
     GrayScale_Resized=PrepareMatchImages.USERFunction_ResizePercent(OriginalImage_GrayScale,100)
     Colour_Resized=PrepareMatchImages.USERFunction_ResizePercent(OriginalImage_col,100)
 
-    GrayScale_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(GrayScale_Resized,(44,184),(32,145))#Y range then X range
-    Colour_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized,(44,184),(32,145))#Y range then X range
+    GrayScale_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(GrayScale_Resized,(99,165),(49,118))#Y range then X range
+    Colour_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized,(99,165),(49,118))#Y range then X range
     if Index<3: ImageReviewDict["Colour_Resized"]=Colour_Resized
 
     #get small image to experiment with macro structure matching
-    MacroStructure_img = cv2.resize(Colour_Resized,(7,7))
+    temp_MacroStructure_img=PrepareMatchImages.USERFunction_Crop_Pixels(OriginalImage_col,(42,177),(59,119))
+    MacroStructure_img = cv2.resize(temp_MacroStructure_img,(7,7))
     if Index < 3: ImageReviewDict["MacroStructure_img"] =  cv2.resize(MacroStructure_img,(270,270))#blow it up so we can see the preview- will be tiny otherwise
 
     # get PCA for structure
-    image_result, angle_list, eigenvectors_list, eigenvalues_list = PCA_Structure(Colour_Resized)
+    temp_PCA=PrepareMatchImages.USERFunction_Crop_Pixels(OriginalImage_col,(42,177),(59,119))
+    image_result, angle_list, eigenvectors_list, eigenvalues_list = PCA_Structure(temp_PCA)
     if Index < 3: ImageReviewDict["get PCA for structure"] = image_result
     PCA_Struct_EigenVecs = eigenvectors_list
     PCA_Struct_EigenVals = eigenvalues_list
@@ -363,16 +380,28 @@ def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict
     if Index<3: ImageReviewDict["PhaseCorrelate_FourierMagImg visualise"]=cv2.convertScaleAbs(PhaseCorrelate_FourierMagImg)
 
 
-    PhaseCorrelate_Std=PrepareMatchImages.USERFunction_ResizePercent(GrayScale_Resized,40)
+    #PhaseCorrelate_Std=PrepareMatchImages.USERFunction_ResizePercent(GrayScale_Resized,40)
     #if we are using an image we hvae to convert to float
-    PhaseCorrelate_Std = PhaseCorrelate_Std.astype("float32")
+    #PhaseCorrelate_Std = PhaseCorrelate_Std.astype("float32")
     #PhaseCorrelate_Std=GetPhaseCorrelationReadyImage(PhaseCorrelate_Std)
-    if Index<3: ImageReviewDict["PhaseCorrelate_Std visualise"]=cv2.convertScaleAbs(PhaseCorrelate_Std)
+    #if Index<3: ImageReviewDict["PhaseCorrelate_Std visualise"]=cv2.convertScaleAbs(PhaseCorrelate_Std)
 
 
-    DebugImage=PrepareMatchImages.StackTwoimages(Colour_Resized,FFT_magnitude_spectrum_visualise)
 
-    if Index==1:
+
+    PhaseCorrelate_Std=cv2.resize(Colour_Resized,(25,25))#PrepareMatchImages.USERFunction_ResizePercent(GrayScale_Resized,40)
+    #if we are using an image we hvae to convert to float
+    #can only do grayscale images
+    if len(PhaseCorrelate_Std.shape)==3:
+        PhaseCorrelate_Std=cv2.cvtColor(PhaseCorrelate_Std, cv2.COLOR_BGR2GRAY)
+    PhaseCorrelate_Std = np.float32(PhaseCorrelate_Std)
+    #PhaseCorrelate_Std=GetPhaseCorrelationReadyImage(PhaseCorrelate_Std)
+    if Index<3: ImageReviewDict["PhaseCorrelate_Std visualise"]=cv2.resize(cv2.convertScaleAbs(PhaseCorrelate_Std),(300,300))
+
+
+
+
+    if PrepareMatchImages.PreviewImagePrep==True and Index<1:
         #on first loop show image to user
         FM_DrawnKeypoints=_3DVisLabLib.draw_keypoints_v2(StackedColour_AndGradient_img.copy(),keypoints)
         ImageReviewDict["FM_DrawnKeypoints"]=FM_DrawnKeypoints
@@ -384,59 +413,6 @@ def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict
             _3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(Img,(Img.shape[1]*1,Img.shape[0]*1)),0,True,True)
         
 
-    #get fourier transform
-    #dft = cv2.dft(np.float32(OriginalImage_GrayScale),flags = cv2.DFT_COMPLEX_OUTPUT)
-    #dft_shift = np.fft.fftshift(dft)
-    #magnitude = cv2.magnitude(dft_shift[:,:,0],dft_shift[:,:,1])
-    #product = 20*np.log(magnitude)
-    
-
-
-    #magnitude_spectrum_normed=PrepareMatchImages.ForceNormalise_forHOG(magnitude_spectrum)
-    #print("forced magnitude_spectrum_normed")
-    #_3DVisLabLib.ImageViewer_Quick_no_resize(magnitude_spectrum_normed,0,True,True)
-
-
-    #get eigenvectors and values for image
-    #have to use grayscale at the moment
-    #convert using opencv converter to comply with example code
-    #https://docs.opencv.org/3.4/d1/dee/tutorial_introduction_to_pca.html
-    #ImageforPCA=cv2.cvtColor(Pod1Image_col, cv2.COLOR_BGR2GRAY)
-    # Convert image to binary
-    #_, bw = cv2.threshold(ImageforPCA, 50, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-    #adaptive threshold
-    #bw = cv2.adaptiveThreshold(ImageforPCA,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,11,2)
-    # Find all the contours in the thresholded image
-    # _, contours = cv2.findContours(bw, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-    # for i, c in enumerate(contours):
-    #     # Calculate the area of each contour
-    #     area = cv2.contourArea(c)
-    #     # Ignore contours that are too small or too large
-    #     if area < 1e2 or 1e5 < area:
-    #         continue
-    #     # Draw each contour only for visualisation purposes
-    #     cv2.drawContours(ImageforPCA, contours, i, (0, 0, 255), 2)
-    #     # Find the orientation of each shape
-    #     _3DVisLabLib.Get_PCA_getOrientation(c, ImageforPCA)
-
-    #_3DVisLabLib.ImageViewer_Quick_no_resize(bw,0,True,True)
-    # Find the orientation of each shape
-    #_3DVisLabLib.Get_PCA_getOrientation(bw, ImageforPCA)
-    #_3DVisLabLib.ImageViewer_Quick_no_resize(ImageforPCA,0,True,True)
-    #https://towardsdatascience.com/principal-component-analysis-in-depth-understanding-through-image-visualization-892922f77d9f
-    #in_matrix = None 
-    #vec = OriginalImage_GrayScale.reshape(OriginalImage_GrayScale.shape[0] * OriginalImage_GrayScale.shape[1])
-    #in_matrix = vec
-    #can also stack images if we want
-    #n_matrix = np.vstack((in_matrix, vec))'
-    #mean, eigenvectors = cv2.PCACompute(in_matrix, np.mean(in_matrix, axis=0).reshape(1,-1))
-    #np.set_printoptions(precision=3)
-    #cov = np.cov(MB_matrix.transpose())
-
-    
-
-
-    #save PCA into image info object
 
 
     #load into image object
@@ -455,7 +431,7 @@ def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict
     ImageInfo.HOG_Mag=None#HOG_mag
     ImageInfo.HOG_Angle=None#HOG_angle
     ImageInfo.OPENCV_hog_descriptor=OPENCV_hog_descriptor
-    ImageInfo.PhaseCorrelate_FourierMagImg=None#PhaseCorrelate_Std
+    ImageInfo.PhaseCorrelate_FourierMagImg=PhaseCorrelate_Std
     ImageInfo.DebugImage=None#DebugImage
     ImageInfo.OriginalImageFilePath=ImagePath
     ImageInfo.PwrSpectralDensity=PwrSpectralDensity
@@ -494,8 +470,8 @@ def PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReview
     #create resized versions
     GrayScale_Resized=PrepareMatchImages.USERFunction_ResizePercent(OriginalImage_GrayScale,100)
     Colour_Resized=PrepareMatchImages.USERFunction_ResizePercent(OriginalImage_col,100)
-    GrayScale_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(GrayScale_Resized,(0,65),(0,144))#Y range then X range
-    Colour_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized,(0,65),(0,144))#Y range then X range
+    GrayScale_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(GrayScale_Resized,(0,65),(0,120))#Y range then X range
+    Colour_Resized=PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized,(0,65),(0,120))#Y range then X range
     if Index<3: ImageReviewDict["Colour_Resized cropped"]=Colour_Resized
 
 
@@ -510,12 +486,12 @@ def PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReview
     if Index<3: ImageReviewDict["Image_For_FM"]=Image_For_FM
 
     # get small image to experiment with macro structure matching
-    MacroStructure_img = cv2.resize(Colour_Resized, (6, 6))
+    MacroStructure_img = cv2.resize(Colour_Resized, (7, 7))
     if Index < 3: ImageReviewDict["MacroStructure_img"] = cv2.resize(MacroStructure_img, (270, 270))  # blow it up so we can see the preview- will be tiny otherwise
 
     #create version for histogram matching
     Image_For_Histogram=Colour_Resized.copy()#PrepareMatchImages.USERFunction_CropForHistogram(Colour_Resized)
-    Image_For_Histogram=PrepareMatchImages.USERFunction_ResizePercent(Image_For_Histogram,100)
+    Image_For_Histogram=PrepareMatchImages.USERFunction_ResizePercent(Image_For_Histogram,50)
     if Index<3: ImageReviewDict["Image_For_Histogram"]=Image_For_Histogram
     #get histogram for comparing colours
     hist = cv2.calcHist([Image_For_Histogram], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
@@ -554,7 +530,6 @@ def PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReview
     #has to have shape=3 (colour image)
     Image_For_PCA=PrepareMatchImages.USERFunction_Crop_Pixels(Colour_Resized,(0,65),(0,65))
     Image_For_PCA=PrepareMatchImages.USERFunction_ResizePercent(Image_For_PCA,90)
-    
     PC,EigVal,EigVec=Get_PCA_(Image_For_PCA)
     if Index<3: ImageReviewDict["Image_For_PCA"]=Image_For_PCA
 
@@ -578,8 +553,6 @@ def PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReview
     #a lot of noise - lets see if we can remove noise
     kernel = np.ones((5,5),np.float32)/25#kernel size for smoothing - maybe make smoother as such small images
     dst = cv2.filter2D(FFT_magnitude_spectrum,-1,kernel)
-
-
     FFT_magnitude_spectrum_visualise=cv2.convertScaleAbs(dst)
     if Index<3: ImageReviewDict["FFT_magnitude_spectrum_visualise"]=FFT_magnitude_spectrum_visualise
     #PowerSpectralDensity=10*np.log10(abs(fshift).^2)
@@ -597,16 +570,19 @@ def PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReview
     if Index<3: ImageReviewDict["PhaseCorrelate_FourierMagImg visualise"]=cv2.convertScaleAbs(PhaseCorrelate_FourierMagImg)
 
 
-    PhaseCorrelate_Std=PrepareMatchImages.USERFunction_ResizePercent(GrayScale_Resized,40)
+
+    PhaseCorrelate_Std=cv2.resize(Colour_Resized,(25,25))#PrepareMatchImages.USERFunction_ResizePercent(GrayScale_Resized,40)
     #if we are using an image we hvae to convert to float
-    PhaseCorrelate_Std = PhaseCorrelate_Std.astype("float32")
+    #can only do grayscale images
+    if len(PhaseCorrelate_Std.shape)==3:
+        PhaseCorrelate_Std=cv2.cvtColor(PhaseCorrelate_Std, cv2.COLOR_BGR2GRAY)
+    PhaseCorrelate_Std = np.float32(PhaseCorrelate_Std)
     #PhaseCorrelate_Std=GetPhaseCorrelationReadyImage(PhaseCorrelate_Std)
-    if Index<3: ImageReviewDict["PhaseCorrelate_Std visualise"]=cv2.convertScaleAbs(PhaseCorrelate_Std)
+    if Index<3: ImageReviewDict["PhaseCorrelate_Std visualise"]=cv2.resize(cv2.convertScaleAbs(PhaseCorrelate_Std),(300,300))
 
 
-    DebugImage=PrepareMatchImages.StackTwoimages(Colour_Resized,FFT_magnitude_spectrum_visualise)
 
-    if Index==1:
+    if PrepareMatchImages.PreviewImagePrep==True and Index<1:
         #on first loop show image to user
         FM_DrawnKeypoints=_3DVisLabLib.draw_keypoints_v2(StackedColour_AndGradient_img.copy(),keypoints)
         ImageReviewDict["FM_DrawnKeypoints"]=FM_DrawnKeypoints
@@ -617,60 +593,6 @@ def PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReview
             print(imagereviewimg)
             _3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(Img,(Img.shape[1]*1,Img.shape[0]*1)),0,True,True)
         
-
-    #get fourier transform
-    #dft = cv2.dft(np.float32(OriginalImage_GrayScale),flags = cv2.DFT_COMPLEX_OUTPUT)
-    #dft_shift = np.fft.fftshift(dft)
-    #magnitude = cv2.magnitude(dft_shift[:,:,0],dft_shift[:,:,1])
-    #product = 20*np.log(magnitude)
-    
-
-
-    #magnitude_spectrum_normed=PrepareMatchImages.ForceNormalise_forHOG(magnitude_spectrum)
-    #print("forced magnitude_spectrum_normed")
-    #_3DVisLabLib.ImageViewer_Quick_no_resize(magnitude_spectrum_normed,0,True,True)
-
-
-    #get eigenvectors and values for image
-    #have to use grayscale at the moment
-    #convert using opencv converter to comply with example code
-    #https://docs.opencv.org/3.4/d1/dee/tutorial_introduction_to_pca.html
-    #ImageforPCA=cv2.cvtColor(Pod1Image_col, cv2.COLOR_BGR2GRAY)
-    # Convert image to binary
-    #_, bw = cv2.threshold(ImageforPCA, 50, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-    #adaptive threshold
-    #bw = cv2.adaptiveThreshold(ImageforPCA,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,11,2)
-    # Find all the contours in the thresholded image
-    # _, contours = cv2.findContours(bw, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-    # for i, c in enumerate(contours):
-    #     # Calculate the area of each contour
-    #     area = cv2.contourArea(c)
-    #     # Ignore contours that are too small or too large
-    #     if area < 1e2 or 1e5 < area:
-    #         continue
-    #     # Draw each contour only for visualisation purposes
-    #     cv2.drawContours(ImageforPCA, contours, i, (0, 0, 255), 2)
-    #     # Find the orientation of each shape
-    #     _3DVisLabLib.Get_PCA_getOrientation(c, ImageforPCA)
-
-    #_3DVisLabLib.ImageViewer_Quick_no_resize(bw,0,True,True)
-    # Find the orientation of each shape
-    #_3DVisLabLib.Get_PCA_getOrientation(bw, ImageforPCA)
-    #_3DVisLabLib.ImageViewer_Quick_no_resize(ImageforPCA,0,True,True)
-    #https://towardsdatascience.com/principal-component-analysis-in-depth-understanding-through-image-visualization-892922f77d9f
-    #in_matrix = None 
-    #vec = OriginalImage_GrayScale.reshape(OriginalImage_GrayScale.shape[0] * OriginalImage_GrayScale.shape[1])
-    #in_matrix = vec
-    #can also stack images if we want
-    #n_matrix = np.vstack((in_matrix, vec))'
-    #mean, eigenvectors = cv2.PCACompute(in_matrix, np.mean(in_matrix, axis=0).reshape(1,-1))
-    #np.set_printoptions(precision=3)
-    #cov = np.cov(MB_matrix.transpose())
-
-    
-
-
-    #save PCA into image info object
 
 
     #load into image object
@@ -696,6 +618,7 @@ def PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReview
     ImageInfo.MacroStructure_img = MacroStructure_img
     ImageInfo.PCA_Struct_EigenVecs=PCA_Struct_EigenVecs
     ImageInfo.PCA_Struct_EigenVals = PCA_Struct_EigenVals
+    
     return ImageInfo
 
 def GetHOG_featureVector(image):
@@ -757,6 +680,69 @@ def Get_PCA_(InputImage):
     ReturnSize=min(len(EigVal),6)
     return PC,EigVal[0:ReturnSize],EigVec[0:ReturnSize]
 
+def Resize_toPixel_keepRatio(Image,PixelsY,PixelsX):
+    #resize image keeping aspect ratio, fill out rest of image with blurred resized version without maintaining aspect ratio
+    FillImage=cv2.resize(Image,(PixelsX,PixelsY))
+    FillImage=cv2.blur(src=FillImage, ksize=(15, 15))
+    #fillimage will be canvas
+    #lazy code, resize by Y and if it doesnt fit resize again :3
+    PercenttoResize=PixelsY/Image.shape[0]
+    Resized=cv2.resize(Image,(int(Image.shape[1]*PercenttoResize),int(Image.shape[0]*PercenttoResize)))
+    #redo this and resize to longest vs shortest dims
+    if Resized.shape[1]>PixelsX:
+        PercenttoResize=PixelsX/Image.shape[1]
+        Resized=cv2.resize(Image,(int(Image.shape[1]*PercenttoResize),int(Image.shape[0]*PercenttoResize)))
+    #if colour/grayscale have to treat differently
+    #place in canvas
+    if len(Image.shape)==3:
+        FillImage[0:Resized.shape[0],0:Resized.shape[1],:]=Resized[:,:,:]
+    else:#grayscale
+        FillImage[0:Resized.shape[0],0:Resized.shape[1]]=Resized[:,:]
+    
+    return FillImage
+    
+
+def CreateCropInMatrixOfImage(Image,StartCropPc_100pc,EndCropPC_100pc,steps):
+    #for an input image, successively crop into the image in stages and create horizontal
+    #quilt
+    if len(Image.shape)!=3:
+        raise Exception("CreateCropInMatrixOfImage, please use colour image as input, or convert to 3 channels")
+    StartCropPc=StartCropPc_100pc/100
+    EndCropPC=EndCropPC_100pc/100
+    #for each crop, resize it back to original input image dimensions
+    #create canvas - stretch it horizontally - matrix maybe isnt necessary
+    Canvas=cv2.resize(Image,(Image.shape[1]*steps,Image.shape[0]))
+    #_3DVisLabLib.ImageViewer_Quick_no_resize(Canvas,0,True,True)
+    StepsX=np.linspace(StartCropPc*Image.shape[1],EndCropPC*Image.shape[1],steps)
+    StepsY=np.linspace(StartCropPc*Image.shape[0],EndCropPC*Image.shape[0],steps)
+    StepsX = [int(x) for x in StepsX]
+    StepsY = [int(x) for x in StepsY]
+
+    #get offset from side
+    SideOffsetX=[]
+    SideOffsetY=[]
+    for StepIndex,StepACtion in enumerate(StepsX):
+        SideOffsetX.append((Image.shape[1]-StepsX[StepIndex]))
+        SideOffsetY.append((Image.shape[0]-StepsY[StepIndex]))
+
+    #convert to ints
+    SideOffsetX = [int(x) for x in SideOffsetX]
+    SideOffsetY = [int(x) for x in SideOffsetY]
+    
+    List_CroppingImg=[]
+    for stepaction in range(0,steps):
+        Xposition_start=stepaction*Image.shape[1]#position horizontally
+        Xposition_end=(stepaction+1)*Image.shape[1]
+        #crop into input image
+        CroppedImage=Image[SideOffsetY[stepaction]:StepsY[stepaction],SideOffsetX[stepaction]:StepsX[stepaction],:]
+        List_CroppingImg.append(CroppedImage)
+        CroppedImage_resize=cv2.resize(CroppedImage,(Image.shape[1],Image.shape[2]))
+        Canvas[:,Xposition_start:Xposition_end,:]=CroppedImage_resize
+
+
+
+
+    _3DVisLabLib.ImageViewer_Quick_no_resize(Canvas,0,True,True)
 
 def GetPhaseCorrelationReadyImage(Image):
     #experiment with using rotational cross correlation type approach to the fourier magnitude
@@ -1092,14 +1078,15 @@ def MatchImagestoInputImages(MatchImages,PlotAndSave_2datas,PlotAndSave):
             MatchImages.HM_data_All[Element,IndexImg]=BlankOut
             MatchImages.HM_data_All[IndexImg,Element]=BlankOut
             #save out image
-            FilePath=SetMatchImages_folder + "_00" + str(counter) +" MatchMetric_" + str(MatchMetric_figure) + "  .jpg"
+
             ImagePath=MatchImages.ImagesInMem_Pairing[Element][0][0]
             #save top matches and worst matches
             if MatchCounter<=MaxMatches:
                 #beyond first image we dont want other items in the match image folder to be used
                 if not ImagePath in MatchImages.List_ImagesToMatchFIlenames.values():
-                    MatchCounter=MatchCounter+1
+                    FilePath = SetMatchImages_folder + "BestMatch_00" + str(MatchCounter) + " MatchMetric_" + str(MatchMetric_figure) + "  .jpg"
                     shutil.copyfile(ImagePath, FilePath)
+                    MatchCounter = MatchCounter + 1
                     # populate dynamic match metrics
                     #dont update if we are skipping images or will confuse debugging
                     for MatchMetric in MatchMetricGraphDict:
@@ -1408,6 +1395,8 @@ def ProcessSimilarity(Input):
             MatchImages.Metrics_dict["HM_data_HOG_Dist"][CurrentBaseImage,TestImageList]=HOG_distance
         
         if "HM_data_FourierPowerDensity" in MatchImages.Metrics_dict:
+            if len(Base_PwrSpectralDensity.shape)!=1:
+                raise Exception("Similarity test error, HM_data_FourierPowerDensity, expected input should be 1D histogram")
             #HM_data_FourierPowerDensity=random.random()
             #HM_data_FourierPowerDensity=np.correlate(Base_PwrSpectralDensity,Test_PwrSpectralDensity,mode='full')[0]
             #print(np.correlate(Base_PwrSpectralDensity,Test_PwrSpectralDensity,mode='full')[0:10])
@@ -1443,8 +1432,8 @@ def ProcessSimilarity(Input):
         #populate output metric comparison matrices
 
         #make data symmetrical for visualisation
-        for MatchMetric in MatchImages.Metrics_dict:
-            MatchImages.Metrics_dict[MatchMetric][TestImageList,CurrentBaseImage]=MatchImages.Metrics_dict[MatchMetric][CurrentBaseImage,TestImageList]
+        #for MatchMetric in MatchImages.Metrics_dict:
+        #    MatchImages.Metrics_dict[MatchMetric][TestImageList,CurrentBaseImage]=MatchImages.Metrics_dict[MatchMetric][CurrentBaseImage,TestImageList]
 
 
 

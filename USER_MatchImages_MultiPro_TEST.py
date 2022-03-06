@@ -56,18 +56,21 @@ class MatchImagesObject():
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         # self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
         self.InputFolder=r"E:\NCR\TestImages\Food\images\cup_cakes"
+        #self.InputFolder=r"E:\NCR\TestImages\Faces\MatcherFolder"
+
+        
         ##################################################
         ##set subset of data - will select random images
         ##if cross checking for similarity will be in O (n/2) time complexity
         ##################################################
-        self.SubSetOfData = int(50)  # subset of data
+        self.SubSetOfData = int(4)  # subset of data
         ################################################################
         ##select what function will be used, which will load image,crop,resize
         ##etc for all analytical procesess
         ###################################################################
         # images have to be prepared in application specific ways - choose function here - don't leave the "()"!!!!
-        self.PrepareImagesFunction = MatchImages_lib.PrepareImageMetrics_FacesFurniture
-        self.PreviewImagePrep=True#preview image processing functions
+        self.PrepareImagesFunction = MatchImages_lib.PrepareImageMetrics_FacesRandomObjects
+        self.PreviewImagePrep=False#preview image processing functions
         ######################################################################
         ##turn on and off which analytics to use, some will add noise rather
         ##than useful metrics depending on images to analyse
@@ -75,16 +78,16 @@ class MatchImagesObject():
         # what metrics to use
         self.Use__FeatureMatch = False  # match detailed areas of image - quite slow
         self.Use__histogram = True  # match how close the image colour distribution is - structure does not matter
-        self.Use__FourierDifference = False  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
+        self.Use__FourierDifference = True  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
         self.Use__PhaseCorrelation = True  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
         #in theory can convert for instance fourier magnitude image, polar unwrap it and check using phase correlation - but has to be proven
         self.Use__HOG_featureMatch = True  # dense feature match - good for small images - very effective for mm side
-        self.Use__EigenVectorDotProd = False  # how close are principle components orientated- doesnt seem to work correctly yet - MUST BE SQUARE!
-        self.Use__EigenValueDifference = True  # how close are principle component lengths - works pretty well - still needs a look at in how to package up matrix, and if using non -square do we use SVD instead?
-        self.Use__FourierPowerDensity = False  # histogram of frequencies found in image - works very well
-        self.Use__MacroStructure=True#6*6 image to compare macrostructure - experimental
-        self.Use__StructuralPCA_dotProd=False#Principle component analysis on binarised image - a geometrical PCA
-        self.Use__StructuralPCA_VectorValue = True  # Principle component analysis on binarised image - a geometrical PCA
+        self.Use__EigenVectorDotProd = True  # how close are principle components orientated- doesnt seem to work correctly yet - MUST BE SQUARE!
+        self.Use__EigenValueDifference = True  # how close are principle component lengths for COLOUR - works pretty well - still needs a look at in how to package up matrix, and if using non -square do we use SVD instead?
+        self.Use__FourierPowerDensity = True  # histogram of frequencies found in image - works very well
+        self.Use__MacroStructure=True#very small image to compare macrostructure - experimental
+        self.Use__StructuralPCA_dotProd=True#Principle component analysis on binarised image - a geometrical PCA
+        self.Use__StructuralPCA_VectorValue = True  # for STRUCTURE Principle component analysis on binarised image - a geometrical PCA
         ######################################################
         ##set multi process behaviour - can force no threading if memory issues are encountered (imgs > 3000)
         #######################################################
@@ -103,7 +106,7 @@ class MatchImagesObject():
         ## will be in ON time complexity
         ##################################################
         self.MatchFindFolder = r"E:\NCR\TestImages\Faces\MatcherFolder"
-        #self.MatchFindFolder = r"E:\NCR\TestImages\FurnitureToMAtch"
+        #self.MatchFindFolder = r"E:\NCR\TestImages\UK_Side_Small_15sets10_findmatch"
         self.MatchInputSet = True  # if a list of input images are provided the system will find similarities only with them, rather than
         # attempt to match every image sequentially.
 
@@ -397,6 +400,25 @@ def main():
     print("Get duplicates only?? - this will be in ~o^(2/N) complexity time (very long)!!!")
     PrepareMatchImages.GetDuplicates= _3DVisLabLib.yesno("?")
 
+
+    #get object that links images to dat records
+    print("attempting to load image to dat record trace file",PrepareMatchImages.InputFolder + "\\" + PrepareMatchImages.TraceExtractedImg_to_DatRecord)
+    try:
+        Json_to_load=PrepareMatchImages.InputFolder + "\\" + PrepareMatchImages.TraceExtractedImg_to_DatRecord
+        with open(Json_to_load) as json_file:
+            PrepareMatchImages.TraceExtractedImg_to_DatRecordObj = json.load(json_file)
+            print("json loaded succesfully")
+            PrepareMatchImages.TraceExtractedImg_to_DatRecordObj
+    except Exception as e:
+        print("JSON_Open error attempting to open json file " + str(PrepareMatchImages.InputFolder + "\\" + PrepareMatchImages.TraceExtractedImg_to_DatRecord) + " " + str(e))
+        if _3DVisLabLib.yesno("Continue operation? No image to dat record trace will be possible so only image matching & sorting")==False:
+            raise Exception("User declined to continue after JSOn image vs dat record file not found")
+
+
+
+
+
+
     print("filtering nested images from", PrepareMatchImages.InputFolder,"this can several minutes if N>10,000")
     #get all files in input folder
     InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(PrepareMatchImages.InputFolder)
@@ -450,18 +472,7 @@ def main():
                 
 
 
-    #get object that links images to dat records
-    print("attempting to load image to dat record trace file",PrepareMatchImages.InputFolder + "\\" + PrepareMatchImages.TraceExtractedImg_to_DatRecord)
-    try:
-        Json_to_load=PrepareMatchImages.InputFolder + "\\" + PrepareMatchImages.TraceExtractedImg_to_DatRecord
-        with open(Json_to_load) as json_file:
-            PrepareMatchImages.TraceExtractedImg_to_DatRecordObj = json.load(json_file)
-            print("json loaded succesfully")
-            PrepareMatchImages.TraceExtractedImg_to_DatRecordObj
-    except Exception as e:
-        print("JSON_Open error attempting to open json file " + str(PrepareMatchImages.InputFolder + "\\" + PrepareMatchImages.TraceExtractedImg_to_DatRecord) + " " + str(e))
-        #if _3DVisLabLib.yesno("Continue operation? No image to dat record trace will be possible so only image matching & sorting")==False:
-        #    raise Exception("User declined to continue after JSOn image vs dat record file not found")
+
     #start timer
     PrepareMatchImages.startTime=time.time()
 
