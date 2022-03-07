@@ -63,27 +63,27 @@ class MatchImagesObject():
         ##set subset of data - will select random images
         ##if cross checking for similarity will be in O (n/2) time complexity
         ##################################################
-        self.SubSetOfData = int(200)  # subset of data
+        self.SubSetOfData = int(50)  # subset of data
         ################################################################
         ##select what function will be used, which will load image,crop,resize
         ##etc for all analytical procesess
         ###################################################################
         # images have to be prepared in application specific ways - choose function here - don't leave the "()"!!!!
-        self.PrepareImagesFunction = MatchImages_lib.PrepareImageMetrics_NotesSide
+        self.PrepareImagesFunction = MatchImages_lib.PrepareImageMetrics_MultipleImgs
         self.PreviewImagePrep=True#preview image processing functions
         ######################################################################
         ##turn on and off which analytics to use, some will add noise rather
         ##than useful metrics depending on images to analyse
         ######################################################################
         # what metrics to use
-        self.Use__FeatureMatch = True  # match detailed areas of image - quite slow
+        self.Use__FeatureMatch = False  # match detailed areas of image - quite slow
         self.Use__histogram = True  # match how close the image colour distribution is - structure does not matter
-        self.Use__FourierDifference = True  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
-        self.Use__PhaseCorrelation = True  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
+        self.Use__FourierDifference = False  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
+        self.Use__PhaseCorrelation = False  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
         #in theory can convert for instance fourier magnitude image, polar unwrap it and check using phase correlation - but has to be proven
-        self.Use__HOG_featureMatch = True  # dense feature match - good for small images - very effective for mm side
-        self.Use__EigenVectorDotProd = True  # how close are principle components orientated- doesnt seem to work correctly yet - MUST BE SQUARE!
-        self.Use__EigenValueDifference = True  # how close are principle component lengths for COLOUR - works pretty well - still needs a look at in how to package up matrix, and if using non -square do we use SVD instead?
+        self.Use__HOG_featureMatch = False  # dense feature match - good for small images - very effective for mm side
+        self.Use__EigenVectorDotProd = False  # how close are principle components orientated- doesnt seem to work correctly yet - MUST BE SQUARE!
+        self.Use__EigenValueDifference = False  # how close are principle component lengths for COLOUR - works pretty well - still needs a look at in how to package up matrix, and if using non -square do we use SVD instead?
         self.Use__FourierPowerDensity = True  # histogram of frequencies found in image - works very well
         self.Use__MacroStructure=True#very small image to compare macrostructure - experimental
         self.Use__StructuralPCA_dotProd=True#Principle component analysis on binarised image - a geometrical PCA
@@ -93,7 +93,7 @@ class MatchImagesObject():
         ##set multi process behaviour - can force no threading if memory issues are encountered (imgs > 3000)
         #######################################################
         # set this to "1" to force inline processing, otherwise to limit cores set to the cores you wish to use then add one (as system will remove one for safety regardless)
-        self.MemoryError_ReduceLoad = (False,1)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
+        self.MemoryError_ReduceLoad = (True,1)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
         self.BeastMode = False  # Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         # self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
         self.HyperThreading = True  # Experimental - hyperthreads are virtual cores so may not work for metrics like Feature Matching (except HOG)
@@ -283,7 +283,7 @@ class MatchImagesObject():
 
     class ImageInfo():
         def __init__(self):
-            self.Histogram=None
+            self.Histogram=[]
             self.OriginalImage=None
             self.ImageColour=None
             self.ImageAdjusted=None
@@ -300,10 +300,11 @@ class MatchImagesObject():
             self.PhaseCorrelate_FourierMagImg=None
             self.DebugImage=None
             self.OriginalImageFilePath=None
-            self.PwrSpectralDensity=None
-            self.MacroStructure_img=None
-            self.PCA_Struct_EigenVecs=None
-            self.PCA_Struct_EigenVals=None
+            self.PwrSpectralDensity=[]
+            self.MacroStructure_img=[]
+            self.PCA_Struct_EigenVecs=[]
+            self.PCA_Struct_EigenVals=[]
+            self.ProcessImages_function=None#if this is not none - should be a function we can call to process images on the fly
             
 def PlotAndSave(Title,Filepath,Data,maximumvalue):
     

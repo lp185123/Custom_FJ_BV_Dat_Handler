@@ -16,6 +16,8 @@ def PCA_Structure(Image):
     #if colour image,convert to gray
     if len(Image.shape) == 3:
         grayImage = cv2.cvtColor(Image, cv2.COLOR_BGR2GRAY)
+    else:
+        grayImage=Image
     #binarise image and use for PCA of structure
     img_blur = cv2.medianBlur(grayImage, 5)
     Binarised_Otsu,image_result  = cv2.threshold(img_blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
@@ -475,8 +477,54 @@ def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict
 
     return ImageInfo
 
-def StackedImg_Generator(InputImage):
-    pass
+def StackedImg_Generator(ImageInfo,IsTestImage):
+    #get stack of images and associated analysis
+    #IsTestImage set to TRUE will stop the program generating stacked images that wont be used (only need one reference)
+    #colour and grayscale images, already resized 
+    ImageColour=ImageInfo.ImageColour[0]#even if just one image its still in list format to keep logic common
+    ImageGrayscale=ImageInfo.ImageGrayscale[0]
+    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,100,70,10,False)
+    #roll through each list and generate analytics for each metric
+    
+    #HISTOGRAM
+    for Img_colour in List_CroppingImg:
+        #get grayscale
+        Img_grayscale=cv2.cvtColor(Img_colour, cv2.COLOR_BGR2GRAY)
+        
+        hist = cv2.calcHist([Img_colour], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
+        hist = cv2.normalize(hist, hist).flatten()
+        ImageInfo.Histogram.append(hist)
+        
+        #MACROSTRUCTURE
+        #get small image to experiment with macro structure matching
+        MacroStructure_img = cv2.resize(Img_colour, (7, 7))
+        ImageInfo.MacroStructure_img.append(MacroStructure_img)
+
+        #POWER SPECTRAL DENSITY
+        PwrSpectralDensity= GetPwrSpcDensity(Img_colour)
+        ImageInfo.PwrSpectralDensity.append(PwrSpectralDensity)
+
+        #PRINCPLE COMPONENT ANALYSIS:STRUCTURE
+        print(Img_grayscale.shape)
+        image_result,angle_list,eigenvectors_list,eigenvalues_list=PCA_Structure(Img_grayscale)
+        ImageInfo.PCA_Struct_EigenVecs.append(eigenvectors_list)
+        ImageInfo.PCA_Struct_EigenVals.append(eigenvalues_list)
+        #HISTOGRAM OF ORIENTATED GRADIENTS FEATURE MATCH
+        #For_HOG_FeatureMatch=USERFunction_PrepareForHOG(Img_colour.copy())
+        #if For_HOG_FeatureMatch.shape[0]!=128 and For_HOG_FeatureMatch.shape[0]!=64:
+        #    raise Exception("Image not correct size for HOG (128 * 64)")
+        #else:
+        #    #get histogram for HOG used for comparison during match matrix
+        #    OPENCV_hog_descriptor=HOG_extrator.compute(For_HOG_FeatureMatch)
+
+        #have one image we are testing the sequenced images against
+        if IsTestImage==True:
+            break
+
+
+    return ImageInfo
+
+    
 
 def PrepareImageMetrics_MultipleImgs(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator):
     #load image into memory - do image processing on demand
@@ -497,8 +545,8 @@ def PrepareImageMetrics_MultipleImgs(PrepareMatchImages,ImagePath,Index,ImageRev
         OriginalImage_GrayScale[:,:,2]=OriginalImage_GrayScale_temp
 
     #should resize here if we are saving into memory
-    ColourRatio_resized=Resize_toPixel_keepRatio(OriginalImage_col,250,250)
-    GrayScaleRatio_resized=Resize_toPixel_keepRatio(OriginalImage_col,250,250)    
+    ColourRatio_resized=Resize_toPixel_keepRatio(OriginalImage_col,80,170)
+    GrayScaleRatio_resized=Resize_toPixel_keepRatio(OriginalImage_col,80,170)    
     if Index<3: ImageReviewDict["GrayScaleRatio_resized"]=GrayScaleRatio_resized
     if Index<3: ImageReviewDict["ColourRatio_resized"]=ColourRatio_resized
 
@@ -511,6 +559,7 @@ def PrepareImageMetrics_MultipleImgs(PrepareMatchImages,ImagePath,Index,ImageRev
     ImageInfo.ImageColour=[ColourRatio_resized]
     ImageInfo.ImageGrayscale=[GrayScaleRatio_resized]
     ImageInfo.OriginalImageFilePath=ImagePath
+    ImageInfo.ProcessImages_function=StackedImg_Generator
 
 
     if PrepareMatchImages.PreviewImagePrep==True and Index<1:
@@ -525,7 +574,6 @@ def PrepareImageMetrics_MultipleImgs(PrepareMatchImages,ImagePath,Index,ImageRev
 
 
     return ImageInfo
-
 
 def PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator):
     #create class object for each image
@@ -787,7 +835,6 @@ def Resize_toPixel_keepRatio(Image,PixelsY,PixelsX):
     #_3DVisLabLib.ImageViewer_Quick_no_resize(FillImage,0,True,True)
     return FillImage
     
-
 def CreateCropInMatrixOfImage(Image,StartCropPc_100pc,EndCropPC_100pc,steps,PolarWrapMode):
     #for an input image, successively crop into the image in stages and create horizontal
     #quilt
@@ -1363,20 +1410,43 @@ def ProcessSimilarity(Input):
 
     #get info for base image
     Base_Image_name=MatchImages.ImagesInMem_Pairing[CurrentBaseImage][1].FirstImage
-    Base_Image_Histo=MatchImages.ImagesInMem_to_Process[Base_Image_name].Histogram[0]
-    Base_Image_FMatches=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Keypoints[0]
-    Base_Image_Descrips=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Descriptors[0]
-    Base_Image_FourierMag=MatchImages.ImagesInMem_to_Process[Base_Image_name].FourierTransform_mag[0]
-    Base_Image_FM=MatchImages.ImagesInMem_to_Process[Base_Image_name].ImageAdjusted[0]
-    Base_Image_EigenVectors=MatchImages.ImagesInMem_to_Process[Base_Image_name].EigenVectors[0]
-    Base_Image_EigenValues=MatchImages.ImagesInMem_to_Process[Base_Image_name].EigenValues[0]
-    Base_Image_HOG_Descriptor=MatchImages.ImagesInMem_to_Process[Base_Image_name].OPENCV_hog_descriptor[0]
-    Base_Image_Phase_CorImg=MatchImages.ImagesInMem_to_Process[Base_Image_name].PhaseCorrelate_FourierMagImg[0]
-    Base_PwrSpectralDensity=MatchImages.ImagesInMem_to_Process[Base_Image_name].PwrSpectralDensity[0]
-    Base_MacroStruct_img = MatchImages.ImagesInMem_to_Process[Base_Image_name].MacroStructure_img[0]
-    Base_PCA_Struct_EigenVecs = MatchImages.ImagesInMem_to_Process[Base_Image_name].PCA_Struct_EigenVecs[0]
-    Base_PCA_Struct_EigenVals = MatchImages.ImagesInMem_to_Process[Base_Image_name].PCA_Struct_EigenVals[0]
 
+    #if we have a prebuilt in image processsing function - use that to process images on the fly, otherwise use the preloaded analytics
+    if MatchImages.ImagesInMem_to_Process[Base_Image_name].ProcessImages_function==None:
+        Base_Image_Histo=MatchImages.ImagesInMem_to_Process[Base_Image_name].Histogram[0]
+        Base_Image_FMatches=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Keypoints[0]
+        Base_Image_Descrips=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Descriptors[0]
+        Base_Image_FourierMag=MatchImages.ImagesInMem_to_Process[Base_Image_name].FourierTransform_mag[0]
+        Base_Image_FM=MatchImages.ImagesInMem_to_Process[Base_Image_name].ImageAdjusted[0]
+        Base_Image_EigenVectors=MatchImages.ImagesInMem_to_Process[Base_Image_name].EigenVectors[0]
+        Base_Image_EigenValues=MatchImages.ImagesInMem_to_Process[Base_Image_name].EigenValues[0]
+        Base_Image_HOG_Descriptor=MatchImages.ImagesInMem_to_Process[Base_Image_name].OPENCV_hog_descriptor[0]
+        Base_Image_Phase_CorImg=MatchImages.ImagesInMem_to_Process[Base_Image_name].PhaseCorrelate_FourierMagImg[0]
+        Base_PwrSpectralDensity=MatchImages.ImagesInMem_to_Process[Base_Image_name].PwrSpectralDensity[0]
+        Base_MacroStruct_img = MatchImages.ImagesInMem_to_Process[Base_Image_name].MacroStructure_img[0]
+        Base_PCA_Struct_EigenVecs = MatchImages.ImagesInMem_to_Process[Base_Image_name].PCA_Struct_EigenVecs[0]
+        Base_PCA_Struct_EigenVals = MatchImages.ImagesInMem_to_Process[Base_Image_name].PCA_Struct_EigenVals[0]
+    else:
+        #process images on the fly using function which is passed in from image info object (so can use different functions depending on application)
+        #pass in the object info and it will be returned loaded with analytics for the image in lists of images
+        Base_On_the_fly_ImgInfo=MatchImages.ImagesInMem_to_Process[Base_Image_name].ProcessImages_function(MatchImages.ImagesInMem_to_Process[Base_Image_name],True)
+        #populate processed images
+        Base_Image_Histo=Base_On_the_fly_ImgInfo.Histogram[0]
+        Base_Image_FMatches=Base_On_the_fly_ImgInfo.FM_Keypoints[0]
+        Base_Image_Descrips=Base_On_the_fly_ImgInfo.FM_Descriptors[0]
+        #Base_Image_FourierMag=Base_On_the_fly_ImgInfo.FourierTransform_mag[0]
+        #Base_Image_FM=Base_On_the_fly_ImgInfo.ImageAdjusted[0]
+        #Base_Image_EigenVectors=Base_On_the_fly_ImgInfo.EigenVectors[0]
+        #Base_Image_EigenValues=Base_On_the_fly_ImgInfo.EigenValues[0]
+        #Base_Image_HOG_Descriptor=Base_On_the_fly_ImgInfo.OPENCV_hog_descriptor[0]
+        #Base_Image_Phase_CorImg=Base_On_the_fly_ImgInfo.PhaseCorrelate_FourierMagImg[0]
+        Base_PwrSpectralDensity=Base_On_the_fly_ImgInfo.PwrSpectralDensity[0]
+        Base_MacroStruct_img = Base_On_the_fly_ImgInfo.MacroStructure_img[0]
+        Base_PCA_Struct_EigenVecs = Base_On_the_fly_ImgInfo.PCA_Struct_EigenVecs[0]
+        Base_PCA_Struct_EigenVals = Base_On_the_fly_ImgInfo.PCA_Struct_EigenVals[0]
+
+
+        
     for TestImageList in MatchImages.ImagesInMem_Pairing:
         if TestImageList<CurrentBaseImage:
             #data is diagonally symmetrical
@@ -1386,25 +1456,47 @@ def ProcessSimilarity(Input):
         #test images - this is where different strategies may come in
         #get first image, can also use the list for this
         #get info for test images
+        
         Test_Image_name=MatchImages.ImagesInMem_Pairing[TestImageList][1].FirstImage
-        Test_Image_Histo=MatchImages.ImagesInMem_to_Process[Test_Image_name].Histogram
-        Test_Image_FMatches=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Keypoints
-        Test_Image_Descrips=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Descriptors
-        Test_Image_FourierMag=MatchImages.ImagesInMem_to_Process[Test_Image_name].FourierTransform_mag
-        Test_Image_FM=MatchImages.ImagesInMem_to_Process[Test_Image_name].ImageAdjusted
-        Test_Image_EigenVectors=MatchImages.ImagesInMem_to_Process[Test_Image_name].EigenVectors
-        Test_Image_EigenValues=MatchImages.ImagesInMem_to_Process[Test_Image_name].EigenValues
-        Test_Image_HOG_Descriptor=MatchImages.ImagesInMem_to_Process[Test_Image_name].OPENCV_hog_descriptor
-        Test_Image_Phase_CorImg=MatchImages.ImagesInMem_to_Process[Test_Image_name].PhaseCorrelate_FourierMagImg
-        Test_PwrSpectralDensity=MatchImages.ImagesInMem_to_Process[Test_Image_name].PwrSpectralDensity
-        Test_MacroStruct_img = MatchImages.ImagesInMem_to_Process[Test_Image_name].MacroStructure_img
-        Test_PCA_Struct_EigenVecs = MatchImages.ImagesInMem_to_Process[Test_Image_name].PCA_Struct_EigenVecs
-        Test_PCA_Struct_EigenVals = MatchImages.ImagesInMem_to_Process[Test_Image_name].PCA_Struct_EigenVals
+
+        if MatchImages.ImagesInMem_to_Process[Test_Image_name].ProcessImages_function==None:
+            Test_Image_Histo=MatchImages.ImagesInMem_to_Process[Test_Image_name].Histogram
+            Test_Image_FMatches=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Keypoints
+            Test_Image_Descrips=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Descriptors
+            Test_Image_FourierMag=MatchImages.ImagesInMem_to_Process[Test_Image_name].FourierTransform_mag
+            Test_Image_FM=MatchImages.ImagesInMem_to_Process[Test_Image_name].ImageAdjusted
+            Test_Image_EigenVectors=MatchImages.ImagesInMem_to_Process[Test_Image_name].EigenVectors
+            Test_Image_EigenValues=MatchImages.ImagesInMem_to_Process[Test_Image_name].EigenValues
+            Test_Image_HOG_Descriptor=MatchImages.ImagesInMem_to_Process[Test_Image_name].OPENCV_hog_descriptor
+            Test_Image_Phase_CorImg=MatchImages.ImagesInMem_to_Process[Test_Image_name].PhaseCorrelate_FourierMagImg
+            Test_PwrSpectralDensity=MatchImages.ImagesInMem_to_Process[Test_Image_name].PwrSpectralDensity
+            Test_MacroStruct_img = MatchImages.ImagesInMem_to_Process[Test_Image_name].MacroStructure_img
+            Test_PCA_Struct_EigenVecs = MatchImages.ImagesInMem_to_Process[Test_Image_name].PCA_Struct_EigenVecs
+            Test_PCA_Struct_EigenVals = MatchImages.ImagesInMem_to_Process[Test_Image_name].PCA_Struct_EigenVals
+        else:
+            #process images on the fly
+            Base_On_the_fly_ImgInfo=MatchImages.ImagesInMem_to_Process[Test_Image_name].ProcessImages_function(MatchImages.ImagesInMem_to_Process[Test_Image_name],False)
+            #populate processed images
+            Test_Image_Histo=Base_On_the_fly_ImgInfo.Histogram
+            Test_Image_FMatches=Base_On_the_fly_ImgInfo.FM_Keypoints
+            Test_Image_Descrips=Base_On_the_fly_ImgInfo.FM_Descriptors
+            #Test_Image_FourierMag=Base_On_the_fly_ImgInfo.FourierTransform_mag
+            #Test_Image_FM=Base_On_the_fly_ImgInfo.ImageAdjusted
+            #Test_Image_EigenVectors=Base_On_the_fly_ImgInfo.EigenVectors
+            #Test_Image_EigenValues=Base_On_the_fly_ImgInfo.EigenValues
+            #Test_Image_HOG_Descriptor=Base_On_the_fly_ImgInfo.OPENCV_hog_descriptor
+            #Test_Image_Phase_CorImg=Base_On_the_fly_ImgInfo.PhaseCorrelate_FourierMagImg
+            Test_PwrSpectralDensity=Base_On_the_fly_ImgInfo.PwrSpectralDensity
+            Test_MacroStruct_img = Base_On_the_fly_ImgInfo.MacroStructure_img
+            Test_PCA_Struct_EigenVecs = Base_On_the_fly_ImgInfo.PCA_Struct_EigenVecs
+            Test_PCA_Struct_EigenVals = Base_On_the_fly_ImgInfo.PCA_Struct_EigenVals
+            
 
 
+        BestMatch=MatchImages.DummyMaxValue
 
         if "HM_data_MacroStructure" in MatchImages.Metrics_dict:
-            BestMatch=MatchImages.DummyMaxValue
+            
             BestIndex=-1
 
             for Indexer,testimage in enumerate(Test_MacroStruct_img):
@@ -1412,18 +1504,14 @@ def ProcessSimilarity(Input):
                 diff = cv2.absdiff(testimage, Base_MacroStruct_img)
                 diff_sum=diff.sum()
 
-                if Indexer==0:
-                    jgfghj
-                    BestMatch=diff_sum
-
-
-                if diff_sum<BestMatch:
+                if (diff_sum<BestMatch) or Indexer==0:
                     BestMatch=diff_sum
                     BestIndex=Indexer
                     MatchImages.Metrics_dict["HM_data_MacroStructure"][CurrentBaseImage, TestImageList] = diff_sum
+            PluralImages_BestIndex.append(BestIndex)
 
         if "HM_data_StructuralPCA_dotProd" in MatchImages.Metrics_dict:
-            BestMatch=MatchImages.DummyMaxValue
+           
             BestIndex=-1
 
             for Indexer,testimage in enumerate(Test_PCA_Struct_EigenVecs):
@@ -1440,14 +1528,14 @@ def ProcessSimilarity(Input):
                 
                 sum_ListEigenDots=sum(ListEigenDots)
 
-                if sum_ListEigenDots<BestMatch:
+                if (sum_ListEigenDots<BestMatch) or Indexer==0:
                     BestMatch=sum_ListEigenDots
                     BestIndex=Indexer
                     EigenVectorDotProd_struct =sum_ListEigenDots   # round((Base_Image_EigenVectors[0] @ Test_Image_EigenVectors[0]),5)
                     MatchImages.Metrics_dict["HM_data_StructuralPCA_dotProd"][CurrentBaseImage, TestImageList] = EigenVectorDotProd_struct
-
+            PluralImages_BestIndex.append(BestIndex)
         if "HM_data_StructuralPCA_VectorValue" in MatchImages.Metrics_dict:
-            BestMatch=MatchImages.DummyMaxValue
+            
             BestIndex=-1
 
             for Indexer,testimage in enumerate(Test_PCA_Struct_EigenVals):
@@ -1456,13 +1544,13 @@ def ProcessSimilarity(Input):
                 for eigenelem in range(MaxRange):
                     Diff=Diff+(testimage[eigenelem]-Base_PCA_Struct_EigenVals[eigenelem])**2
 
-                if Diff<BestMatch:
+                if (Diff<BestMatch) or Indexer==0:
                     BestMatch=Diff
                     BestIndex=Indexer
                     MatchImages.Metrics_dict["HM_data_StructuralPCA_VectorValue"][CurrentBaseImage,TestImageList]=Diff
-
+            PluralImages_BestIndex.append(BestIndex)
         if "HM_data_EigenValueDifference" in MatchImages.Metrics_dict:
-            BestMatch=MatchImages.DummyMaxValue
+            
             BestIndex=-1
 
             #eigenvector metric
@@ -1479,17 +1567,18 @@ def ProcessSimilarity(Input):
                     ListEigenVals.append(abs((Base_Image_EigenValues[EVector]-testimage[EVector])))
 
                 EigenValue_diff=sum(ListEigenVals)#abs((Base_Image_EigenValues[0] )-(Test_Image_EigenValues[0] ))
-                if EigenValue_diff<BestMatch:
+
+                if (EigenValue_diff<BestMatch) or Indexer==0:
                     BestMatch=EigenValue_diff
                     BestIndex=Indexer
                    
                     #get distance
                     #print(EigenValue_diff)
                     MatchImages.Metrics_dict["HM_data_EigenValueDifference"][CurrentBaseImage,TestImageList]=EigenValue_diff
-
+            PluralImages_BestIndex.append(BestIndex)
 
         if "HM_data_EigenVectorDotProd" in MatchImages.Metrics_dict:
-            BestMatch=MatchImages.DummyMaxValue
+            
             BestIndex=-1
 
             for Indexer,testimage in enumerate(Test_Image_EigenVectors):
@@ -1511,7 +1600,7 @@ def ProcessSimilarity(Input):
 
                 EigenVectorDotProd=sum(ListEigenDots)#round((Base_Image_EigenVectors[0] @ Test_Image_EigenVectors[0]),5)
                 
-                if EigenVectorDotProd<BestMatch:
+                if (EigenVectorDotProd<BestMatch) or Indexer==0:
                     BestMatch=EigenVectorDotProd
                     BestIndex=Indexer
 
@@ -1519,15 +1608,16 @@ def ProcessSimilarity(Input):
             #StackTwoimages=MatchImages.StackTwoimages(Base_Image_FM,Test_Image_FM)
             #_3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(StackTwoimages,(StackTwoimages.shape[1]*1,StackTwoimages.shape[0]*1)),0,True,True)
             
-
+            PluralImages_BestIndex.append(BestIndex)
         #histogram metric
         if "HM_data_histo" in MatchImages.Metrics_dict:
-            BestMatch=MatchImages.DummyMaxValue
+            
             BestIndex=-1
 
             for Indexer,testimage in enumerate(Test_Image_Histo):
                 HistogramSimilarity=CompareHistograms(Base_Image_Histo,testimage)
-                if BestMatch>HistogramSimilarity:
+
+                if (BestMatch>HistogramSimilarity) or Indexer==0:
                     BestMatch=HistogramSimilarity
                     BestIndex=Indexer
             MatchImages.Metrics_dict["HM_data_histo"][CurrentBaseImage,TestImageList]=BestMatch
@@ -1537,7 +1627,7 @@ def ProcessSimilarity(Input):
 
         #feature match metric
         if "HM_data_FM" in MatchImages.Metrics_dict:
-            BestMatch=MatchImages.DummyMaxValue
+            
             BestIndex=-1
 
             for Indexer,testimage_FMMatchers in enumerate(Test_Image_FMatches):
@@ -1551,67 +1641,70 @@ def ProcessSimilarity(Input):
                     #watch out this might not be a valid maximum!!
                     AverageMatchDistance=MatchImages.DummyMinValue
 
-                if AverageMatchDistance<BestMatch:
+                if (AverageMatchDistance<BestMatch) or Indexer==0:
                     BestMatch=AverageMatchDistance
                     BestIndex=Indexer
                     MatchImages.Metrics_dict["HM_data_FM"][CurrentBaseImage,TestImageList]=AverageMatchDistance
 
-
+            PluralImages_BestIndex.append(BestIndex)
 
         if "HM_data_HOG_Dist" in MatchImages.Metrics_dict:
-            BestMatch=MatchImages.DummyMaxValue
+           
             BestIndex=-1
 
             for Indexer,testimage_FMMatchers in enumerate(Test_Image_HOG_Descriptor):
                 HOG_distance=CompareHistograms(Base_Image_HOG_Descriptor, testimage_FMMatchers)
 
-                if HOG_distance<BestMatch:
+                if (HOG_distance<BestMatch) or Indexer==0:
                     BestMatch=HOG_distance
                     BestIndex=Indexer
 
 
                     MatchImages.Metrics_dict["HM_data_HOG_Dist"][CurrentBaseImage,TestImageList]=HOG_distance
-            
+            PluralImages_BestIndex.append(BestIndex)
+
+
+
         if "HM_data_FourierPowerDensity" in MatchImages.Metrics_dict:
-            BestMatch=MatchImages.DummyMaxValue
+            
             BestIndex=-1
 
-            for Indexer,testimage_FMMatchers in enumerate(Test_PwrSpectralDensity):
-                if len(Base_PwrSpectralDensity.shape)!=1:
+            for Indexer,ToTestPwrSpectralDensity in enumerate(Test_PwrSpectralDensity):
+                if len(ToTestPwrSpectralDensity.shape)!=1:
                     raise Exception("Similarity test error, HM_data_FourierPowerDensity, expected input should be 1D histogram")
                 #HM_data_FourierPowerDensity=random.random()
                 #HM_data_FourierPowerDensity=np.correlate(Base_PwrSpectralDensity,Test_PwrSpectralDensity,mode='full')[0]
                 #print(np.correlate(Base_PwrSpectralDensity,Test_PwrSpectralDensity,mode='full')[0:10])
-                HM_data_PowerDensity=CompareHistograms(Base_PwrSpectralDensity,testimage_FMMatchers)
+                HM_data_PowerDensity=CompareHistograms(Base_PwrSpectralDensity,ToTestPwrSpectralDensity)
 
-                if HM_data_PowerDensity<BestMatch:
+                if (HM_data_PowerDensity<BestMatch) or Indexer==0:
                     BestMatch=HM_data_PowerDensity
                     BestIndex=Indexer
 
 
                     MatchImages.Metrics_dict["HM_data_FourierPowerDensity"][CurrentBaseImage,TestImageList]=HM_data_PowerDensity
-            
+            PluralImages_BestIndex.append(BestIndex)
         #fourier difference metric
         #get differnce between fourier magnitudes of image
         #not the best solution as fourier magnitude will rotate with image 
         #generally this performs well on its own as matches similar notes with similar skew
         if "HM_data_FourierDifference" in MatchImages.Metrics_dict:
-            BestMatch=MatchImages.DummyMaxValue
+            
             BestIndex=-1
 
             for Indexer,testimage_FMMatchers in enumerate(Test_Image_FourierMag):
                 FourierDifference=(abs(Base_Image_FourierMag-testimage_FMMatchers)).sum()
 
 
-                if FourierDifference<BestMatch:
+                if (FourierDifference<BestMatch) or Indexer==0:
                     BestMatch=FourierDifference
                     BestIndex=Indexer
 
                     MatchImages.Metrics_dict["HM_data_FourierDifference"][CurrentBaseImage,TestImageList]=FourierDifference
             
-
+            PluralImages_BestIndex.append(BestIndex)
         if "HM_data_PhaseCorrelation" in MatchImages.Metrics_dict:
-            BestMatch=MatchImages.DummyMaxValue
+           
             BestIndex=-1
             #phase correlation difference
             #use a polar wrapped version of the fourier transform magnitude
@@ -1624,14 +1717,16 @@ def ProcessSimilarity(Input):
                     print("ERROR, PhaseCorrelationMatch is greater than 1, this shoudnt be possible",PhaseCorrelationMatch_raw )
                 PhaseCorrelationMatch=1-PhaseCorrelationMatch_raw#signal power so we will reverse it 
                 
-                if PhaseCorrelationMatch<BestMatch:
+                if (PhaseCorrelationMatch<BestMatch) or Indexer==0:
                     BestMatch=PhaseCorrelationMatch
                     BestIndex=Indexer
                 
                     MatchImages.Metrics_dict["HM_data_PhaseCorrelation"][CurrentBaseImage,TestImageList]=PhaseCorrelationMatch
                 #if np.isnan(PhaseCorrelationMatch):
                 #    PhaseCorrelationMatch=MatchImages.DummyMinValue
-                
+            PluralImages_BestIndex.append(BestIndex)
+
+
         if "HM_data_QuiltScan" in MatchImages.Metrics_dict:
             pass
 
