@@ -12,6 +12,76 @@ from statistics import mean
 import math
 import shutil
 
+
+# Create HOG Descriptor object outside of loops
+HOG_extrator = cv2.HOGDescriptor()
+
+
+
+class FeatureMatch_Dict_Common:
+
+    SIFT_default=dict(nfeatures=0,nOctaveLayers=3,contrastThreshold=0.04,edgeThreshold=10)
+    
+    ORB_default=dict(nfeatures=20000,scaleFactor=1.3,
+                    nlevels=2,edgeThreshold=0,
+                    firstLevel=0, WTA_K=2,
+                    scoreType=0,patchSize=155)
+    
+    SIFT_Testing=dict(nfeatures=50,contrastThreshold=0.04,edgeThreshold=10)
+    
+    ORB_Testing=dict(nfeatures=20000,scaleFactor=1.02,
+                    nlevels=4,edgeThreshold=0,
+                    firstLevel=4, WTA_K=2,
+                    scoreType=0,patchSize=100)
+
+def USERFunction_PrepareForHOG(image,TargetHeight_HOG=64,TargetWidth_HOG=128):
+    #HOG expects 64 * 128
+    #lets not chagne aspect ratio
+    ImageHeight=image.shape[0]
+    ImageWidth=image.shape[1]
+    #set to target height then crop as needed
+    Percent2match=TargetHeight_HOG/ImageHeight
+    TargetWidth=round(ImageWidth*Percent2match)
+    Resized=cv2.resize(image,(TargetWidth,TargetHeight_HOG))
+
+    #create blank
+    blank_image = np.zeros(shape=[TargetHeight_HOG, TargetWidth_HOG, image.shape[2]], dtype=np.uint8)
+
+    #now crop to HOG shape
+    HOG_specific_crop=Resized[:,0:TargetWidth_HOG,:]
+
+    blank_image[0:HOG_specific_crop.shape[0],0:HOG_specific_crop.shape[1],:]=HOG_specific_crop
+
+    #now need to flip on its side
+    # rotate ccw
+    Rotate=cv2.transpose(blank_image)
+    Rotate=cv2.flip(Rotate,flipCode=0)
+    return Rotate
+
+def GetFFT_OfImage(InputGraySCaleImg,CropPercent_100,Blur):
+    if len(InputGraySCaleImg.shape)==3:
+        raise Exception("GetFFT_OfImage image not grayscale")
+
+    f = np.fft.fft2(InputGraySCaleImg)
+    fshift = np.fft.fftshift(f)
+    FFT_magnitude_spectrum = 20*np.log(np.abs(fshift))#magnitude is what we will use to compare
+
+    #most of fourier is just noise - lets crop it
+    CropRange=CropPercent_100/100#0.80#1.0=100%
+    RangeX=int(FFT_magnitude_spectrum.shape[0]*CropRange)
+    RangeY=int(FFT_magnitude_spectrum.shape[1]*CropRange)
+    BufferX=int((FFT_magnitude_spectrum.shape[0]-RangeX)/2)
+    BufferY=int((FFT_magnitude_spectrum.shape[1]-RangeY)/2)
+    FFT_magnitude_spectrum=FFT_magnitude_spectrum[BufferX:-BufferX,BufferY:-BufferY]
+    
+    if Blur==True:
+        #a lot of noise - lets see if we can remove noise
+        kernel = np.ones((5,5),np.float32)/25#kernel size for smoothing - maybe make smoother as such small images
+        dst = cv2.filter2D(FFT_magnitude_spectrum,-1,kernel)
+        FFT_magnitude_spectrum_visualise=cv2.convertScaleAbs(dst)
+    
+    return FFT_magnitude_spectrum
+
 def PCA_Structure(Image):
     #if colour image,convert to gray
     if len(Image.shape) == 3:
@@ -48,8 +118,7 @@ def PCA_Structure(Image):
         eigenvalues_list.append(eigenvalues[EigenIndex])
     return image_result,angle_list,eigenvectors_list,eigenvalues_list
 
-
-def PrepareImageMetrics_FacesRandomObjects(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator):
+def PrepareImageMetrics_FacesRandomObjects(PrepareMatchImages,ImagePath,Index,ImageReviewDict):
     #create class object for each image
     ImageInfo=PrepareMatchImages.ImageInfo()
 
@@ -167,7 +236,7 @@ def PrepareImageMetrics_FacesRandomObjects(PrepareMatchImages,ImagePath,Index,Im
 
     #prepare image for HOG matching
     #image needs to be a particular size for HOG matching
-    For_HOG_FeatureMatch=PrepareMatchImages.USERFunction_PrepareForHOG(Colour_Resized.copy())
+    For_HOG_FeatureMatch=USERFunction_PrepareForHOG(Colour_Resized.copy())
     if Index<3: ImageReviewDict["For_HOG_FeatureMatch"]=For_HOG_FeatureMatch
     #this step is for visualisation
     HOG_mag,HOG_angle=GetHOG_featureVector(For_HOG_FeatureMatch)
@@ -287,7 +356,7 @@ def PrepareImageMetrics_FacesRandomObjects(PrepareMatchImages,ImagePath,Index,Im
     ImageInfo.PCA_Struct_EigenVals = [PCA_Struct_EigenVals]
     return ImageInfo
 
-def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator):
+def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict):
     #create class object for each image
     ImageInfo=PrepareMatchImages.ImageInfo()
 
@@ -347,7 +416,7 @@ def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict
 
     #prepare image for HOG matching
     #image needs to be a particular size for HOG matching
-    For_HOG_FeatureMatch=PrepareMatchImages.USERFunction_PrepareForHOG(Colour_Resized.copy())
+    For_HOG_FeatureMatch=USERFunction_PrepareForHOG(Colour_Resized.copy())
     if Index<3: ImageReviewDict["For_HOG_FeatureMatch"]=For_HOG_FeatureMatch
     #this step is for visualisation
     HOG_mag,HOG_angle=GetHOG_featureVector(For_HOG_FeatureMatch)
@@ -477,58 +546,148 @@ def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict
 
     return ImageInfo
 
-def StackedImg_Generator(ImageInfo,IsTestImage):
+def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
     #get stack of images and associated analysis
     #IsTestImage set to TRUE will stop the program generating stacked images that wont be used (only need one reference)
     #colour and grayscale images, already resized 
-    ImageColour=ImageInfo.ImageColour[0]#even if just one image its still in list format to keep logic common
-    ImageGrayscale=ImageInfo.ImageGrayscale[0]
-    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,100,70,10,False)
+
+    #don't write into object
+    ImageInfo=copy.deepcopy(ImageInfo_ref)
+
+    #load in original image
+    OriginalImage_col = cv2.imread(ImageInfo.OriginalImageFilePath)
+
+    #bad code to convert gray to colour but still 3 channels
+    if len(OriginalImage_col.shape)!=3:
+        OriginalImage_col=cv2.cvtColor(OriginalImage_col,cv2.COLOR_GRAY2RGB)
+
+
+    #even if just one image its still in list format to keep logic common
+    ImageColour = Resize_toPixel_keepRatio(OriginalImage_col, 120, 120)
+    #ImageGrayscale=Resize_toPixel_keepRatio(ImageInfo.ImageGrayscale[0], 120, 120)
+
+    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,100,70,5,False)
     #roll through each list and generate analytics for each metric
     
-    #HISTOGRAM
+    #clean out image info object
+    #items that could have more than one item
+    if "HM_data_histo" in Metrics_dict:ImageInfo.Histogram=[]
+    if "HM_data_MacroStructure" in Metrics_dict:ImageInfo.MacroStructure_img=[]
+    if "HM_data_FourierPowerDensity" in Metrics_dict:ImageInfo.PwrSpectralDensity=[]
+    if "HM_data_StructuralPCA_dotProd" in Metrics_dict:ImageInfo.PCA_Struct_EigenVecs=[]
+    if "HM_data_StructuralPCA_VectorValue" in Metrics_dict:ImageInfo.PCA_Struct_EigenVals=[]
+    if "HM_data_FourierDifference" in Metrics_dict:ImageInfo.FourierTransform_mag=[]
+    
+
+    
+    #PHASE CORRELATION IMAGE
+    if "HM_data_PhaseCorrelation" in Metrics_dict:
+        #just have one phase correlation image
+        if len(Canvas.shape)==3:
+            Canvas=cv2.cvtColor(Canvas, cv2.COLOR_BGR2GRAY)
+        kernel = np.ones((5,5),np.float32)/25#kernel size for smoothing
+        Canvas = cv2.filter2D(Canvas,-1,kernel)#smoothing might help with cross correllation
+        PhaseCorrelate_Std = np.float32(Canvas)
+        ImageInfo.PhaseCorrelate_FourierMagImg=[PhaseCorrelate_Std]
+
+    #HISTOGRAM OF ORIENTATED GRADIENTS FEATURE MATCH
+    if "HM_data_HOG_Dist" in Metrics_dict:
+        #don't need to do at every scale - its scale invarient
+        For_HOG_FeatureMatch=USERFunction_PrepareForHOG(ImageColour)
+        #ensure input image is correct dimensions for HOG function
+        if For_HOG_FeatureMatch.shape[0]!=128 and For_HOG_FeatureMatch.shape[0]!=64:
+            raise Exception("Image not correct size for HOG (128 * 64)")
+        else:
+            #get histogram for HOG used for comparison during match matrix
+            OPENCV_hog_descriptor=HOG_extrator.compute(For_HOG_FeatureMatch)
+        ImageInfo.OPENCV_hog_descriptor=[OPENCV_hog_descriptor]
+
+    
+    #FEATURE MATCHER
+    if "HM_data_FM" in Metrics_dict:
+        keypoints,descriptor=_3DVisLabLib.OrbKeyPointsOnly(ImageColour,FeatureMatch_Dict_Common.ORB_default)
+        ImageInfo.FM_Keypoints=[keypoints]
+        ImageInfo.FM_Descriptors=[descriptor]
+
+
+    #get various crops into image
+    #we have to load the list up properly - they should come in here as "[NONE]"
+
     for Img_colour in List_CroppingImg:
         #get grayscale
         Img_grayscale=cv2.cvtColor(Img_colour, cv2.COLOR_BGR2GRAY)
         
-        hist = cv2.calcHist([Img_colour], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
-        hist = cv2.normalize(hist, hist).flatten()
-        ImageInfo.Histogram.append(hist)
-        
+        #HISTOGRAM
+        if "HM_data_histo" in Metrics_dict:
+            hist = cv2.calcHist([Img_colour], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
+            hist = cv2.normalize(hist, hist).flatten()
+            ImageInfo.Histogram.append(hist)
+            
         #MACROSTRUCTURE
+        if "HM_data_MacroStructure" in Metrics_dict:
         #get small image to experiment with macro structure matching
-        MacroStructure_img = cv2.resize(Img_colour, (7, 7))
-        ImageInfo.MacroStructure_img.append(MacroStructure_img)
+            MacroStructure_img = cv2.resize(Img_colour, (7, 7))
+            ImageInfo.MacroStructure_img.append(MacroStructure_img)
 
         #POWER SPECTRAL DENSITY
-        PwrSpectralDensity= GetPwrSpcDensity(Img_colour)
-        ImageInfo.PwrSpectralDensity.append(PwrSpectralDensity)
+        if "HM_data_FourierPowerDensity" in Metrics_dict:
+            PwrSpectralDensity= GetPwrSpcDensity(Img_colour)
+            ImageInfo.PwrSpectralDensity.append(PwrSpectralDensity)
 
         #PRINCPLE COMPONENT ANALYSIS:STRUCTURE
-        print(Img_grayscale.shape)
-        image_result,angle_list,eigenvectors_list,eigenvalues_list=PCA_Structure(Img_grayscale)
-        ImageInfo.PCA_Struct_EigenVecs.append(eigenvectors_list)
-        ImageInfo.PCA_Struct_EigenVals.append(eigenvalues_list)
-        #HISTOGRAM OF ORIENTATED GRADIENTS FEATURE MATCH
-        #For_HOG_FeatureMatch=USERFunction_PrepareForHOG(Img_colour.copy())
-        #if For_HOG_FeatureMatch.shape[0]!=128 and For_HOG_FeatureMatch.shape[0]!=64:
-        #    raise Exception("Image not correct size for HOG (128 * 64)")
-        #else:
-        #    #get histogram for HOG used for comparison during match matrix
-        #    OPENCV_hog_descriptor=HOG_extrator.compute(For_HOG_FeatureMatch)
+        if ("HM_data_StructuralPCA_dotProd" in Metrics_dict) or ("HM_data_StructuralPCA_VectorValue" in Metrics_dict):
+            image_result,angle_list,eigenvectors_list,eigenvalues_list=PCA_Structure(Img_grayscale)
+            if "HM_data_StructuralPCA_dotProd" in Metrics_dict:
+                ImageInfo.PCA_Struct_EigenVecs.append(eigenvectors_list)
+            if "HM_data_StructuralPCA_VectorValue" in Metrics_dict:
+                ImageInfo.PCA_Struct_EigenVals.append(eigenvalues_list)
 
-        #have one image we are testing the sequenced images against
+        #FOURIER MAGNITUDE DIFFERENCE
+        if "HM_data_FourierDifference" in Metrics_dict:
+            #have one image we are testing the sequenced images against
+            ImageInfo.FourierTransform_mag.append(GetFFT_OfImage(Img_grayscale,80,True))
+
+
+
+        if "HM_data_EigenValueDifference" in Metrics_dict:
+            pass
+
+        if "HM_data_EigenVectorDotProd" in Metrics_dict:
+            pass
+
         if IsTestImage==True:
             break
 
 
     return ImageInfo
 
-    
-
-def PrepareImageMetrics_MultipleImgs(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator):
+def PrepareImageMetrics_MultipleImgs(PrepareMatchImages,ImagePath,Index,ImageReviewDict):
     #load image into memory - do image processing on demand
     ImageInfo=PrepareMatchImages.ImageInfo()
+
+    #only need to populate the filename 
+    ImageInfo.OriginalImageFilePath=ImagePath
+
+    #treat this image differently potentially if its the one we want to match
+    if ImagePath in PrepareMatchImages.List_ImagesToMatchFIlenames.values():
+        ImageInfo.is_ImageToMatch=True
+    else:
+        ImageInfo.is_ImageToMatch=False
+
+    #user option to process items on the fly or not
+    if PrepareMatchImages.ProcessImagesOnFly==True:
+        ImageInfo.ProcessImages_function=StackedImg_Generator
+    else:
+        #set function to none so similarity processor knows data exists for image
+        ImageInfo.ProcessImages_function=None
+        #function to generate stack of images
+        ImageInfo=StackedImg_Generator(ImageInfo,False,PrepareMatchImages.Metrics_dict)
+
+    return ImageInfo
+
+
+
+
     #load in original image
     OriginalImage_col = cv2.imread(ImagePath)
     #bad code to convert gray to colour but still 3 channels
@@ -544,24 +703,45 @@ def PrepareImageMetrics_MultipleImgs(PrepareMatchImages,ImagePath,Index,ImageRev
         OriginalImage_GrayScale[:,:,1]=OriginalImage_GrayScale_temp
         OriginalImage_GrayScale[:,:,2]=OriginalImage_GrayScale_temp
 
+
+    #crop it if a face in our images to match 
+    if ImagePath in PrepareMatchImages.List_ImagesToMatchFIlenames.values():
+        pass
+        #faces
+        #OriginalImage_GrayScale=PrepareMatchImages.USERFunction_Crop_Pixels(OriginalImage_GrayScale,(25,182),(21,139))#Y range then X range
+        #OriginalImage_col=PrepareMatchImages.USERFunction_Crop_Pixels(OriginalImage_col,(25,182),(21,139))#Y range then X range
+
+    
+    OriginalImage_col = cv2.resize(OriginalImage_col, (218, 218))
+    OriginalImage_GrayScale = cv2.resize(OriginalImage_GrayScale, (218, 218))
+
     #should resize here if we are saving into memory
-    ColourRatio_resized=Resize_toPixel_keepRatio(OriginalImage_col,80,170)
-    GrayScaleRatio_resized=Resize_toPixel_keepRatio(OriginalImage_col,80,170)    
+    ColourRatio_resized=Resize_toPixel_keepRatio(OriginalImage_col,int(218),int(218))#178
+    GrayScaleRatio_resized=Resize_toPixel_keepRatio(OriginalImage_GrayScale,int(218),int(218))#178
     if Index<3: ImageReviewDict["GrayScaleRatio_resized"]=GrayScaleRatio_resized
     if Index<3: ImageReviewDict["ColourRatio_resized"]=ColourRatio_resized
 
     #get feature match keypoints
-    keypoints,descriptor=_3DVisLabLib.OrbKeyPointsOnly(ColourRatio_resized,PrepareMatchImages.FeatureMatch_Dict_Common.ORB_default)
+    #keypoints,descriptor=_3DVisLabLib.OrbKeyPointsOnly(ColourRatio_resized,PrepareMatchImages.FeatureMatch_Dict_Common.ORB_default)
 
-    #load up object
-    ImageInfo.FM_Keypoints=[keypoints]
-    ImageInfo.FM_Descriptors=[descriptor]
+    #load up object info
+    ImageInfo.FM_Keypoints=[None]
+    ImageInfo.FM_Descriptors=[None]
     ImageInfo.ImageColour=[ColourRatio_resized]
-    ImageInfo.ImageGrayscale=[GrayScaleRatio_resized]
+    ImageInfo.ImageGrayscale=[None]
     ImageInfo.OriginalImageFilePath=ImagePath
-    ImageInfo.ProcessImages_function=StackedImg_Generator
+    #by populating this variable with a function - it will be used on the fly to generate image info
+    #otherwise if we sepcific the function such as "ImageInfo=StackedImg_Generator(ImageInfo,False)"
+    #the image data will be pre populated
+
+    #if we are using stacked images testing, we can select to process images on the fly
+    #or pre-prepare data, if using a large amount of data (16k images), processing on the
+    #fly can help save memory errors
 
 
+
+    
+    
     if PrepareMatchImages.PreviewImagePrep==True and Index<1:
         #on first loop show image to user
         FM_DrawnKeypoints=_3DVisLabLib.draw_keypoints_v2(ColourRatio_resized,keypoints)
@@ -575,7 +755,7 @@ def PrepareImageMetrics_MultipleImgs(PrepareMatchImages,ImagePath,Index,ImageRev
 
     return ImageInfo
 
-def PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator):
+def PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReviewDict):
     #create class object for each image
     ImageInfo=PrepareMatchImages.ImageInfo()
 
@@ -633,7 +813,7 @@ def PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReview
 
     #prepare image for HOG matching
     #image needs to be a particular size for HOG matching
-    For_HOG_FeatureMatch=PrepareMatchImages.USERFunction_PrepareForHOG(Colour_Resized.copy())
+    For_HOG_FeatureMatch=USERFunction_PrepareForHOG(Colour_Resized.copy())
     if Index<3: ImageReviewDict["For_HOG_FeatureMatch"]=For_HOG_FeatureMatch
     #this step is for visualisation
     HOG_mag,HOG_angle=GetHOG_featureVector(For_HOG_FeatureMatch)
@@ -874,7 +1054,7 @@ def CreateCropInMatrixOfImage(Image,StartCropPc_100pc,EndCropPC_100pc,steps,Pola
              CroppedImage=GetPhaseCorrelationReadyImage(CroppedImage)
         #_3DVisLabLib.ImageViewer_Quick_no_resize(CroppedImage,0,True,True)
         CroppedImage_resize=cv2.resize(CroppedImage,(Image.shape[1],Image.shape[0]))
-        List_CroppingImg.append(CroppedImage)
+        List_CroppingImg.append(CroppedImage_resize)
         if PolarWrapMode==False:
             Canvas[:,Xposition_start:Xposition_end,:]=CroppedImage_resize
         else:
@@ -1165,7 +1345,7 @@ def MatchImagestoInputImages(MatchImages,PlotAndSave_2datas,PlotAndSave):
         SetMatchImages_folder=MatchImages.OutputPairs +"\\" + str(IndexImg) + "_" + str(Image.split(".")[-2]) + "\\"
         _3DVisLabLib. MakeFolder(SetMatchImages_folder)
         #save test image first 
-        FilePath=SetMatchImages_folder + "_00" + str(counter) + "_"+ Image
+        FilePath=SetMatchImages_folder + "_00" + str(counter) + "_"+ Image.replace(" ","_")
         ImagePath=MatchImages.List_ImagesToMatchFIlenames[Image]
         shutil.copyfile(ImagePath, FilePath)
 
@@ -1217,12 +1397,17 @@ def MatchImagestoInputImages(MatchImages,PlotAndSave_2datas,PlotAndSave):
             #print("result",Row)
             Element=random.choice(result[0])#incase we have two identical results
             #record MatchMetric
-            MatchMetric_figure=round(MatchImages.HM_data_All[Element,IndexImg],3)
+            MatchMetric_figure=round(MatchImages.HM_data_All[Element,IndexImg],4)
 
 
             #blank out similarity element
             MatchImages.HM_data_All[Element,IndexImg]=BlankOut
             MatchImages.HM_data_All[IndexImg,Element]=BlankOut
+
+            #if perfect match probably a duplicate - skip
+            if MatchMetric_figure==0.0: continue
+
+            
             #save out image
 
             ImagePath=MatchImages.ImagesInMem_Pairing[Element][0][0]
@@ -1417,7 +1602,7 @@ def ProcessSimilarity(Input):
         Base_Image_FMatches=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Keypoints[0]
         Base_Image_Descrips=MatchImages.ImagesInMem_to_Process[Base_Image_name].FM_Descriptors[0]
         Base_Image_FourierMag=MatchImages.ImagesInMem_to_Process[Base_Image_name].FourierTransform_mag[0]
-        Base_Image_FM=MatchImages.ImagesInMem_to_Process[Base_Image_name].ImageAdjusted[0]
+        #Base_Image_FM=MatchImages.ImagesInMem_to_Process[Base_Image_name].ImageAdjusted[0]
         Base_Image_EigenVectors=MatchImages.ImagesInMem_to_Process[Base_Image_name].EigenVectors[0]
         Base_Image_EigenValues=MatchImages.ImagesInMem_to_Process[Base_Image_name].EigenValues[0]
         Base_Image_HOG_Descriptor=MatchImages.ImagesInMem_to_Process[Base_Image_name].OPENCV_hog_descriptor[0]
@@ -1429,17 +1614,17 @@ def ProcessSimilarity(Input):
     else:
         #process images on the fly using function which is passed in from image info object (so can use different functions depending on application)
         #pass in the object info and it will be returned loaded with analytics for the image in lists of images
-        Base_On_the_fly_ImgInfo=MatchImages.ImagesInMem_to_Process[Base_Image_name].ProcessImages_function(MatchImages.ImagesInMem_to_Process[Base_Image_name],True)
+        Base_On_the_fly_ImgInfo=MatchImages.ImagesInMem_to_Process[Base_Image_name].ProcessImages_function(MatchImages.ImagesInMem_to_Process[Base_Image_name],True,MatchImages.Metrics_dict)
         #populate processed images
         Base_Image_Histo=Base_On_the_fly_ImgInfo.Histogram[0]
         Base_Image_FMatches=Base_On_the_fly_ImgInfo.FM_Keypoints[0]
         Base_Image_Descrips=Base_On_the_fly_ImgInfo.FM_Descriptors[0]
-        #Base_Image_FourierMag=Base_On_the_fly_ImgInfo.FourierTransform_mag[0]
+        Base_Image_FourierMag=Base_On_the_fly_ImgInfo.FourierTransform_mag[0]
         #Base_Image_FM=Base_On_the_fly_ImgInfo.ImageAdjusted[0]
         #Base_Image_EigenVectors=Base_On_the_fly_ImgInfo.EigenVectors[0]
         #Base_Image_EigenValues=Base_On_the_fly_ImgInfo.EigenValues[0]
-        #Base_Image_HOG_Descriptor=Base_On_the_fly_ImgInfo.OPENCV_hog_descriptor[0]
-        #Base_Image_Phase_CorImg=Base_On_the_fly_ImgInfo.PhaseCorrelate_FourierMagImg[0]
+        Base_Image_HOG_Descriptor=Base_On_the_fly_ImgInfo.OPENCV_hog_descriptor[0]
+        Base_Image_Phase_CorImg=Base_On_the_fly_ImgInfo.PhaseCorrelate_FourierMagImg[0]
         Base_PwrSpectralDensity=Base_On_the_fly_ImgInfo.PwrSpectralDensity[0]
         Base_MacroStruct_img = Base_On_the_fly_ImgInfo.MacroStructure_img[0]
         Base_PCA_Struct_EigenVecs = Base_On_the_fly_ImgInfo.PCA_Struct_EigenVecs[0]
@@ -1451,7 +1636,7 @@ def ProcessSimilarity(Input):
         if TestImageList<CurrentBaseImage:
             #data is diagonally symmetrical
             continue
-
+        #print("doing",TestImageList,"of",CurrentBaseImage)
         PluralImages_BestIndex=[]
         #test images - this is where different strategies may come in
         #get first image, can also use the list for this
@@ -1464,7 +1649,7 @@ def ProcessSimilarity(Input):
             Test_Image_FMatches=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Keypoints
             Test_Image_Descrips=MatchImages.ImagesInMem_to_Process[Test_Image_name].FM_Descriptors
             Test_Image_FourierMag=MatchImages.ImagesInMem_to_Process[Test_Image_name].FourierTransform_mag
-            Test_Image_FM=MatchImages.ImagesInMem_to_Process[Test_Image_name].ImageAdjusted
+            #Test_Image_FM=MatchImages.ImagesInMem_to_Process[Test_Image_name].ImageAdjusted
             Test_Image_EigenVectors=MatchImages.ImagesInMem_to_Process[Test_Image_name].EigenVectors
             Test_Image_EigenValues=MatchImages.ImagesInMem_to_Process[Test_Image_name].EigenValues
             Test_Image_HOG_Descriptor=MatchImages.ImagesInMem_to_Process[Test_Image_name].OPENCV_hog_descriptor
@@ -1475,17 +1660,17 @@ def ProcessSimilarity(Input):
             Test_PCA_Struct_EigenVals = MatchImages.ImagesInMem_to_Process[Test_Image_name].PCA_Struct_EigenVals
         else:
             #process images on the fly
-            Base_On_the_fly_ImgInfo=MatchImages.ImagesInMem_to_Process[Test_Image_name].ProcessImages_function(MatchImages.ImagesInMem_to_Process[Test_Image_name],False)
+            Base_On_the_fly_ImgInfo=MatchImages.ImagesInMem_to_Process[Test_Image_name].ProcessImages_function(MatchImages.ImagesInMem_to_Process[Test_Image_name],False,MatchImages.Metrics_dict)
             #populate processed images
             Test_Image_Histo=Base_On_the_fly_ImgInfo.Histogram
             Test_Image_FMatches=Base_On_the_fly_ImgInfo.FM_Keypoints
             Test_Image_Descrips=Base_On_the_fly_ImgInfo.FM_Descriptors
-            #Test_Image_FourierMag=Base_On_the_fly_ImgInfo.FourierTransform_mag
+            Test_Image_FourierMag=Base_On_the_fly_ImgInfo.FourierTransform_mag
             #Test_Image_FM=Base_On_the_fly_ImgInfo.ImageAdjusted
             #Test_Image_EigenVectors=Base_On_the_fly_ImgInfo.EigenVectors
             #Test_Image_EigenValues=Base_On_the_fly_ImgInfo.EigenValues
-            #Test_Image_HOG_Descriptor=Base_On_the_fly_ImgInfo.OPENCV_hog_descriptor
-            #Test_Image_Phase_CorImg=Base_On_the_fly_ImgInfo.PhaseCorrelate_FourierMagImg
+            Test_Image_HOG_Descriptor=Base_On_the_fly_ImgInfo.OPENCV_hog_descriptor
+            Test_Image_Phase_CorImg=Base_On_the_fly_ImgInfo.PhaseCorrelate_FourierMagImg
             Test_PwrSpectralDensity=Base_On_the_fly_ImgInfo.PwrSpectralDensity
             Test_MacroStruct_img = Base_On_the_fly_ImgInfo.MacroStructure_img
             Test_PCA_Struct_EigenVecs = Base_On_the_fly_ImgInfo.PCA_Struct_EigenVecs
@@ -1549,6 +1734,9 @@ def ProcessSimilarity(Input):
                     BestIndex=Indexer
                     MatchImages.Metrics_dict["HM_data_StructuralPCA_VectorValue"][CurrentBaseImage,TestImageList]=Diff
             PluralImages_BestIndex.append(BestIndex)
+
+
+
         if "HM_data_EigenValueDifference" in MatchImages.Metrics_dict:
             
             BestIndex=-1
@@ -1633,7 +1821,7 @@ def ProcessSimilarity(Input):
             for Indexer,testimage_FMMatchers in enumerate(Test_Image_FMatches):
 
                 try:
-                    MatchedPoints,OutputImage,PointsA,PointsB,FinalMatchMetric=_3DVisLabLib.Orb_FeatureMatch(Base_Image_FMatches,Base_Image_Descrips,Test_Image_FMatches[Indexer],Test_Image_Descrips[Indexer],99999,Base_Image_FM,Test_Image_FM[Indexer],0.7,MatchImages.DummyMinValue)
+                    MatchedPoints,OutputImage,PointsA,PointsB,FinalMatchMetric=_3DVisLabLib.Orb_FeatureMatch(Base_Image_FMatches,Base_Image_Descrips,Test_Image_FMatches[Indexer],Test_Image_Descrips[Indexer],99999,None,None,0.7,MatchImages.DummyMinValue)
                     AverageMatchDistance=FinalMatchMetric#smaller the better
                     #print("Feature match",FinalMatchMetric,len(Base_Image_FMatches),len(Test_Image_FMatches))
                 except:
@@ -1737,6 +1925,8 @@ def ProcessSimilarity(Input):
         #make data symmetrical for visualisation
         #for MatchMetric in MatchImages.Metrics_dict:
         #    MatchImages.Metrics_dict[MatchMetric][TestImageList,CurrentBaseImage]=MatchImages.Metrics_dict[MatchMetric][CurrentBaseImage,TestImageList]
+
+
 
 
 

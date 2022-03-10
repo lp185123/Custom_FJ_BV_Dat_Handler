@@ -11,7 +11,7 @@ OutputFolder=r"C:\Working\FindIMage_In_Dat\Output"
 MergedRecordSize=300
 
 #what folder has user placed in images (dat records) to merge
-TestMergingFolder=r"C:\Working\FindIMage_In_Dat\Output\TestMerge"
+TestMergingFolder=r"C:\Working\FindIMage_In_Dat\Output\ReorganiseOrMerge"
 
 #load json file which links image proxies back to their dat files and record
 RecordOffset=-1#fudge factor
@@ -108,7 +108,8 @@ for imgfilename in ListAllJpg_files:
 InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(TestMergingFolder)
 #Get pickle file - warning will just take first one
 ListAllDat_files=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles,ImageTypes=[".dat"])
-#clean up old dats
+
+#clean up old dats left in merge folder
 for DatToDelete in ListAllDat_files:
     os.remove(DatToDelete)
 

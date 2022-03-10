@@ -51,6 +51,7 @@ class UserInputParameters():
     def __init__(self):
         self.InputFilePath=r"C:\Working\FindIMage_In_Dat\Input"
         self.OutputFilePath=""
+        self.ReorganiseDats=r"C:\Working\FindIMage_In_Dat\Input\ReorganiseOrMerge"#another program will look here to see alternative folder structure to reorganise dats into
         self.FirstImageOnly=True
         self.AutomaticMode=True
         self.BlockType_ImageFormat=None

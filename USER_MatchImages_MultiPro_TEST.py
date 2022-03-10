@@ -48,45 +48,46 @@ class MatchImagesObject():
         ##set input folder here
         ##################################################
         #self.InputFolder=r"E:\NCR\TestImages\Faces\img_align_celeba"
-        #self.InputFolder = r"E:\NCR\TestImages\Furniture"
+        self.InputFolder = r"E:\NCR\TestImages\Furniture"
         #self.InputFolder=r"E:\NCR\TestImages\Food"
         # self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         # self.InputFolder=r"E:\NCR\TestImages\UK_1000"
         #self.InputFolder=r"E:\NCR\TestImages\Food\images"
-        self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
+        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
         #self.InputFolder=r"E:\NCR\TestImages\Randos"
         #self.InputFolder=r"E:\NCR\TestImages\Faces\MatcherFolder"
-
+        #self.InputFolder=r"E:\NCR\Currencies\Bangladesh_SR2800\Bangladesh\SR DC\MM8\05_1000(2020)"
         
         ##################################################
         ##set subset of data - will select random images
         ##if cross checking for similarity will be in O (n/2) time complexity
         ##################################################
-        self.SubSetOfData = int(50)  # subset of data
+        self.SubSetOfData = int(30)  # subset of data
         ################################################################
         ##select what function will be used, which will load image,crop,resize
         ##etc for all analytical procesess
         ###################################################################
         # images have to be prepared in application specific ways - choose function here - don't leave the "()"!!!!
+        #also hvae option to use stacked image function
         self.PrepareImagesFunction = MatchImages_lib.PrepareImageMetrics_MultipleImgs
-        self.PreviewImagePrep=True#preview image processing functions
+        self.PreviewImagePrep=False#preview image processing functions
         ######################################################################
         ##turn on and off which analytics to use, some will add noise rather
         ##than useful metrics depending on images to analyse
         ######################################################################
         # what metrics to use
         self.Use__FeatureMatch = False  # match detailed areas of image - quite slow
-        self.Use__histogram = True  # match how close the image colour distribution is - structure does not matter
+        self.Use__histogram = False  # match how close the image colour distribution is - structure does not matter
         self.Use__FourierDifference = False  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
-        self.Use__PhaseCorrelation = False  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
+        self.Use__PhaseCorrelation = True  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
         #in theory can convert for instance fourier magnitude image, polar unwrap it and check using phase correlation - but has to be proven
         self.Use__HOG_featureMatch = False  # dense feature match - good for small images - very effective for mm side
         self.Use__EigenVectorDotProd = False  # how close are principle components orientated- doesnt seem to work correctly yet - MUST BE SQUARE!
         self.Use__EigenValueDifference = False  # how close are principle component lengths for COLOUR - works pretty well - still needs a look at in how to package up matrix, and if using non -square do we use SVD instead?
         self.Use__FourierPowerDensity = True  # histogram of frequencies found in image - works very well
         self.Use__MacroStructure=True#very small image to compare macrostructure - experimental
-        self.Use__StructuralPCA_dotProd=True#Principle component analysis on binarised image - a geometrical PCA
+        self.Use__StructuralPCA_dotProd=False#Principle component analysis on binarised image - a geometrical PCA
         self.Use__StructuralPCA_VectorValue = True  # for STRUCTURE Principle component analysis on binarised image - a geometrical PCA
         #self.Use__QuiltScan==True
         ######################################################
@@ -98,17 +99,26 @@ class MatchImagesObject():
         # self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
         self.HyperThreading = True  # Experimental - hyperthreads are virtual cores so may not work for metrics like Feature Matching (except HOG)
         #but its not possible to predict how windows will distribute processes to which cores
+
+        #***This option very slow still under development***#currently 150 images vs 12 input match takes 4min with on-fly but 12 seconds pre processed
+        self.ProcessImagesOnFly=True#currently only works with MULTIPLE IMAGE function - if using a large amount of images
+        #setting this to true will not load image processing details into memory but process on the fly, this
+        #is much slower and much less efficient but is currently only solution to large datasets. Parallel processing may
+        #mitigate some slowness
+        
         #set buffer for memory that should remain - this is not definitive as its not possible to get an accurate size of the python process
-        self.FreeMemoryBuffer_pc = 50  # how much memory % should be reserved while processing
+        self.FreeMemoryBuffer_pc = 30  # how much memory % should be reserved while processing
         ##################################################
         ## input image matching mode - for ecah image in
         ## input image folder will try and find top 20
         ## matches from images in main input folder.
         ## will be in ON time complexity
         ##################################################
-        self.MatchFindFolder = r"E:\NCR\TestImages\Faces\MatcherFolder"
+        self.MatchFindFolder = r"E:\NCR\TestImages\Faces\MatcherFolder - Copy"
         #self.MatchFindFolder = r"E:\NCR\TestImages\UK_Side_Small_15sets10_findmatch"
-        self.MatchInputSet = False  # if a list of input images are provided the system will find similarities only with them, rather than
+        #self.MatchFindFolder = r"E:\NCR\TestImages\FurnitureToMAtch"
+
+        self.MatchInputSet = True  # if a list of input images are provided the system will find similarities only with them, rather than
         # attempt to match every image sequentially.
 
 
@@ -189,29 +199,30 @@ class MatchImagesObject():
         #_3DVisLabLib.ImageViewer_Quick_no_resize(cv2.resize(blank_image,(blank_image.shape[1]*3,blank_image.shape[0]*3)),0,True,True)
         return blank_image
 
-    def USERFunction_PrepareForHOG(self,image,TargetHeight_HOG=64,TargetWidth_HOG=128):
-        #HOG expects 64 * 128
-        #lets not chagne aspect ratio
-        ImageHeight=image.shape[0]
-        ImageWidth=image.shape[1]
-        #set to target height then crop as needed
-        Percent2match=TargetHeight_HOG/ImageHeight
-        TargetWidth=round(ImageWidth*Percent2match)
-        Resized=cv2.resize(image,(TargetWidth,TargetHeight_HOG))
+    # def USERFunction_PrepareForHOG(self,image,TargetHeight_HOG=64,TargetWidth_HOG=128):
 
-        #create blank
-        blank_image = np.zeros(shape=[TargetHeight_HOG, TargetWidth_HOG, image.shape[2]], dtype=np.uint8)
+    #     #HOG expects 64 * 128
+    #     #lets not chagne aspect ratio
+    #     ImageHeight=image.shape[0]
+    #     ImageWidth=image.shape[1]
+    #     #set to target height then crop as needed
+    #     Percent2match=TargetHeight_HOG/ImageHeight
+    #     TargetWidth=round(ImageWidth*Percent2match)
+    #     Resized=cv2.resize(image,(TargetWidth,TargetHeight_HOG))
 
-        #now crop to HOG shape
-        HOG_specific_crop=Resized[:,0:TargetWidth_HOG,:]
+    #     #create blank
+    #     blank_image = np.zeros(shape=[TargetHeight_HOG, TargetWidth_HOG, image.shape[2]], dtype=np.uint8)
 
-        blank_image[0:HOG_specific_crop.shape[0],0:HOG_specific_crop.shape[1],:]=HOG_specific_crop
+    #     #now crop to HOG shape
+    #     HOG_specific_crop=Resized[:,0:TargetWidth_HOG,:]
 
-        #now need to flip on its side
-        # rotate ccw
-        Rotate=cv2.transpose(blank_image)
-        Rotate=cv2.flip(Rotate,flipCode=0)
-        return Rotate
+    #     blank_image[0:HOG_specific_crop.shape[0],0:HOG_specific_crop.shape[1],:]=HOG_specific_crop
+
+    #     #now need to flip on its side
+    #     # rotate ccw
+    #     Rotate=cv2.transpose(blank_image)
+    #     Rotate=cv2.flip(Rotate,flipCode=0)
+    #     return Rotate
 
     def USERFunction_CropForFM(self,image):
         return image
@@ -283,27 +294,28 @@ class MatchImagesObject():
 
     class ImageInfo():
         def __init__(self):
-            self.Histogram=[]
+            self.is_ImageToMatch=False
+            self.Histogram=[None]
             self.OriginalImage=None
             self.ImageColour=None
             self.ImageAdjusted=None
-            self.FM_Keypoints=None
-            self.FM_Descriptors=None
-            self.FourierTransform_mag=None
-            self.ImageGrayscale=None
-            self.EigenValues=None
-            self.EigenVectors=None
-            self.PrincpleComponents=None
-            self.HOG_Mag=None
-            self.HOG_Angle=None
-            self.OPENCV_hog_descriptor=None
-            self.PhaseCorrelate_FourierMagImg=None
+            self.FM_Keypoints=[None]
+            self.FM_Descriptors=[None]
+            self.FourierTransform_mag=[None]
+            self.ImageGrayscale=[None]
+            self.EigenValues=[None]
+            self.EigenVectors=[None]
+            self.PrincpleComponents=[None]
+            self.HOG_Mag=[None]
+            self.HOG_Angle=[None]
+            self.OPENCV_hog_descriptor=[None]
+            self.PhaseCorrelate_FourierMagImg=[None]
             self.DebugImage=None
             self.OriginalImageFilePath=None
-            self.PwrSpectralDensity=[]
-            self.MacroStructure_img=[]
-            self.PCA_Struct_EigenVecs=[]
-            self.PCA_Struct_EigenVals=[]
+            self.PwrSpectralDensity=[None]
+            self.MacroStructure_img=[None]
+            self.PCA_Struct_EigenVecs=[None]
+            self.PCA_Struct_EigenVals=[None]
             self.ProcessImages_function=None#if this is not none - should be a function we can call to process images on the fly
             
 def PlotAndSave(Title,Filepath,Data,maximumvalue):
@@ -479,20 +491,19 @@ def main():
     #populate images 
     #load images into memory
 
-    # Create HOG Descriptor object outside of loops
-    HOG_extrator = cv2.HOGDescriptor()
+    
     #record images to allow us to debug code
     ImageReviewDict=dict()
     for Index, ImagePath in enumerate(RandomOrder):
         if Index%30==0: print("Image load",Index,"/",len(RandomOrder))
 
         #if True==True:
-        try:
-            ImageInfo=PrepareMatchImages.PrepareImagesFunction(PrepareMatchImages,ImagePath,Index,ImageReviewDict,HOG_extrator)
+        #try:
+        ImageInfo=PrepareMatchImages.PrepareImagesFunction(PrepareMatchImages,ImagePath,Index,ImageReviewDict)
         #populate dictionary
-            PrepareMatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
-        except:
-            print("error with image, skipping",ImagePath)
+        PrepareMatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
+        #except:
+         #   print("error with image, skipping",ImagePath)
 
     #need this to copy the keypoints for some reason - incompatible with pickle which means
     #any multiprocessing wont work either
@@ -623,11 +634,21 @@ def main():
         print("WARNING!! possible memory overflow - restricting number of processes from",processes,"to",MaxPossibleProcesses)
         processes=MaxPossibleProcesses
     #user option for process boost
-    if MatchImages.BeastMode==False:
-        chunksize=processes*3
+
+    if MatchImages.MatchInputSet==True:
+        ThreadsNeeded=len(MatchImages.List_ImagesToMatchFIlenames)
+        chunksize=1#in this mode we are generally running a low # of threads VS a large amount of images
+        
     else:
+        ThreadsNeeded=len(MatchImages.ImagesInMem_Pairing)
+        chunksize=processes*3#arbitrary setting to be able to get time feedback and not clog up system - but each reset of tasks can have memory overhead
+
+
+    #user option to speed up process by stacking tasks with no breaks - warning - might need maxpossibletask settings in the pool 
+    if MatchImages.BeastMode==True:
         print("WARNING! Beast mode active - this optimisation prohibits any timing feedback")
-        chunksize=int(len(MatchImages.ImagesInMem_Pairing)/processes)
+        chunksize=int(ThreadsNeeded/processes)
+
     #how many jobs do we build up to pass off to the multiprocess pool, in this case in theory each core gets 3 stacked tasks
     ProcessesPerCycle=processes*chunksize
     
@@ -668,13 +689,14 @@ def main():
     ProcessOnly_start = time.perf_counter()
     t1_start = time.perf_counter()
     if processes>1:
-        print("[Multiprocess start]","Taskstack per core:",chunksize,"  Taskpool size:",ProcessesPerCycle,"  Physical cores used:",processes,"   Images:",len(MatchImages.ImagesInMem_Pairing))
+        print("[Multiprocess start]","Taskstack per core:",chunksize,"  Taskpool size:",ProcessesPerCycle,"  Physical cores used:",processes,"   Image Threads:",ThreadsNeeded)
         for Index, BaseImageList in enumerate(ImagesInMem_Pairing_ForThreading):
             
 
             listJobs.append((MatchImages,BaseImageList))
 
             if (Index%ProcessesPerCycle==0 and Index!=0) or Index==len(ImagesInMem_Pairing_ForThreading)-1:#before was matches.imagepairinginmemory incase this breaks
+                #maxtasksperchild can help with memory problems
                 ReturnList=(pool.imap_unordered(MatchImages_lib.ProcessSimilarity,listJobs,chunksize=chunksize))
                 #populate output metric comparison matrices
                 for ReturnObjects in ReturnList:
@@ -762,9 +784,13 @@ def main():
     
     print("Total process only time:",str(datetime.timedelta(seconds= time.perf_counter()-ProcessOnly_start)))
     print("Conforming data..")
+
+
+
     #create diagonally symetrical matrix
     for BaseImageList in MatchImages.ImagesInMem_Pairing:
         for testImageList in MatchImages.ImagesInMem_Pairing:
+            #can either be checking each image against all others, or only a smaller subset of images against a main set
             if MatchImages.MatchInputSet == True:
                 if (testImageList > len(MatchImages.List_ImagesToMatchFIlenames)) and (BaseImageList > len(MatchImages.List_ImagesToMatchFIlenames)):
                     continue
