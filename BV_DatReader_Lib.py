@@ -71,9 +71,9 @@ class UserInputParameters():
         self.FirstImageOnly=True
         self.AutomaticMode=True
         self.BlockType_ImageFormat="GBVE MM1 image"
-        self.BlockTypeWave="C"
+        self.BlockTypeWave=None#"C"
         self.GetSNR=False
-        self.GetRGBImage=True
+        self.GetRGBImage=""#""True""
         self.FolderPerDat=False
 
     def UserPopulateParameters(self):
@@ -146,7 +146,7 @@ class UserInputParameters():
                 print("\n \n \n \n \n")
                 print(Result, "is an invalid choice - please try again")
 
-        if (self.BlockTypeWave) is None or (self.BlockTypeWave==""):
+        if (self.BlockTypeWave is None) or (self.BlockTypeWave==""):
             while True:
                 #ask user what block type (format of image)
                 print("\n \n \n \n \n")
@@ -184,8 +184,10 @@ def Image_from_Automatic_mode(filteredImages,Notefound,data_hex,Is_mm8=False):
     #different extraction process potentially
     if Is_mm8==True:
         (gray_image,DataVerify_image)=GetImage_fromHex_MM8(data_hex,UserManualMemoryScan,UserManualMemoryScan.Offset)
+        #gray_image = cv2.normalize(gray_image, gray_image,0, 255, cv2.NORM_MINMAX)
     else:
         (gray_image,DataVerify_image)=GetImage_fromHex(data_hex,UserManualMemoryScan,UserManualMemoryScan.Offset)
+        
 
     return (gray_image,DataVerify_image)
 
@@ -267,10 +269,10 @@ def AutomaticExtraction(UserParameters):
                 #WARNING these colour channels will not correspond to RGB!!! Done ad hoc 
                 #For OpenCV, 0=blue, 1=Green, 2=red
                 RGB_Image[:,:,0]=blue_image
-                RGB_Image[:,:,1]=OutputImage.copy()
+                RGB_Image[:,:,1]=OutputImage
                 RGB_Image[:,:,2]=red_image
                 #should have an RGB image now 
-                OutputImage=RGB_Image.copy()
+                OutputImage=RGB_Image
 
             #display image
             #_3DVisLabLib.ImageViewer_Quickv2(OutputImage,0,False,False)
@@ -445,7 +447,7 @@ def mapFromTo(x,a,b,c,d):
    y=(x-a)/(b-a)*(d-c)+c
    return y
 
-def ConvertListHex_to_GrayScale_bitdepth(InputListHex_str,bytedepth,OutputGrayScale_Decimal):
+def ConvertListHex_to_GrayScale_bitdepth(InputListHex_str,bytedepth,OutputGrayScale_Decimal,Base):
     ListOfGrayScaleInt=[]
     for i in range (0,len(InputListHex_str),bytedepth):
         try:
@@ -454,13 +456,17 @@ def ConvertListHex_to_GrayScale_bitdepth(InputListHex_str,bytedepth,OutputGraySc
             for j in range(i,i+bytedepth):
                 HexSet=HexSet+InputListHex_str[j]
             #what base do we convert set of hex into,images are usually 2 bytes (256 per channel) or can be 4 bytes (1024) etc
-            Int_from_Hex = int(HexSet,16)#TODO if this is a bitdepth greater than 16 bits why doesnt "bytedepth*8" work?
+            #this was 16 bits before
+            Int_from_Hex = int(HexSet,Base)#TODO if this is a bitdepth greater than 16 bits why doesnt "bytedepth*8" work?
+            
+
             #Int_from_Hex=mapFromTo(Int_from_Hex,0,(bytedepth*8)*(bytedepth*8),0,OutputGrayScale_Decimal)
             ListOfGrayScaleInt.append(Int_from_Hex)
         except Exception as e: 
             print(repr(e))
             print(HexSet, " not valid hex")
 
+        
     return ListOfGrayScaleInt
 
 def CreateGrayImage_from_memory(List_decimalValues, WidthImage,HeightImage):
@@ -492,7 +498,39 @@ def CreateGrayImage_from_memory(List_decimalValues, WidthImage,HeightImage):
                     DataVerify_image[Yelement,Xelement,2]=0
 
     return (gray_image,DataVerify_image)
-   
+
+def CreateGrayImage_from_memory_mm8(List_decimalValues, WidthImage,HeightImage):
+    #create grayscale and colour images - colour here is for undefined areas of memory (red) and defined (green)
+    DataVerify_image = np.zeros((HeightImage,WidthImage,3), np.uint8)
+    gray_image = cv2.cvtColor(DataVerify_image, cv2.COLOR_BGR2GRAY)
+    ListOfGrayScale_temp=copy.copy(List_decimalValues)
+
+    for Yelement in range (0,HeightImage,1):
+        for Xelement in range (0,WidthImage,1):
+            IndexRequired=((Yelement)*WidthImage)+Xelement
+            gray_image[Yelement,Xelement]=ListOfGrayScale_temp[IndexRequired]
+            # if IndexRequired>len(ListOfGrayScale_temp)-1:
+            #     gray_image[Yelement,Xelement]=0
+            #     DataVerify_image[Yelement,Xelement,0]=0
+            #     DataVerify_image[Yelement,Xelement,1]=0
+            #     DataVerify_image[Yelement,Xelement,2]=255
+            # else:
+            #     #valid grayscale values will be in green channel
+            #     if ListOfGrayScale_temp[IndexRequired]>-1 or ListOfGrayScale_temp[IndexRequired]<256:
+            #         gray_image[Yelement,Xelement]=ListOfGrayScale_temp[IndexRequired]
+            #         DataVerify_image[Yelement,Xelement,0]=0
+            #         DataVerify_image[Yelement,Xelement,1]=ListOfGrayScale_temp[IndexRequired]
+            #         DataVerify_image[Yelement,Xelement,2]=0
+            #     else:
+            #         #invalid greyscale values in blue channel
+            #         gray_image[Yelement,Xelement]=ListOfGrayScale_temp[IndexRequired]
+            #         DataVerify_image[Yelement,Xelement,0]=255
+            #         DataVerify_image[Yelement,Xelement,1]=0
+            #         DataVerify_image[Yelement,Xelement,2]=0
+
+    return (gray_image,DataVerify_image)
+
+
 def GetDataFile(InputPath):
     #Load input data
     #data=Load_Hex_File(r"C:\Working\FindIMage_In_Dat\01_5_A.dat")
@@ -566,7 +604,8 @@ def GetImage_fromHex(Data_hex,UserManualMemoryScan,OverRide_StartOffset):
     ListOfHex_Subset=Return_SubSet_of_Memory(Data_hex,hex(OverRide_StartOffset*2),EndHex,0)
 
     #convert to grayscale
-    ListOfGrayScale_Subset=ConvertListHex_to_GrayScale_bitdepth(ListOfHex_Subset,2,255)
+    ListOfGrayScale_Subset=ConvertListHex_to_GrayScale_bitdepth(ListOfHex_Subset,2,255,16)
+
 
     #ReplaceHexStrings(ListOfGrayScale_Subset,DatFileInfos)
     #interpret area of memory as image
@@ -581,10 +620,21 @@ def GetImage_fromHex_MM8(Data_hex,UserManualMemoryScan,OverRide_StartOffset):
 
     #calculate offsets
     EndHex=hex((ConvertHex_to_decimal(UserManualMemoryScan.OffsetEnd))*2)
-    ListOfHex_Subset=Return_SubSet_of_Memory(Data_hex,hex(OverRide_StartOffset*2),EndHex,0)
+    ListOfHex_Subset=Return_SubSet_of_Memory( Data_hex,hex((OverRide_StartOffset*2)),EndHex,0)
 
     #convert to grayscale
-    ListOfGrayScale_Subset=ConvertListHex_to_GrayScale_bitdepth(ListOfHex_Subset,2,255)
+    ListOfGrayScale_Subset=ConvertListHex_to_GrayScale_bitdepth(ListOfHex_Subset,4,255,16)
+    print("this area needs experimentation of a loop of parametrs to see whats happening")
+    #scrappy code - lets try and make sure image bitdepth is in correct range
+    #ReRanged=[]
+    #for Elemn in ListOfGrayScale_Subset:
+    #    if Elemn>32000:
+    #        ReRanged.append(32000)
+    #    elif Elemn<0:
+    #        ReRanged.append(0)
+    #    else:
+    #        ReRanged.append(Elemn)
+        #ReRanged.append(mapFromTo(Elemn,0,2**12,0,254))#WARNING this isnt correct - will normalise the data
 
     #interpret area of memory as image
     (gray_image,DataVerify_image)=CreateGrayImage_from_memory(ListOfGrayScale_Subset,UserManualMemoryScan.Width,UserManualMemoryScan.Height)
@@ -614,7 +664,7 @@ def UpdateSkimmer(data_hex,UserManualMemoryScan):
     UserManualMemoryScan.PrintInfo()
 
     #cut image out of hex datamass
-    (gray_image,DataVerify_image)=GetImage_fromHex(data_hex,UserManualMemoryScan,UserManualMemoryScan.Offset)
+    (gray_image,DataVerify_image)=GetImage_fromHex_MM8(data_hex,UserManualMemoryScan,UserManualMemoryScan.Offset)
 
     #add header graphic if user has established record length discovery
     if UserManualMemoryScan.HeaderStartGuideImg is not None:

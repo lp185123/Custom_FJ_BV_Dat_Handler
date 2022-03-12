@@ -48,12 +48,13 @@ class MatchImagesObject():
         ##set input folder here
         ##################################################
         #self.InputFolder=r"E:\NCR\TestImages\Faces\img_align_celeba"
-        self.InputFolder = r"E:\NCR\TestImages\Furniture"
-        #self.InputFolder=r"E:\NCR\TestImages\Food"
+        #self.InputFolder=r"C:\Working\TempImages\Flowers"
+        #self.InputFolder = r"E:\NCR\TestImages\Furniture"
+        #self.InputFolder=r"C:\Working\TempImages\Food"
         # self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         # self.InputFolder=r"E:\NCR\TestImages\UK_1000"
         #self.InputFolder=r"E:\NCR\TestImages\Food\images"
-        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
+        self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
         #self.InputFolder=r"E:\NCR\TestImages\Randos"
         #self.InputFolder=r"E:\NCR\TestImages\Faces\MatcherFolder"
@@ -63,7 +64,7 @@ class MatchImagesObject():
         ##set subset of data - will select random images
         ##if cross checking for similarity will be in O (n/2) time complexity
         ##################################################
-        self.SubSetOfData = int(30)  # subset of data
+        self.SubSetOfData = int(300)  # subset of data
         ################################################################
         ##select what function will be used, which will load image,crop,resize
         ##etc for all analytical procesess
@@ -80,28 +81,28 @@ class MatchImagesObject():
         self.Use__FeatureMatch = False  # match detailed areas of image - quite slow
         self.Use__histogram = False  # match how close the image colour distribution is - structure does not matter
         self.Use__FourierDifference = False  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
-        self.Use__PhaseCorrelation = True  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
+        self.Use__PhaseCorrelation = False  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
         #in theory can convert for instance fourier magnitude image, polar unwrap it and check using phase correlation - but has to be proven
         self.Use__HOG_featureMatch = False  # dense feature match - good for small images - very effective for mm side
         self.Use__EigenVectorDotProd = False  # how close are principle components orientated- doesnt seem to work correctly yet - MUST BE SQUARE!
         self.Use__EigenValueDifference = False  # how close are principle component lengths for COLOUR - works pretty well - still needs a look at in how to package up matrix, and if using non -square do we use SVD instead?
-        self.Use__FourierPowerDensity = True  # histogram of frequencies found in image - works very well
-        self.Use__MacroStructure=True#very small image to compare macrostructure - experimental
-        self.Use__StructuralPCA_dotProd=False#Principle component analysis on binarised image - a geometrical PCA
+        self.Use__FourierPowerDensity = False  # histogram of frequencies found in image - works very well
+        self.Use__MacroStructure=False#very small image to compare macrostructure - experimental
+        self.Use__StructuralPCA_dotProd=True#Principle component analysis on binarised image - a geometrical PCA
         self.Use__StructuralPCA_VectorValue = True  # for STRUCTURE Principle component analysis on binarised image - a geometrical PCA
         #self.Use__QuiltScan==True
         ######################################################
         ##set multi process behaviour - can force no threading if memory issues are encountered (imgs > 3000)
         #######################################################
         # set this to "1" to force inline processing, otherwise to limit cores set to the cores you wish to use then add one (as system will remove one for safety regardless)
-        self.MemoryError_ReduceLoad = (True,1)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
+        self.MemoryError_ReduceLoad = (False,1)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
         self.BeastMode = False  # Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         # self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
         self.HyperThreading = True  # Experimental - hyperthreads are virtual cores so may not work for metrics like Feature Matching (except HOG)
         #but its not possible to predict how windows will distribute processes to which cores
 
         #***This option very slow still under development***#currently 150 images vs 12 input match takes 4min with on-fly but 12 seconds pre processed
-        self.ProcessImagesOnFly=True#currently only works with MULTIPLE IMAGE function - if using a large amount of images
+        self.ProcessImagesOnFly=False#currently only works with MULTIPLE IMAGE function - if using a large amount of images
         #setting this to true will not load image processing details into memory but process on the fly, this
         #is much slower and much less efficient but is currently only solution to large datasets. Parallel processing may
         #mitigate some slowness
@@ -114,11 +115,11 @@ class MatchImagesObject():
         ## matches from images in main input folder.
         ## will be in ON time complexity
         ##################################################
-        self.MatchFindFolder = r"E:\NCR\TestImages\Faces\MatcherFolder - Copy"
+        #self.MatchFindFolder = r"E:\NCR\TestImages\Faces\MatcherFolder - Copy"
         #self.MatchFindFolder = r"E:\NCR\TestImages\UK_Side_Small_15sets10_findmatch"
         #self.MatchFindFolder = r"E:\NCR\TestImages\FurnitureToMAtch"
 
-        self.MatchInputSet = True  # if a list of input images are provided the system will find similarities only with them, rather than
+        self.MatchInputSet = False  # if a list of input images are provided the system will find similarities only with them, rather than
         # attempt to match every image sequentially.
 
 
@@ -145,24 +146,45 @@ class MatchImagesObject():
         self.HistogramSelfSimilarityThreshold = 0.005  # should be zero but incase there is image compression noise
         self.CurrentBaseImage = None
         self.List_ImagesToMatchFIlenames = dict()
-
+        self.MetricsFunctions=dict()
+        self.ImageProcessingFunction_SaveImages=False
         # populatemetricDictionary
         self.Metrics_dict = dict()
+        self.Metrics_functions = dict()
 
-        if self.Use__FeatureMatch: self.Metrics_dict["HM_data_FM"] = None  # slow - maybe cant be hyperthreaded?
-        if self.Use__histogram: self.Metrics_dict["HM_data_histo"] = None  # fast =no idea about hyperthreading
-        if self.Use__FourierDifference: self.Metrics_dict[
-            "HM_data_FourierDifference"] = None  # fast -hyperthreading yes
-        if self.Use__PhaseCorrelation: self.Metrics_dict["HM_data_PhaseCorrelation"] = None  # -hyperthreading yes
-        if self.Use__HOG_featureMatch: self.Metrics_dict["HM_data_HOG_Dist"] = None  # slow -hyperthreading yes
-        if self.Use__EigenVectorDotProd: self.Metrics_dict["HM_data_EigenVectorDotProd"] = None  # fast
-        if self.Use__EigenValueDifference: self.Metrics_dict[
-            "HM_data_EigenValueDifference"] = None  # fast #-hyperthreading yes
-        if self.Use__FourierPowerDensity: self.Metrics_dict[
-            "HM_data_FourierPowerDensity"] = None  # fast #-hyperthreading yes
-        if self.Use__MacroStructure: self.Metrics_dict["HM_data_MacroStructure"] = None
-        if self.Use__StructuralPCA_dotProd: self.Metrics_dict["HM_data_StructuralPCA_dotProd"] = None
-        if self.Use__StructuralPCA_VectorValue: self.Metrics_dict["HM_data_StructuralPCA_VectorValue"] = None
+        if self.Use__FeatureMatch: 
+            self.Metrics_dict["HM_data_FM"] = None  # slow - maybe cant be hyperthreaded?
+            self.Metrics_functions["HM_data_FM"] = None 
+        if self.Use__histogram:
+            self.Metrics_dict["HM_data_histo"] = None  # fast =no idea about hyperthreading
+            self.Metrics_functions["HM_data_histo"] = None
+        if self.Use__FourierDifference: 
+            self.Metrics_dict["HM_data_FourierDifference"] = None  # fast -hyperthreading yes
+            self.Metrics_functions["HM_data_FourierDifference"] = None
+        if self.Use__PhaseCorrelation:
+            self.Metrics_dict["HM_data_PhaseCorrelation"] = None  # -hyperthreading yes
+            self.Metrics_functions["HM_data_PhaseCorrelation"] = None
+        if self.Use__HOG_featureMatch: 
+            self.Metrics_dict["HM_data_HOG_Dist"] = None  # slow -hyperthreading yes
+            self.Metrics_functions["HM_data_HOG_Dist"] = None
+        if self.Use__EigenVectorDotProd: 
+            self.Metrics_dict["HM_data_EigenVectorDotProd"] = None  # fast
+            self.Metrics_functions["HM_data_EigenVectorDotProd"] = None
+        if self.Use__EigenValueDifference:
+            self.Metrics_dict["HM_data_EigenValueDifference"] = None  # fast #-hyperthreading yes
+            self.Metrics_functions["HM_data_EigenValueDifference"] = None
+        if self.Use__FourierPowerDensity:
+            self.Metrics_dict["HM_data_FourierPowerDensity"] = None  # fast #-hyperthreading yes
+            self.Metrics_functions["HM_data_FourierPowerDensity"] = None
+        if self.Use__MacroStructure: 
+            self.Metrics_dict["HM_data_MacroStructure"] = None
+            self.Metrics_functions["HM_data_MacroStructure"] = None
+        if self.Use__StructuralPCA_dotProd: 
+            self.Metrics_dict["HM_data_StructuralPCA_dotProd"] = None
+            self.Metrics_functions["HM_data_StructuralPCA_dotProd"] = None
+        if self.Use__StructuralPCA_VectorValue: 
+            self.Metrics_dict["HM_data_StructuralPCA_VectorValue"] = None
+            self.Metrics_functions["HM_data_StructuralPCA_VectorValue"] = None
         #if self.Use__QuiltScan: self.Metrics_dict["HM_data_QuiltScan"] = None
 
         for metrix in self.Metrics_dict:
@@ -295,29 +317,31 @@ class MatchImagesObject():
     class ImageInfo():
         def __init__(self):
             self.is_ImageToMatch=False
-            self.Histogram=[None]
+            #self.Histogram=[None]
             self.OriginalImage=None
             self.ImageColour=None
             self.ImageAdjusted=None
-            self.FM_Keypoints=[None]
-            self.FM_Descriptors=[None]
-            self.FourierTransform_mag=[None]
-            self.ImageGrayscale=[None]
-            self.EigenValues=[None]
-            self.EigenVectors=[None]
-            self.PrincpleComponents=[None]
-            self.HOG_Mag=[None]
-            self.HOG_Angle=[None]
-            self.OPENCV_hog_descriptor=[None]
-            self.PhaseCorrelate_FourierMagImg=[None]
+            #self.FM_Keypoints=[None]
+            #self.FM_Descriptors=[None]
+            #self.FourierTransform_mag=[None]
+            #self.ImageGrayscale=[None]
+            #self.EigenValues=[None]
+            #self.EigenVectors=[None]
+            #self.PrincpleComponents=[None]
+            #self.HOG_Mag=[None]
+            #self.HOG_Angle=[None]
+            #self.OPENCV_hog_descriptor=[None]
+            #self.PhaseCorrelate_FourierMagImg=[None]
             self.DebugImage=None
             self.OriginalImageFilePath=None
-            self.PwrSpectralDensity=[None]
-            self.MacroStructure_img=[None]
-            self.PCA_Struct_EigenVecs=[None]
-            self.PCA_Struct_EigenVals=[None]
+            #self.PwrSpectralDensity=[None]
+            #self.MacroStructure_img=[None]
+            #self.PCA_Struct_EigenVecs=[None]
+            #self.PCA_Struct_EigenVals=[None]
             self.ProcessImages_function=None#if this is not none - should be a function we can call to process images on the fly
-            
+            self.IsInError=False
+            self.Metrics_functions=dict()
+
 def PlotAndSave(Title,Filepath,Data,maximumvalue):
     
     #this causes crashes
@@ -429,7 +453,6 @@ def main():
 
 
 
-
     print("filtering nested images from", PrepareMatchImages.InputFolder,"this can several minutes if N>10,000")
     #get all files in input folder
     InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(PrepareMatchImages.InputFolder)
@@ -495,13 +518,28 @@ def main():
     #record images to allow us to debug code
     ImageReviewDict=dict()
     for Index, ImagePath in enumerate(RandomOrder):
-        if Index%30==0: print("Image load",Index,"/",len(RandomOrder))
+        if Index%30==0: print("Image loadcheck",Index,"/",len(RandomOrder))
 
-        #if True==True:
+
         #try:
-        ImageInfo=PrepareMatchImages.PrepareImagesFunction(PrepareMatchImages,ImagePath,Index,ImageReviewDict)
-        #populate dictionary
-        PrepareMatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
+        #test that image is valid first
+        if MatchImages_lib.TestImage(ImagePath):
+            
+            ImageInfo=PrepareMatchImages.PrepareImagesFunction(PrepareMatchImages,ImagePath,Index,ImageReviewDict)
+
+            #populate dictionary
+            if ImageInfo is not None:
+                PrepareMatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
+
+                #save out images for inspection
+                if Index==0:
+                    pass
+                    #PrepareMatchImages.ImageProcessingFunction_SaveImages=True
+                    #ImageInfo=PrepareMatchImages.PrepareImagesFunction(PrepareMatchImages,ImagePath,Index,ImageReviewDict)
+                    #if ImageInfo.ProcessImages_function is not None:
+                    #    PrepareMatchImages.ImageProcessingFunction_SaveImages=False
+
+
         #except:
          #   print("error with image, skipping",ImagePath)
 
@@ -582,12 +620,24 @@ def main():
             ImgCol_InfoSheet.FirstImage=img
             MatchImages.ImagesInMem_Pairing[Index]=([img],ImgCol_InfoSheet)
 
+
+
+
     #initialise metric matrices
-    MatchImages.HM_data_MetricDistances = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
-    MatchImages.HM_data_MetricDistances_auto = np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+    #previously would create an N by N matrix as expects to cross-check
+    #all images - lets try and add logic so if we are testing a small
+    #subset of images VS a large dataset (16 vs 100,000), we dont
+    #run into memory problems with the default N by N matrix size
+    if MatchImages.MatchInputSet==True:
+        MetricsMatrices_height=len(MatchImages.List_ImagesToMatchFIlenames)
+    else:
+        MetricsMatrices_height=len(MatchImages.ImagesInMem_Pairing)
+    
+    MatchImages.HM_data_MetricDistances = np.zeros((MetricsMatrices_height,len(MatchImages.ImagesInMem_Pairing)))
+    MatchImages.HM_data_MetricDistances_auto = np.zeros((MetricsMatrices_height,len(MatchImages.ImagesInMem_Pairing)))
     #initialise all metric matrices
     for MetricsMatrix in MatchImages.Metrics_dict:
-        MatchImages.Metrics_dict[MetricsMatrix]=np.zeros((len(MatchImages.ImagesInMem_Pairing),len(MatchImages.ImagesInMem_Pairing)))
+        MatchImages.Metrics_dict[MetricsMatrix]=np.zeros((MetricsMatrices_height,len(MatchImages.ImagesInMem_Pairing)))
 
 
     #get info about cores for setting up multiprocess
@@ -677,7 +727,17 @@ def main():
             ImagesInMem_Pairing_ForThreading[Indexer]=MatchImages.ImagesInMem_Pairing[Indexer]
             
     
-
+    #check that cores dont have more than 1 task stack in this mode- otherwise the process time will
+    #be multiplied as excess tasks will run after the parallel processes
+    if MatchImages.MatchInputSet==True:
+        if MatchImages.SubSetOfData>1000:
+            #if MatchImages.ProcessImagesOnFly==True
+            if chunksize>1:
+                print("\n\n\n")
+                print("large amount of images to check for image matcher - please ensure IMAGE TO MATCH N does not exceed CORES N")
+                print("As need one core per image to run through all test images, and if cannot do in parallel will multiply time taken by excess N")
+                print("Information will follow to assess parallel configuration")
+                result=input("any key to confirm warning")
     
     pool = multiprocessing.Pool(processes=processes)
     listJobs=[]
@@ -792,53 +852,80 @@ def main():
         for testImageList in MatchImages.ImagesInMem_Pairing:
             #can either be checking each image against all others, or only a smaller subset of images against a main set
             if MatchImages.MatchInputSet == True:
-                if (testImageList > len(MatchImages.List_ImagesToMatchFIlenames)) and (BaseImageList > len(MatchImages.List_ImagesToMatchFIlenames)):
-                    continue
+                #dont need to make symettrical as the matrix will not be square to cope with large dataset
+                #if (testImageList > len(MatchImages.List_ImagesToMatchFIlenames)) and (BaseImageList > len(MatchImages.List_ImagesToMatchFIlenames)):
+                continue
             if testImageList<BaseImageList:
                 for MatchMetric in MatchImages.Metrics_dict:
                     MatchImages.Metrics_dict[MatchMetric][BaseImageList,testImageList]=MatchImages.Metrics_dict[MatchMetric][testImageList,BaseImageList]
 
     #fix any bad numbers
-    for BaseImageList in MatchImages.ImagesInMem_Pairing:
-        for testImageList in MatchImages.ImagesInMem_Pairing:
-            if MatchImages.MatchInputSet == True:
-                if (testImageList > len(MatchImages.List_ImagesToMatchFIlenames)) and (BaseImageList > len(MatchImages.List_ImagesToMatchFIlenames)):
-                    continue
+    if MatchImages.MatchInputSet == False:
+        #dealing with an N by N matrix
+        for BaseImageList in MatchImages.ImagesInMem_Pairing:
+            for testImageList in MatchImages.ImagesInMem_Pairing:
+                for MatchMetric in MatchImages.Metrics_dict:
+                    if math.isnan( MatchImages.Metrics_dict[MatchMetric][BaseImageList,testImageList]):
+                        MatchImages.Metrics_dict[MatchMetric][BaseImageList,testImageList]=MatchImages.DummyMinValue
+                        print("Bad value found, ",MatchMetric)
+        #dealing with a rectangular matrix with a small height but potentially very long width
 
-            for MatchMetric in MatchImages.Metrics_dict:
-                if math.isnan( MatchImages.Metrics_dict[MatchMetric][BaseImageList,testImageList]):
-                    MatchImages.Metrics_dict[MatchMetric][BaseImageList,testImageList]=MatchImages.DummyMinValue
-                    print("Bad value found, ",MatchMetric)
+    if MatchImages.MatchInputSet == True:
+        for OuterIndex in range(MatchImages.HM_data_MetricDistances.shape[0]):
+            for InnerIndex in range(MatchImages.HM_data_MetricDistances.shape[1]):
+                for MatchMetric in MatchImages.Metrics_dict:
+                    if math.isnan( MatchImages.Metrics_dict[MatchMetric][OuterIndex,InnerIndex]):
+                        MatchImages.Metrics_dict[MatchMetric][OuterIndex,InnerIndex]=MatchImages.DummyMinValue
+                        print("Bad value found, ",MatchMetric)
+                  
 
 
 
-    #normalize
+#normalize
     for MatchMetric in MatchImages.Metrics_dict:
         MatchImages.Metrics_dict[MatchMetric]=normalize_2d(np.where(MatchImages.Metrics_dict[MatchMetric]==MatchImages.DummyMinValue, MatchImages.Metrics_dict[MatchMetric].max()+1, MatchImages.Metrics_dict[MatchMetric]))
 
-
-    for BaseImageList in MatchImages.ImagesInMem_Pairing:
-        for TestImageList in MatchImages.ImagesInMem_Pairing:
-            if TestImageList<BaseImageList:
-                #data is diagonally symmetrical
-                continue
-            #special case if matching input images - dont need to complete similarity matrix
-            if MatchImages.MatchInputSet == True:
-                if (testImageList > len(MatchImages.List_ImagesToMatchFIlenames)) and (BaseImageList > len(MatchImages.List_ImagesToMatchFIlenames)):
+    if MatchImages.MatchInputSet == False:
+        for BaseImageList in MatchImages.ImagesInMem_Pairing:
+            for TestImageList in MatchImages.ImagesInMem_Pairing:
+                if TestImageList<BaseImageList:
+                    #data is diagonally symmetrical
                     continue
-            #create total of all metrics
-            BuildUpTotals=[]
-            for MatchMetric in MatchImages.Metrics_dict:
-                if math.isnan(MatchImages.Metrics_dict[MatchMetric][BaseImageList,TestImageList]):
+                #special case if matching input images - dont need to complete similarity matrix
+                if MatchImages.MatchInputSet == True:
+                    if (testImageList > len(MatchImages.List_ImagesToMatchFIlenames)) and (BaseImageList > len(MatchImages.List_ImagesToMatchFIlenames)):
+                        continue
+                #create total of all metrics
+                BuildUpTotals=[]
+                for MatchMetric in MatchImages.Metrics_dict:
+                    #if math.isnan(MatchImages.Metrics_dict[MatchMetric][BaseImageList,TestImageList]):
                     BuildUpTotals.append(MatchImages.Metrics_dict[MatchMetric][BaseImageList,TestImageList])
-                else:
-                    BuildUpTotals.append(MatchImages.Metrics_dict[MatchMetric][BaseImageList,TestImageList])
-            SquaredSum=0
-            for Total in BuildUpTotals:
-                SquaredSum=SquaredSum+Total**2
-            MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]=MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]+math.sqrt(SquaredSum)
-             #mirror data for visualisation
-            MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]=MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]
+                    #else:
+                    #    BuildUpTotals.append(MatchImages.Metrics_dict[MatchMetric][BaseImageList,TestImageList])
+                SquaredSum=0
+                for Total in BuildUpTotals:
+                    SquaredSum=SquaredSum+Total**2
+                MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]=MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]+math.sqrt(SquaredSum)
+                #mirror data for visualisation
+                MatchImages.HM_data_MetricDistances[BaseImageList,TestImageList]=MatchImages.HM_data_MetricDistances[TestImageList,BaseImageList]
+    else:
+
+        for OuterIndex in range(MatchImages.HM_data_MetricDistances.shape[0]):
+            for InnerIndex in range(MatchImages.HM_data_MetricDistances.shape[1]):
+                #create total of all metrics
+                BuildUpTotals=[]
+                #for MatchMetric in MatchImages.Metrics_dict:
+                for MatchMetric in MatchImages.Metrics_dict:
+                    #if math.isnan(MatchImages.Metrics_dict[MatchMetric][BaseImageList,TestImageList]):
+                    BuildUpTotals.append(MatchImages.Metrics_dict[MatchMetric][OuterIndex,InnerIndex])
+                    #else:
+                    #    BuildUpTotals.append(MatchImages.Metrics_dict[MatchMetric][BaseImageList,TestImageList])
+                SquaredSum=0
+                for Total in BuildUpTotals:
+                    SquaredSum=SquaredSum+Total**2
+                MatchImages.HM_data_MetricDistances[OuterIndex,InnerIndex]=MatchImages.HM_data_MetricDistances[OuterIndex,InnerIndex]+math.sqrt(SquaredSum)
+
+
 
     #normalise final data
     MatchImages.HM_data_MetricDistances=normalize_2d(MatchImages.HM_data_MetricDistances)
