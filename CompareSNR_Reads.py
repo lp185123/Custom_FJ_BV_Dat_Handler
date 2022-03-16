@@ -27,9 +27,11 @@ def CleanUpExternalOCR(InputOCR):
     #should be left with continous string of alphanumeric characters
     return CleanedUpSnr
 
-class CheckSN_Answers():
+class CheckSN_Answers(NoTemplateSNR_CloudOCR_Only=False):
+    #if NoTemplateSNR_CloudOCR_Only is true, it will not attempt to compare template SNR and CLoud OCR (by failing gracefully)
+    #if it is false, the system will compare template SNR and Cloud SNR
     def __init__(self):
-
+        
         self.BaseSNR_Folder = input("Please enter images folder: Default is C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput")
         if len(self.BaseSNR_Folder)==0:
             self.BaseSNR_Folder = r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput"
@@ -63,7 +65,7 @@ class CheckSN_Answers():
             for MatchResult in MatchResults_dict:
                 for SingleResult in MatchResults_dict[MatchResult][0]:
                     if SingleResult.Pass==True:
-                        TotalPass=TotalPass+1
+                        TotalPass=TotalPass+1 
                     else:
                         TotalFail=TotalFail+1
 
@@ -437,6 +439,15 @@ class CheckSN_Answers():
         return MatchResults_dict
 
 
+class OCR_analysisCard_Dummy():
+    def __init__(self) -> None:
+        self.TemplateSNR=None
+        self.ExternalSNR=None
+        self.ExpectedFielding=None
+        self.Error=None
+        self.InfoString=None
+        self.Pass=None
+        self.RepairedExternalOCR=None
 
 def CheckSNR_Reads(TemplateSNR,ExternalSNR,Fielding):
     ###pass in internal and external SNR and check for match
@@ -447,6 +458,20 @@ def CheckSNR_Reads(TemplateSNR,ExternalSNR,Fielding):
         #extract snr - by previous process will be bookended by "[" and "]"
 #try:
     if (not "[" in TemplateSNR) or (not "]" in TemplateSNR):
+        DUmmyResult=OCR_analysisCard_Dummy()
+        DUmmyResult.TemplateSNR="NONE FOUND"
+        DUmmyResult.ExternalSNR=ExternalSNR
+        DUmmyResult.ExpectedFielding="NONE AVAILABLE"
+        DUmmyResult.Error="NA"
+        DUmmyResult.InfoString="NA"
+        DUmmyResult.Pass=False
+        DUmmyResult.RepairedExternalOCR="NA"
+
+        return DUmmyResult
+
+
+
+
         raise Exception("Template SNR not formatted correctly []")
     Get_SNR_string=TemplateSNR.split("[")#delimit
     Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string

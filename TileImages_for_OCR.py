@@ -117,18 +117,24 @@ def TileImages_with_delimiterImage(DelimiterImage,ImgVsPath,ImageY,ImageX,Column
 
                 #extract SNR from filename if it exists
                 #get delimited string
-                Get_SNR_string=ImgFilePath.split("[")#delimit
-                Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
-                Get_SNR_string=Get_SNR_string.split("]")#delimit
-                Get_SNR_string=Get_SNR_string[0]
-                if Get_SNR_string is not None:
-                    if len(Get_SNR_string)>5:#TODO magic number
-                        #keep consistent format of SNR read string
-                        Get_SNR_string="[" + Get_SNR_string +"]"
+                #if no "[]" exist - images dont hvae serial number read embedded - which is valid depending on application
+                if "[" in ImgFilePath:#no snr - but could hvae this in the filename so have to be careful
+                    print("No SNR in file",ImgFilePath,"dummying out SNR")
+
+                    Get_SNR_string=ImgFilePath.split("[")#delimit
+                    Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
+                    Get_SNR_string=Get_SNR_string.split("]")#delimit
+                    Get_SNR_string=Get_SNR_string[0]
+                    if Get_SNR_string is not None:
+                        if len(Get_SNR_string)>1:#TODO magic number
+                            #keep consistent format of SNR read string
+                            Get_SNR_string="[" + Get_SNR_string +"]"
+                        else:
+                            Get_SNR_string=""
                     else:
-                        Get_SNR_string="NO_SNR"
+                        Get_SNR_string=""
                 else:
-                    Get_SNR_string="NO_SNR"
+                    Get_SNR_string="NO SNR EMBEDDED IN IMAGE"
                 SNRAnswersList.append(Get_SNR_string + ImgFilePath)
                 SnrAnswersDict[Index]=(Get_SNR_string,ImgFilePath)
             #save out delimited master image ready for OCR 

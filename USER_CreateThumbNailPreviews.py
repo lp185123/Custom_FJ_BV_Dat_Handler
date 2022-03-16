@@ -7,6 +7,7 @@ from copy import deepcopy
 import BV_DatReader_Lib
 import DatScraper_tool
 import gc
+import ManyMuchS39
 gc.disable()
 
 def main(S39_only=False):
@@ -294,7 +295,7 @@ if __name__ == "__main__":
     #try:
     
     print("WARNING! MM8 images WIP - still issue with image depth size WIP")
-    if _3DVisLabLib.yesno("Get SR thumbnails only?"):main(True)
+    if _3DVisLabLib.yesno("Get *macro function*?"):main(True)
     else:
         main(False)
     #except Exception as e:

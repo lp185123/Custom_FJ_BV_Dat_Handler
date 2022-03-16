@@ -1,17 +1,22 @@
+import google
 from google.cloud import vision
+import google.auth.credentials
 import io
-import os
-import _3DVisLabLib
 import re
-
+import os
+print(google.api_core.__version__)
+print(google.auth.credentials.__file__)
 class CloudOCR():
     """Class to authenticate cloud service and perform OCR services."""
     def __init__(self):
         #Authenticate user - see notes 
-        self.client = vision.ImageAnnotatorClient()
+        #https://www.youtube.com/watch?v=_24h-FQODqo good guidance - have to PIP install the google thing very specifically
         #os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = r"C:\Working\FindIMage_In_Dat\VisionAPIDemo\ocrtrial-338212-a4732d2e2a9c.json"
         #os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = r"C:\Working\FindIMage_In_Dat\VisionAPIDemo\ServiceAccountToken.json"
+        self.client = vision.ImageAnnotatorClient()
         #set GOOGLE_APPLICATION_CREDENTIALS="C:\Working\FindIMage_In_Dat\VisionAPIDemo\ServiceAccountToken.json
+        #pip install --upgrade google-analytics-data
+        #pip install --upgrade google-auth
     def PerformOCR(self,FilePath,ImageObject):
         """Pass in Filepath or Imageobject - currently imageobject is not tested"""
         if (ImageObject is None) and (FilePath is None):
@@ -66,3 +71,5 @@ class CloudOCR():
 
 
 
+arse=CloudOCR()
+print("plop")

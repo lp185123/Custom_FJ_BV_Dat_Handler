@@ -15,8 +15,8 @@ import shutil
 
 # Create HOG Descriptor object outside of loops
 HOG_extrator = cv2.HOGDescriptor()
-
-
+HistogramCentralis_mask=None
+HistogramStripulus_Centralis=None
 
 class FeatureMatch_Dict_Common:
 
@@ -76,7 +76,7 @@ def GetFFT_OfImage(InputGraySCaleImg,CropPercent_100,Blur):
     
     if Blur==True:
         #a lot of noise - lets see if we can remove noise
-        kernel = np.ones((5,5),np.float32)/25#kernel size for smoothing - maybe make smoother as such small images
+        kernel = np.ones((3,3),np.float32)/25#kernel size for smoothing - maybe make smoother as such small images
         dst = cv2.filter2D(FFT_magnitude_spectrum,-1,kernel)
         FFT_magnitude_spectrum_visualise=cv2.convertScaleAbs(dst)
     
@@ -356,6 +356,13 @@ def PrepareImageMetrics_FacesRandomObjects(PrepareMatchImages,ImagePath,Index,Im
     ImageInfo.PCA_Struct_EigenVals = [PCA_Struct_EigenVals]
     return ImageInfo
 
+def _Crop_Pixels(image,CropRangeY,CropRangeX):
+    if len(image.shape)!=3:
+        return image[CropRangeY[0]:CropRangeY[1],CropRangeX[0]:CropRangeX[1]]
+    else:
+        return image[CropRangeY[0]:CropRangeY[1],CropRangeX[0]:CropRangeX[1],:]
+
+
 def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict):
     #create class object for each image
     ImageInfo=PrepareMatchImages.ImageInfo()
@@ -546,6 +553,39 @@ def PrepareImageMetrics_Faces(PrepareMatchImages,ImagePath,Index,ImageReviewDict
 
     return ImageInfo
 
+def GetHistogram_ColorNormalised(Image):
+    raise Exception("GetHistogram_ColorNormalised Not developed yet - still too slow creating 2d histogram ")
+    hsv = cv2.cvtColor(Image,cv2.COLOR_BGR2HSV)#colour 2d histogram needs conveted to hsv
+    # channels = [0,1] because we need to process both H and S plane.
+    # bins = [180,256] 180 for H plane and 256 for S plane.
+    # range = [0,180,0,256] Hue value lies between 0 and 180 & Saturation lies between 0 and 256.
+    hist = cv2.calcHist([hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
+    hist = cv2.normalize(hist, hist).flatten()
+    return hist
+    
+def Histogram_Stripes(Image,StripsPerDim,BinsPerChannel,Mask):
+    #generates horizontal and vertical histogram stripes which may be compared to
+    #overcome skewed and aspect ratio'd images
+    Height=Image.shape[0]
+    Width=Image.shape[1]
+    Histogram_List=[]
+
+    HeightStrips=math.floor(Height/StripsPerDim)
+    WidthStrips=math.floor(Width/StripsPerDim)
+
+    for WidthStripeIndex in range (0,Width,WidthStrips):
+        #Image_for_slice=Image[:,WidthStripeIndex:WidthStripeIndex+WidthStrips]
+        hist = cv2.calcHist([Image], [0, 1, 2], Mask, [BinsPerChannel, BinsPerChannel, BinsPerChannel],[0, 256, 0, 256, 0, 256])
+        hist = cv2.normalize(hist, hist).flatten()
+        Histogram_List.append(hist)
+    for HeightStripeIndex in range (0,Height,HeightStrips):
+        #Image_for_slice=Image[HeightStripeIndex:HeightStripeIndex+HeightStrips,:]
+        hist = cv2.calcHist([Image], [0, 1, 2], Mask, [BinsPerChannel, BinsPerChannel, BinsPerChannel],[0, 256, 0, 256, 0, 256])
+        hist = cv2.normalize(hist, hist).flatten()
+        Histogram_List.append(hist)
+
+    return Histogram_List
+
 def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
     #get stack of images and associated analysis
     #IsTestImage set to TRUE will stop the program generating stacked images that wont be used (only need one reference)
@@ -576,11 +616,27 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
 
     #even if just one image its still in list format to keep logic common
     #ImageColour = Resize_toPixel_keepRatio(OriginalImage_col, 120, 120)
+    #NOTES
+    #ImageColour=_Crop_Pixels(OriginalImage_col,(0,63),(0,130))#Y range then X range
+    #FACES
+    #ImageColour=_Crop_Pixels(OriginalImage_col,(35,190),(25,160))##Y range then X range
+
+    #faces vs eveything
+    # if IsTestImage==True:
+    #     ImageColour=_Crop_Pixels(OriginalImage_col,(35,190),(25,160))##Y range then X range
+    #     ImageColour= cv2.resize(ImageColour, (120, 120))
+    # else:
+    #     ImageColour= cv2.resize(OriginalImage_col, (120, 120))
+
     ImageColour= cv2.resize(OriginalImage_col, (120, 120))
+
     #ImageGrayscale=Resize_toPixel_keepRatio(ImageInfo.ImageGrayscale[0], 120, 120)
 
-    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,100,60,6,False)
+    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,100,90,3,False)
+    kernel = np.ones((5,5),np.float32)/25#kernel size for smoothing
+
     
+
 
     #HISTOGRAM OF ORIENTATED GRADIENTS FEATURE MATCH
     if "HM_data_HOG_Dist" in Metrics_dict:
@@ -608,17 +664,58 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
         #get grayscale
         Img_grayscale=cv2.cvtColor(Img_colour, cv2.COLOR_BGR2GRAY)
         
+        if "HM_data_HistogramCentralis" in Metrics_dict:
+            #create a masked histogram with just central position
+            global HistogramCentralis_mask
+            if HistogramCentralis_mask is None:#check global object is populated with mask or not
+                HistogramCentralis_mask = np.zeros((Img_colour.shape[0],Img_colour.shape[1],3), np.uint8)
+                #get radius
+                Diameter=min((HistogramCentralis_mask.shape[0]),(HistogramCentralis_mask.shape[1]))
+                Radius=int((Diameter/2)*0.50)#percentage of smallest dimension
+                cv2.circle(HistogramCentralis_mask,(int(HistogramCentralis_mask.shape[1]/2),int(HistogramCentralis_mask.shape[0]/2)), Radius, (255,255,255), -1)
+                HistogramCentralis_mask = cv2.cvtColor(HistogramCentralis_mask, cv2.COLOR_BGR2GRAY)
+                #_3DVisLabLib.ImageViewer_Quick_no_resize(grayImage,0,True,True)
+            hist = cv2.calcHist([Img_colour], [0, 1, 2], HistogramCentralis_mask, [8, 8, 8],[0, 256, 0, 256, 0, 256])
+            hist = cv2.normalize(hist, hist).flatten()
+            ImageInfo.Metrics_functions["HM_data_HistogramCentralis"].append(hist)
+            
+    
         #HISTOGRAM
         if "HM_data_histo" in Metrics_dict:
             hist = cv2.calcHist([Img_colour], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
+            #hsv conversion very slow
+            #hsv = cv2.cvtColor(Img_colour,cv2.COLOR_BGR2HSV)#colour 2d histogram needs conveted to hsv
+            # channels = [0,1] because we need to process both H and S plane.
+            # bins = [180,256] 180 for H plane and 256 for S plane.
+            # range = [0,180,0,256] Hue value lies between 0 and 180 & Saturation lies between 0 and 256.
+            #hist = cv2.calcHist([hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
             hist = cv2.normalize(hist, hist).flatten()
             ImageInfo.Metrics_functions["HM_data_histo"].append(hist)
             
         #MACROSTRUCTURE
         if "HM_data_MacroStructure" in Metrics_dict:
         #get small image to experiment with macro structure matching
-            MacroStructure_img = cv2.resize(Img_colour, (25, 25))
+            
+            MacroStructure_img = cv2.resize(Img_colour, (19, 19))
+            kernel = np.ones((3,3),np.float32)/25#kernel size for smoothing
+            MacroStructure_img = cv2.filter2D(MacroStructure_img,-1,kernel)
+            #MacroStructure_img=MacroStructure_img/np.sqrt(np.sum(MacroStructure_img**2))
             ImageInfo.Metrics_functions["HM_data_MacroStructure"].append(MacroStructure_img)
+
+        #HISTOGRAM STRIPING - vertical and horizontal histogram 
+        if "HM_data_HistogramStriping" in Metrics_dict:
+            global HistogramStripulus_Centralis
+            if HistogramStripulus_Centralis is None:#check global object is populated with mask or not
+               HistogramStripulus_Centralis = np.zeros((Img_colour.shape[0],Img_colour.shape[1],3), np.uint8)
+               #get radius
+               Diameter=min((HistogramCentralis_mask.shape[0]),(HistogramCentralis_mask.shape[1]))
+               Radius=int((Diameter/2)*1)#percentage of smallest dimension
+               cv2.circle(HistogramStripulus_Centralis,(int(HistogramStripulus_Centralis.shape[1]/2),int(HistogramStripulus_Centralis.shape[0]/2)), Radius, (255,255,255), -1)
+               HistogramStripulus_Centralis = cv2.cvtColor(HistogramStripulus_Centralis, cv2.COLOR_BGR2GRAY)
+            #MacroStructure_img = cv2.resize(Img_colour, (25, 25))
+            HistoStripes = cv2.filter2D(Img_colour,-1,kernel)
+            HistoStripes=Histogram_Stripes(HistoStripes,8,8,HistogramStripulus_Centralis)
+            ImageInfo.Metrics_functions["HM_data_HistogramStriping"].append(HistoStripes)
 
         #POWER SPECTRAL DENSITY
         if "HM_data_FourierPowerDensity" in Metrics_dict:
@@ -642,7 +739,7 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
         if "HM_data_PhaseCorrelation" in Metrics_dict:
             if len(Img_grayscale.shape)==3:
                 Img_grayscale=cv2.cvtColor(Img_grayscale, cv2.COLOR_BGR2GRAY)
-            kernel = np.ones((5,5),np.float32)/25#kernel size for smoothing - keep this here even if its being repeated for neatness
+            
             Img_grayscale = cv2.filter2D(Img_grayscale,-1,kernel)#smoothing might help with cross correllation
             PhaseCorrelate_Std = np.float32(Img_grayscale)
             ImageInfo.Metrics_functions["HM_data_PhaseCorrelation"].append(PhaseCorrelate_Std)
@@ -655,6 +752,9 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
                 ImageInfo.Metrics_functions["HM_data_EigenVectorDotProd"].append(EigVec)
             if "HM_data_EigenValueDifference" in Metrics_dict:
                 ImageInfo.Metrics_functions["HM_data_EigenValueDifference"].append(EigVal)
+
+        if "HM_data_TemplateMatching" in Metrics_dict:
+            ImageInfo.Metrics_functions["HM_data_TemplateMatching"].append(Img_colour)
 
         #if in match image mode (folder of images to match - its not necessary to calculate sequential images as only first will be used)
         if IsTestImage==True:
@@ -914,8 +1014,8 @@ def Get_PCA_(InputImage):
         PCA_image=cv2.cvtColor(PCA_image,cv2.COLOR_GRAY2RGB)
         
     #test if square matrix
-    #if InputImage.shape[0]!=InputImage.shape[1]:
-    #    print("WARNING! Input Image to PCA not square, PCA will give invalid results")
+    if InputImage.shape[0]!=InputImage.shape[1]:
+        print("WARNING! Input Image to PCA not square, PCA will give invalid results")
 
 
     MB_img = np.zeros((PCA_image.shape[0],PCA_image.shape[1],PCA_image.shape[2]))
@@ -972,6 +1072,9 @@ def CreateCropInMatrixOfImage(Image,StartCropPc_100pc,EndCropPC_100pc,steps,Pola
     #quilt
     #if PolarWrapMode==True:
     #    raise Exception("CreateCropInMatrixOfImage, this function not yet developed")
+    if steps==0:
+        return Image,[Image]#return canvas and list of image
+
     if len(Image.shape)!=3:
         raise Exception("CreateCropInMatrixOfImage, please use colour image as input, or convert to 3 channels")
     StartCropPc=StartCropPc_100pc/100
@@ -1448,6 +1551,7 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
             SplitImagePath=Images.split("\\")[-1]
             FilePath=MatchImages.OutputPairs +"\\00" +str(Counter)+ "_ImgNo_" + str(BaseImageList) + "_score_" + str(round(MatchImages.HM_data_All[Element,BaseImageList],3))+ "_" + SplitImagePath
             ImagePath=MatchImages.ImagesInMem_to_Process[Images].OriginalImageFilePath
+
             shutil.copyfile(ImagePath, FilePath)
             #cv2.imwrite(FilePath,MatchImages.ImagesInMem_to_Process[Images].OriginalImage)
             if Images in OrderedImages:
@@ -1594,6 +1698,14 @@ def ProcessSimilarity(Input):
                     #very small image (3*3) used to check macro structure
                     diff = cv2.absdiff(testimage, BaseImage_Object["HM_data_MacroStructure"][0])
                     diff_sum=diff.sum()
+                    # if len(testimage.shape)==3:
+                    #     diff_sum=0
+                    #     for Channel in range(2):
+                    #         TestChannel=testimage[:,:,Channel]
+                    #         BaseChannel=BaseImage_Object["HM_data_MacroStructure"][0][:,:,Channel]
+
+                    #         diff=np.sum(TestChannel*BaseChannel)
+                    #         diff_sum=diff_sum+(1-diff)
 
                     if (diff_sum<BestMatch) or Indexer==0:
                         BestMatch=diff_sum
@@ -1710,7 +1822,20 @@ def ProcessSimilarity(Input):
                 PluralImages_BestIndex.append(BestIndex)
             #histogram metric
 
+            if "HM_data_HistogramStriping" in MatchImages.Metrics_dict:
+                BestIndex=-1
+                for Indexer,testimage in enumerate(TestImage_Object["HM_data_HistogramStriping"]):
+                    
+                    HistoSum=0
+                    for HistoIndex, HistoGramStrip in enumerate(testimage):
+                        HistogramSimilarity=CompareHistograms(BaseImage_Object["HM_data_HistogramStriping"][0][HistoIndex],HistoGramStrip)
+                        HistoSum=HistoSum+HistogramSimilarity
 
+                    if (BestMatch>HistoSum) or Indexer==0:
+                        BestMatch=HistoSum
+                        BestIndex=Indexer
+                MatchImages.Metrics_dict["HM_data_HistogramStriping"][CurrentBaseImage,TestImageList]=BestMatch
+                PluralImages_BestIndex.append(BestIndex)
 
             if "HM_data_histo" in MatchImages.Metrics_dict:
                 
@@ -1840,6 +1965,31 @@ def ProcessSimilarity(Input):
                 PluralImages_BestIndex_mean=statistics.mean(PluralImages_BestIndex)
                 #probably want to convert to binary encoding here and get Hamming Distance
 
+
+
+            if "HM_data_HistogramCentralis"  in MatchImages.Metrics_dict:
+                BestIndex=-1
+
+                for Indexer,testimage in enumerate(TestImage_Object["HM_data_HistogramCentralis"]):
+                    HistogramSimilarity=CompareHistograms(BaseImage_Object["HM_data_HistogramCentralis"][0],testimage)
+
+                    if (BestMatch>HistogramSimilarity) or Indexer==0:
+                        BestMatch=HistogramSimilarity
+                        BestIndex=Indexer
+                MatchImages.Metrics_dict["HM_data_HistogramCentralis"][CurrentBaseImage,TestImageList]=BestMatch
+                PluralImages_BestIndex.append(BestIndex)
+
+            if "HM_data_TemplateMatching" in MatchImages.Metrics_dict:
+                BestIndex=-1
+                for Indexer,testimage_templates in enumerate(TestImage_Object["HM_data_TemplateMatching"]):
+                    img_template_probability_match = cv2.matchTemplate(BaseImage_Object["HM_data_TemplateMatching"][0], testimage_templates, cv2.TM_CCOEFF_NORMED)[0][0]
+                    img_template_diff = 1 - img_template_probability_match
+
+                    if (img_template_diff<BestMatch) or Indexer==0:
+                        BestMatch=img_template_diff
+                        BestIndex=Indexer
+                        MatchImages.Metrics_dict["HM_data_TemplateMatching"][CurrentBaseImage,TestImageList]=img_template_diff
+                PluralImages_BestIndex.append(BestIndex)
 
         except Exception as e:
             print("Error with ",Test_Image_name,"vs",Base_Image_name,"in process similarity")

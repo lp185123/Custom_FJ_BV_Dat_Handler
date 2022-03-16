@@ -22,7 +22,7 @@ ColumnSize=30
 #Preprocessing on/off - if ML optimisation has been used
 PreProcessing=False
 #can force mirroring or it can be found in genparameters
-MirrorImage=True # turn this on if preprocessing is false
+MirrorImage=False # turn this on if preprocessing is false
 
 
 

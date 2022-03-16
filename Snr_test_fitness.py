@@ -368,7 +368,9 @@ def GenerateSN_Fielding(InputListSNRReads):
             print(repr(e)) 
         
     if len(SNR_Dict.keys())==0:
-        raise Exception("GenerateSN_Fielding: No serial numbers found!")
+        #raise Exception("GenerateSN_Fielding: No serial numbers found!")
+        print("GenerateSN_Fielding: No serial numbers found!")
+        return None
     
     #check general format of SNR
     #check 1 - are all the same length? if not - can't proceed as format will be inconsistent
@@ -652,10 +654,13 @@ class TestSNR_Fitness():
             if ProcessImg==True: TestImage= ProcessImage(TestImage,ParameterObject)
             #ReturnImg,ReturnFitness=SNR_fitnessTest.RunSNR_With_Parameters(ImageFilePath,SNRparams,TestImage,SkipOcr=True,GenParams=None)
             #get delimited string
-            Get_SNR_string=ImgFile.split("[")#delimit
-            Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
-            Get_SNR_string=Get_SNR_string.split("]")#delimit
-            Get_SNR_string=Get_SNR_string[0]
+            if ImgFile.find("[")==-1:#does not exist
+                Get_SNR_string=None
+            else:
+                Get_SNR_string=ImgFile.split("[")#delimit
+                Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string
+                Get_SNR_string=Get_SNR_string.split("]")#delimit
+                Get_SNR_string=Get_SNR_string[0]
             if Get_SNR_string is not None:
                 if len(Get_SNR_string)>0:#TODO magic number
                     #keep consistent format of SNR read string

@@ -1,8 +1,8 @@
 import datetime
-from cmath import nan
-from difflib import Match
-from logging import raiseExceptions
-from ssl import SSL_ERROR_SSL
+#from cmath import nan
+#from difflib import Match
+#from logging import raiseExceptions
+#from ssl import SSL_ERROR_SSL
 from tkinter import Y
 import enum
 from cv2 import sqrt
@@ -20,14 +20,14 @@ import scipy
 import math
 import numpy as np
 from scipy import stats
-from scipy.stats import skew
+#from scipy.stats import skew
 import gc
 import MatchImages_lib
 import copyreg#need this to pickle keypoints
 #gc.disable()
 import psutil
 import os
-from sklearn.decomposition import PCA
+#from sklearn.decomposition import PCA
 
 #stuff for HOG
 #from skimage.io import Ski_imread, ski_imshow
@@ -47,24 +47,24 @@ class MatchImagesObject():
         ##################################################
         ##set input folder here
         ##################################################
-        #self.InputFolder=r"E:\NCR\TestImages\Faces\img_align_celeba"
+        #self.InputFolder=r"C:\Working\TempImages\Faces\img_align_celeba"
         #self.InputFolder=r"C:\Working\TempImages\Flowers"
         #self.InputFolder = r"E:\NCR\TestImages\Furniture"
-        #self.InputFolder=r"C:\Working\TempImages\Food"
-        # self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
-        # self.InputFolder=r"E:\NCR\TestImages\UK_1000"
-        #self.InputFolder=r"E:\NCR\TestImages\Food\images"
-        self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
+        #self.InputFolder=r"C:\Working\TempImages\TestMatches"
+        #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
+        #self.InputFolder=r"E:\NCR\TestImages\UK_1000"
+        #self.InputFolder=r"C:\Working\TempImages\Furniture"
+        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
         #self.InputFolder=r"E:\NCR\TestImages\Randos"
-        #self.InputFolder=r"E:\NCR\TestImages\Faces\MatcherFolder"
+        self.InputFolder=r"C:\Working\TempImages\butterflys"
         #self.InputFolder=r"E:\NCR\Currencies\Bangladesh_SR2800\Bangladesh\SR DC\MM8\05_1000(2020)"
-        
+        #self.InputFolder=r"C:\Working\TempImages\Food\images"
         ##################################################
         ##set subset of data - will select random images
         ##if cross checking for similarity will be in O (n/2) time complexity
         ##################################################
-        self.SubSetOfData = int(300)  # subset of data
+        self.SubSetOfData = int(9999999)  # subset of data
         ################################################################
         ##select what function will be used, which will load image,crop,resize
         ##etc for all analytical procesess
@@ -79,30 +79,33 @@ class MatchImagesObject():
         ######################################################################
         # what metrics to use
         self.Use__FeatureMatch = False  # match detailed areas of image - quite slow
-        self.Use__histogram = False  # match how close the image colour distribution is - structure does not matter
+        self.Use__histogram = True  # match how close the image colour distribution is - structure does not matter
         self.Use__FourierDifference = False  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
         self.Use__PhaseCorrelation = False  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
         #in theory can convert for instance fourier magnitude image, polar unwrap it and check using phase correlation - but has to be proven
-        self.Use__HOG_featureMatch = False  # dense feature match - good for small images - very effective for mm side
-        self.Use__EigenVectorDotProd = False  # how close are principle components orientated- doesnt seem to work correctly yet - MUST BE SQUARE!
-        self.Use__EigenValueDifference = False  # how close are principle component lengths for COLOUR - works pretty well - still needs a look at in how to package up matrix, and if using non -square do we use SVD instead?
-        self.Use__FourierPowerDensity = False  # histogram of frequencies found in image - works very well
+        self.Use__HOG_featureMatch = True  # dense feature match - good for small images - very effective for mm side
+        self.Use__EigenVectorDotProd = False  #SQUARE IMAGE ONLY how close are principle components orientated- doesnt seem to work correctly yet - MUST BE SQUARE!
+        self.Use__EigenValueDifference = False  #SQUARE IMAGE ONLY how close are principle component lengths for COLOUR - works pretty well - still needs a look at in how to package up matrix, and if using non -square do we use SVD instead?
+        self.Use__FourierPowerDensity = True  # histogram of frequencies found in image - works very well
         self.Use__MacroStructure=False#very small image to compare macrostructure - experimental
-        self.Use__StructuralPCA_dotProd=True#Principle component analysis on binarised image - a geometrical PCA
-        self.Use__StructuralPCA_VectorValue = True  # for STRUCTURE Principle component analysis on binarised image - a geometrical PCA
+        self.Use__StructuralPCA_dotProd=False#Principle component analysis on binarised image - a geometrical PCA
+        self.Use__StructuralPCA_VectorValue = False  # for STRUCTURE Principle component analysis on binarised image - a geometrical PCA
+        self.Use__TemplateMatching = False # match templates by sliding one over the other - can be different sizes so bear that in mind
+        self.Use__HistogramStriping = True#to handle images with aspect ratio changes or scaling, uses a spherical mask
+        self.Use__HistogramCentralis = True#create a histogram mask so just look at centre of image - not good for images with translation problem but may be effective for general image matching
         #self.Use__QuiltScan==True
         ######################################################
         ##set multi process behaviour - can force no threading if memory issues are encountered (imgs > 3000)
         #######################################################
         # set this to "1" to force inline processing, otherwise to limit cores set to the cores you wish to use then add one (as system will remove one for safety regardless)
-        self.MemoryError_ReduceLoad = (False,1)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
+        self.MemoryError_ReduceLoad = (True,11)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
         self.BeastMode = False  # Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
         # self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
         self.HyperThreading = True  # Experimental - hyperthreads are virtual cores so may not work for metrics like Feature Matching (except HOG)
         #but its not possible to predict how windows will distribute processes to which cores
 
         #***This option very slow still under development***#currently 150 images vs 12 input match takes 4min with on-fly but 12 seconds pre processed
-        self.ProcessImagesOnFly=False#currently only works with MULTIPLE IMAGE function - if using a large amount of images
+        self.ProcessImagesOnFly=True#currently only works with MULTIPLE IMAGE function - if using a large amount of images
         #setting this to true will not load image processing details into memory but process on the fly, this
         #is much slower and much less efficient but is currently only solution to large datasets. Parallel processing may
         #mitigate some slowness
@@ -115,10 +118,9 @@ class MatchImagesObject():
         ## matches from images in main input folder.
         ## will be in ON time complexity
         ##################################################
-        #self.MatchFindFolder = r"E:\NCR\TestImages\Faces\MatcherFolder - Copy"
+        #self.MatchFindFolder = r"C:\Working\TempImages\Faces\MatcherFolder"
         #self.MatchFindFolder = r"E:\NCR\TestImages\UK_Side_Small_15sets10_findmatch"
-        #self.MatchFindFolder = r"E:\NCR\TestImages\FurnitureToMAtch"
-
+        self.MatchFindFolder = r"C:\Working\TempImages\MatchPerson2\cropped"
         self.MatchInputSet = False  # if a list of input images are provided the system will find similarities only with them, rather than
         # attempt to match every image sequentially.
 
@@ -185,6 +187,15 @@ class MatchImagesObject():
         if self.Use__StructuralPCA_VectorValue: 
             self.Metrics_dict["HM_data_StructuralPCA_VectorValue"] = None
             self.Metrics_functions["HM_data_StructuralPCA_VectorValue"] = None
+        if self.Use__TemplateMatching: 
+            self.Metrics_dict["HM_data_TemplateMatching"] = None
+            self.Metrics_functions["HM_data_TemplateMatching"] = None
+        if self.Use__HistogramStriping:
+            self.Metrics_dict["HM_data_HistogramStriping"] = None
+            self.Metrics_functions["HM_data_HistogramStriping"] = None
+        if self.Use__HistogramCentralis:
+            self.Metrics_dict["HM_data_HistogramCentralis"] = None
+            self.Metrics_functions["HM_data_HistogramCentralis"] = None
         #if self.Use__QuiltScan: self.Metrics_dict["HM_data_QuiltScan"] = None
 
         for metrix in self.Metrics_dict:
@@ -257,12 +268,7 @@ class MatchImagesObject():
         return image
         return cv2.resize(image.copy(),(500,250))
 
-    def USERFunction_Crop_Pixels(self,image,CropRangeY,CropRangeX):
-        if len(image.shape)!=3:
-            return image[CropRangeY[0]:CropRangeY[1],CropRangeX[0]:CropRangeX[1]]
-        else:
-            return image[CropRangeY[0]:CropRangeY[1],CropRangeX[0]:CropRangeX[1],:]
-
+    
     def USERFunction_ResizePercent(self,image,Percent):
         Percent=Percent/100
         return cv2.resize(image.copy(),(int(image.shape[1]*Percent),int(image.shape[0]*Percent)))
@@ -710,7 +716,7 @@ def main():
     #in this manner we wont have a situation where the first thread has the bigger range of the factorial jobs
     #and all processes more or less have some workload - this can be done more systematically but this
     #gets us most the way there without fiddly code
-    print("Optimising parallel process load balance for",processes)
+    print("Optimising parallel process load balance for",processes,"cores")
 
     #different strategies if we are matching images from input folder - dont need to load balance as will have much smaller subset of
     #images to test

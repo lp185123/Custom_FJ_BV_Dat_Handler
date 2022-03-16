@@ -11,6 +11,7 @@ from collections import namedtuple
 import enum
 import DatScraper_tool
 import json
+import ManyMuchS39
 
 class OperationCodes(enum.Enum):
     ERROR="error"
@@ -64,7 +65,7 @@ class UserInputParameters():
         #image subset waves for RGB channels
         self.TopFeed_RGBwaves=["C","E1","F1"]
         self.UnderFeed_RGBwaves=["D","E2","F2"]
-
+        self.GenerateS39=False
         #testing automatic fill
         self.InputFilePath=r"C:\Working\FindIMage_In_Dat\Input"
         self.OutputFilePath=r"C:\Working\FindIMage_In_Dat\Output"
@@ -75,6 +76,18 @@ class UserInputParameters():
         self.GetSNR=False
         self.GetRGBImage=""#""True""
         self.FolderPerDat=False
+
+
+        self.s39_shouldPrintProgress = True
+        self.s39_directory = '.\\'
+        self.s39_outputDirectory = '.\\s39\\'
+        self.s39_wave = 'red' # or green or blue
+        self.s39_side = 'front' # or back
+        self.s39_validation = '80080103'
+        self.s39_width = 336
+        self.s39_height = 88
+        self.s39_x = 568+420#add these together
+        self.s39_y = 88#keep scroll point at 320 (weird coordinate systems)
 
     def UserPopulateParameters(self):
         self.UserInput_and_test()
@@ -120,6 +133,11 @@ class UserInputParameters():
             #output folder hardcoded for now - warning we dont want the user to set same 
             #folder for output and input as files will be deleted - but generally will put preview images
             #alongside data
+
+        #if s39 we dont need any more info
+        self.GenerateS39=_3DVisLabLib.yesno("Extract S39? WIll skip all other questions")
+        if self.GenerateS39==True: return True
+
 
         self.AutomaticMode=_3DVisLabLib.yesno("Automatic(y) or Manual (m) mode?")
         if self.AutomaticMode==False: return False
@@ -191,6 +209,12 @@ def Image_from_Automatic_mode(filteredImages,Notefound,data_hex,Is_mm8=False):
 
     return (gray_image,DataVerify_image)
 
+class DummyImageClass():
+    def __init__(self):
+        self.offsetStart=None
+        self.offsetEnd=None
+        self.height=None
+        self.width=None
 
 def AutomaticExtraction(UserParameters):
     #get all files in input folder - already done but to make code modular
@@ -204,143 +228,192 @@ def AutomaticExtraction(UserParameters):
             InputFiles_cleaned.append(elem)
     #skipped files
     SkippedFiles=dict()
-    for FileIndex, DatFile in enumerate(InputFiles_cleaned):
-        #get all images from first .dat file in input folder(s) (nested)
-        #create subfolder from name of dat file
 
-        #for nested folder, chop off the top file path string
-        NestedFolder=DatFile.replace(UserParameters.InputFilePath,"")
 
-        DatName_as_Subfolder=((DatFile.split("\\"))[-1])
+    if UserParameters.GenerateS39==True:
+        for FileIndex, DatFile in enumerate(InputFiles_cleaned):
+            #get all images from first .dat file in input folder(s) (nested)
+            #create subfolder from name of dat file
 
-        DatFolder=UserParameters.OutputFilePath +NestedFolder 
+            #for nested folder, chop off the top file path string
+            NestedFolder=DatFile.replace(UserParameters.InputFilePath,"")
 
-        #DatFolder=UserParameters.OutputFilePath +"\\FileIndex_" +str(FileIndex)+ "__DatName_"+ Subfolder
-        #first image usually previewed alongside dats, dont create folders in default output
-        if UserParameters.FirstImageOnly==False and UserParameters.FolderPerDat==True:_3DVisLabLib. MakeFolders(DatFolder)
-        
-        print("Processing",DatFile)
-        #get all images found in file
-        images = DatScraper_tool.ImageExtractor(DatFile)
-        #filter to request specific image type and subtype (for instance mm1 image in A1 wave)
-        filteredImages = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.BlockTypeWave)
-        #check filtered images
-        if len(filteredImages)==0 or filteredImages is None:
-            SkippedFiles[DatFile]="Automatic image extraction",UserParameters.BlockType_ImageFormat,UserParameters.BlockTypeWave,"not found"
-            print(SkippedFiles[DatFile])
-            #skip this iteration
-            continue
-            #raise Exception(DatFile, "Automatic image extraction",UserParameters.BlockType_ImageFormat,UserParameters.BlockTypeWave,"not found")
-        #if user has requested colour channel combination - superimpose RGB channels
-        #first channel is assumed to be C/D channel (feed topside and feed underside)
-        if UserParameters.GetRGBImage==True:
-            #WARNING RGB channels still not quite aligning with channel names if further work is done on
-            #extracting RGB
-            filteredImages = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[0])
-            filteredImagesR = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[2])
-            filteredImagesB = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[1])
-            if ((len(filteredImages) +len(filteredImagesR) +len(filteredImagesB))/3)!=len(filteredImagesB):
-                SkippedFiles[DatFile]="Automatic image extraction RGB channels: extracted channel sizes do not match!"
+            DatName_as_Subfolder=((DatFile.split("\\"))[-1])
+
+            DatFolder=UserParameters.OutputFilePath +NestedFolder 
+
+            #populate input parameters for s39 extraction
+            s39Maker = ManyMuchS39.S39Maker()
+            s39Maker.images=[]#clean out images list
+            s39Maker.wave =UserParameters.s39_wave
+            s39Maker.side=UserParameters.s39_side
+            s39Maker.validation=UserParameters.s39_validation
+            s39Maker.x=UserParameters.s39_x
+            s39Maker.y=UserParameters.s39_y
+            s39Maker.width=UserParameters.s39_width
+            s39Maker.height=UserParameters.s39_height
+            s39Maker.files=[DatFile]
+            s39Maker.outputDirectory=UserParameters.OutputFilePath +"\\"
+            s39Maker.start()
+            #pull out the hex mass and convert to an image
+            #create dummy dictionary for cross-compatibility with other processes
+            FakedClass=DummyImageClass()
+            FakedClass.offsetStart=0
+            FakedClass.offsetEnd=len(s39Maker.images[0])
+            FakedClass.width=s39Maker.width
+            FakedClass.height=s39Maker.height
+            filteredImages=dict()
+            filteredImages["DummyNote"]=FakedClass
+            #interpret hex mass as image - a priori we know the bitdepth
+            (OutputImage,dummy)=Image_from_Automatic_mode(filteredImages,"DummyNote",s39Maker.images[0],False)
+            #save out image
+            DelimitedDat=DatFile.split("\\")
+            DelimitedDat_LastElem=DelimitedDat[-1]
+            ReplacedExtension=DelimitedDat_LastElem.lower().replace(".dat",".jpg")
+            #does user want images sorted into folders or no
+            Savestring=UserParameters.OutputFilePath +"\\" +ReplacedExtension
+            cv2.imwrite(Savestring,OutputImage)
+        return
+
+
+    if UserParameters.GenerateS39==False: 
+        for FileIndex, DatFile in enumerate(InputFiles_cleaned):
+            #get all images from first .dat file in input folder(s) (nested)
+            #create subfolder from name of dat file
+
+            #for nested folder, chop off the top file path string
+            NestedFolder=DatFile.replace(UserParameters.InputFilePath,"")
+
+            DatName_as_Subfolder=((DatFile.split("\\"))[-1])
+
+            DatFolder=UserParameters.OutputFilePath +NestedFolder 
+
+            #DatFolder=UserParameters.OutputFilePath +"\\FileIndex_" +str(FileIndex)+ "__DatName_"+ Subfolder
+            #first image usually previewed alongside dats, dont create folders in default output
+            if UserParameters.FirstImageOnly==False and UserParameters.FolderPerDat==True:_3DVisLabLib. MakeFolders(DatFolder)
+            
+            print("Processing",DatFile)
+            #get all images found in file
+            images = DatScraper_tool.ImageExtractor(DatFile)
+            #filter to request specific image type and subtype (for instance mm1 image in A1 wave)
+            filteredImages = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.BlockTypeWave)
+            #check filtered images
+            if len(filteredImages)==0 or filteredImages is None:
+                SkippedFiles[DatFile]="Automatic image extraction",UserParameters.BlockType_ImageFormat,UserParameters.BlockTypeWave,"not found"
                 print(SkippedFiles[DatFile])
                 #skip this iteration
                 continue
-                #raise Exception(DatFile,"Automatic image extraction RGB channels: extracted channel sizes do not match!")
-
-        #load in dat file as hex
-        data_hex=Load_Hex_File(DatFile)
-        #check if MM8 image wanted
-        IsMM8_Image=False
-        if "MM8" in UserParameters.BlockType_ImageFormat:
-            IsMM8_Image=True
-        #roll through filtered images and extract from datamass
-        NoteCount=0
-        for Index,Notefound in enumerate(filteredImages):
-            (OutputImage,dummy)=Image_from_Automatic_mode(filteredImages,Notefound,data_hex,IsMM8_Image)
-            SNR_ReadResult=""
-            #if request for all colour channels is true - combine images
-            #this will have been checked earlier for alignment
+                #raise Exception(DatFile, "Automatic image extraction",UserParameters.BlockType_ImageFormat,UserParameters.BlockTypeWave,"not found")
+            #if user has requested colour channel combination - superimpose RGB channels
+            #first channel is assumed to be C/D channel (feed topside and feed underside)
             if UserParameters.GetRGBImage==True:
-                (red_image,dummy)=Image_from_Automatic_mode(filteredImagesR,Notefound,data_hex,IsMM8_Image)
-                (blue_image,dummy)=Image_from_Automatic_mode(filteredImagesB,Notefound,data_hex,IsMM8_Image)
-                #create empty 3 channel (RGB) image
-                #all images should be same dimensions so arbitary which one we take dims from
-                RGB_Image = np.zeros((int(filteredImages[Notefound].height),int(filteredImages[Notefound].width),3), np.uint8)
-                #use slicing to load image
-                #WARNING these colour channels will not correspond to RGB!!! Done ad hoc 
-                #For OpenCV, 0=blue, 1=Green, 2=red
-                RGB_Image[:,:,0]=blue_image
-                RGB_Image[:,:,1]=OutputImage
-                RGB_Image[:,:,2]=red_image
-                #should have an RGB image now 
-                OutputImage=RGB_Image
-
-            #display image
-            #_3DVisLabLib.ImageViewer_Quickv2(OutputImage,0,False,False)
-
-            if UserParameters.GetSNR==True:
-                SNR_ReadResult=str(filteredImages[Notefound].note.snr)
-                if SNR_ReadResult is None or SNR_ReadResult =="":
-                    print("Error reading SNR - skipping file ")
+                #WARNING RGB channels still not quite aligning with channel names if further work is done on
+                #extracting RGB
+                filteredImages = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[0])
+                filteredImagesR = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[2])
+                filteredImagesB = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.TopFeed_RGBwaves[1])
+                if ((len(filteredImages) +len(filteredImagesR) +len(filteredImagesB))/3)!=len(filteredImagesB):
+                    SkippedFiles[DatFile]="Automatic image extraction RGB channels: extracted channel sizes do not match!"
+                    print(SkippedFiles[DatFile])
+                    #skip this iteration
                     continue
-                    raise Exception(DatFile, "Could not parse SNR (by user request)")
-                SNR_ReadResult="["+ SNR_ReadResult +"]"
-            NoteCount=NoteCount+1
-            #if user only requires first image, break out of loop
-            if UserParameters.FirstImageOnly==True:
-                #save out thumbnail
-                Savestring=DatFile.lower().replace(".dat",".jpg")
-                print("saving image to ", Savestring)
-                cv2.imwrite(Savestring,OutputImage)
-                break
-            else:
-                DelimitedDat=DatFile.split("\\")
-                DelimitedDat_LastElem=DelimitedDat[-1]
-                ReplacedExtension=DelimitedDat_LastElem.lower().replace(".dat",".jpg")
+                    #raise Exception(DatFile,"Automatic image extraction RGB channels: extracted channel sizes do not match!")
 
-                #does user want images sorted into folders or no
-                if UserParameters.FolderPerDat==True:
-                    Savestring=DatFolder +"\\" + SNR_ReadResult + "File" + str(FileIndex) + "_Image_"+str(Index) +"_"+ ReplacedExtension
+            #load in dat file as hex
+            data_hex=Load_Hex_File(DatFile)
+            #check if MM8 image wanted
+            IsMM8_Image=False
+            if "MM8" in UserParameters.BlockType_ImageFormat:
+                IsMM8_Image=True
+            #roll through filtered images and extract from datamass
+            NoteCount=0
+            for Index,Notefound in enumerate(filteredImages):
+                (OutputImage,dummy)=Image_from_Automatic_mode(filteredImages,Notefound,data_hex,IsMM8_Image)
+                SNR_ReadResult=""
+                #if request for all colour channels is true - combine images
+                #this will have been checked earlier for alignment
+                if UserParameters.GetRGBImage==True:
+                    (red_image,dummy)=Image_from_Automatic_mode(filteredImagesR,Notefound,data_hex,IsMM8_Image)
+                    (blue_image,dummy)=Image_from_Automatic_mode(filteredImagesB,Notefound,data_hex,IsMM8_Image)
+                    #create empty 3 channel (RGB) image
+                    #all images should be same dimensions so arbitary which one we take dims from
+                    RGB_Image = np.zeros((int(filteredImages[Notefound].height),int(filteredImages[Notefound].width),3), np.uint8)
+                    #use slicing to load image
+                    #WARNING these colour channels will not correspond to RGB!!! Done ad hoc 
+                    #For OpenCV, 0=blue, 1=Green, 2=red
+                    RGB_Image[:,:,0]=blue_image
+                    RGB_Image[:,:,1]=OutputImage
+                    RGB_Image[:,:,2]=red_image
+                    #should have an RGB image now 
+                    OutputImage=RGB_Image
+
+                #display image
+                #_3DVisLabLib.ImageViewer_Quickv2(OutputImage,0,False,False)
+
+                if UserParameters.GetSNR==True:
+                    SNR_ReadResult=str(filteredImages[Notefound].note.snr)
+                    if SNR_ReadResult is None or SNR_ReadResult =="":
+                        print("Error reading SNR - skipping file ")
+                        continue
+                        raise Exception(DatFile, "Could not parse SNR (by user request)")
+                    SNR_ReadResult="["+ SNR_ReadResult +"]"
+                NoteCount=NoteCount+1
+                #if user only requires first image, break out of loop
+                if UserParameters.FirstImageOnly==True:
+                    #save out thumbnail
+                    Savestring=DatFile.lower().replace(".dat",".jpg")
+                    print("saving image to ", Savestring)
+                    cv2.imwrite(Savestring,OutputImage)
+                    break
                 else:
-                    Savestring=UserParameters.OutputFilePath +"\\" + SNR_ReadResult + "File" + str(FileIndex) + "_Image_"+str(Index) +"_"+ ReplacedExtension
+                    DelimitedDat=DatFile.split("\\")
+                    DelimitedDat_LastElem=DelimitedDat[-1]
+                    ReplacedExtension=DelimitedDat_LastElem.lower().replace(".dat",".jpg")
 
-                #print("saving image to ", Savestring)
-                #print("Dat file",FileIndex,"/",str(len(InputFiles_cleaned)))
-                cv2.imwrite(Savestring,OutputImage)
-                #CreateImageVDatfileRecord provenance tracker
-                #ImageHash=_3DVisLabLib. pHash(OutputImage)
-                ImgVDatFile_andRecord[Savestring]=(DatFile,Index+1,SNR_ReadResult)
-        print(DatFile,NoteCount)
-    #save out dictionary so we can trace images back to dat files and record number
-    Savestring=UserParameters.OutputFilePath +"\\TraceImg_to_DatRecord.json" 
-    with open(Savestring, 'w') as outfile:
-        json.dump(ImgVDatFile_andRecord, outfile)
+                    #does user want images sorted into folders or no
+                    if UserParameters.FolderPerDat==True:
+                        Savestring=DatFolder +"\\" + SNR_ReadResult + "File" + str(FileIndex) + "_Image_"+str(Index) +"_"+ ReplacedExtension
+                    else:
+                        Savestring=UserParameters.OutputFilePath +"\\" + SNR_ReadResult + "File" + str(FileIndex) + "_Image_"+str(Index) +"_"+ ReplacedExtension
 
-    #if any skipped file exist, print them out
-    if len(SkippedFiles)>0:
-        print("START OF SKIPPED FILES")
-        for SkippedFIle in SkippedFiles:
-            print(SkippedFIle,SkippedFiles[SkippedFIle])
-        print("END OF SKIPPED FILES")
+                    #print("saving image to ", Savestring)
+                    #print("Dat file",FileIndex,"/",str(len(InputFiles_cleaned)))
+                    cv2.imwrite(Savestring,OutputImage)
+                    #CreateImageVDatfileRecord provenance tracker
+                    #ImageHash=_3DVisLabLib. pHash(OutputImage)
+                    ImgVDatFile_andRecord[Savestring]=(DatFile,Index+1,SNR_ReadResult)
+            print(DatFile,NoteCount)
+        #save out dictionary so we can trace images back to dat files and record number
+        Savestring=UserParameters.OutputFilePath +"\\TraceImg_to_DatRecord.json" 
+        with open(Savestring, 'w') as outfile:
+            json.dump(ImgVDatFile_andRecord, outfile)
 
-        #if user requests Serial number read alongside images
-        #TODO are we even using this?
-        # #return
-        # if UserParameters.GetSNR==True:
-        #     #filter for SNR images
-        #     filteredImages = images.filter(UserParameters.HardCodedSnr_BlockType,UserParameters.HardCodedSnr_Wave)
-        #     #get SNR read if any exist
-        #     SNR_Results_per_record=dict()
-        #     for Index, Item in enumerate(images.notes):
-        #         Tempsnr=str(Item.snr)
-        #         if Tempsnr is None:
-        #             SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
-        #             raise Exception(DatFile, "Could not parse SNR (user request)")
-        #         elif Tempsnr =="":
-        #             SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
-        #             raise Exception(DatFile,"Could not parse SNR  (user request)")
-        #         else:
-        #             #build serial number return string - generally they are packaged with square brackets
-        #             SNR_Results_per_record[Index+1]="[" + (str(Item.snr)) + "]" + str(DatFile)
+        #if any skipped file exist, print them out
+        if len(SkippedFiles)>0:
+            print("START OF SKIPPED FILES")
+            for SkippedFIle in SkippedFiles:
+                print(SkippedFIle,SkippedFiles[SkippedFIle])
+            print("END OF SKIPPED FILES")
+
+            #if user requests Serial number read alongside images
+            #TODO are we even using this?
+            # #return
+            # if UserParameters.GetSNR==True:
+            #     #filter for SNR images
+            #     filteredImages = images.filter(UserParameters.HardCodedSnr_BlockType,UserParameters.HardCodedSnr_Wave)
+            #     #get SNR read if any exist
+            #     SNR_Results_per_record=dict()
+            #     for Index, Item in enumerate(images.notes):
+            #         Tempsnr=str(Item.snr)
+            #         if Tempsnr is None:
+            #             SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
+            #             raise Exception(DatFile, "Could not parse SNR (user request)")
+            #         elif Tempsnr =="":
+            #             SNR_Results_per_record[Index+1]=(OperationCodes.ERROR)
+            #             raise Exception(DatFile,"Could not parse SNR  (user request)")
+            #         else:
+            #             #build serial number return string - generally they are packaged with square brackets
+            #             SNR_Results_per_record[Index+1]="[" + (str(Item.snr)) + "]" + str(DatFile)
 
 
 
@@ -606,11 +679,10 @@ def GetImage_fromHex(Data_hex,UserManualMemoryScan,OverRide_StartOffset):
     #convert to grayscale
     ListOfGrayScale_Subset=ConvertListHex_to_GrayScale_bitdepth(ListOfHex_Subset,2,255,16)
 
-
     #ReplaceHexStrings(ListOfGrayScale_Subset,DatFileInfos)
     #interpret area of memory as image
     (gray_image,DataVerify_image)=CreateGrayImage_from_memory(ListOfGrayScale_Subset,UserManualMemoryScan.Width,UserManualMemoryScan.Height)
-
+    
     return (gray_image,DataVerify_image)
 
 def GetImage_fromHex_MM8(Data_hex,UserManualMemoryScan,OverRide_StartOffset):
@@ -622,6 +694,7 @@ def GetImage_fromHex_MM8(Data_hex,UserManualMemoryScan,OverRide_StartOffset):
     EndHex=hex((ConvertHex_to_decimal(UserManualMemoryScan.OffsetEnd))*2)
     ListOfHex_Subset=Return_SubSet_of_Memory( Data_hex,hex((OverRide_StartOffset*2)),EndHex,0)
 
+    #ListOfHex_Subset=ListOfHex_Subset[0:int(len(ListOfHex_Subset/3))]
     #convert to grayscale
     ListOfGrayScale_Subset=ConvertListHex_to_GrayScale_bitdepth(ListOfHex_Subset,4,255,16)
     print("this area needs experimentation of a loop of parametrs to see whats happening")
@@ -638,7 +711,7 @@ def GetImage_fromHex_MM8(Data_hex,UserManualMemoryScan,OverRide_StartOffset):
 
     #interpret area of memory as image
     (gray_image,DataVerify_image)=CreateGrayImage_from_memory(ListOfGrayScale_Subset,UserManualMemoryScan.Width,UserManualMemoryScan.Height)
-
+    gray_image = cv2.normalize(gray_image,  gray_image, 0, 255, cv2.NORM_MINMAX)
     return (gray_image,DataVerify_image)
 
 
@@ -664,7 +737,7 @@ def UpdateSkimmer(data_hex,UserManualMemoryScan):
     UserManualMemoryScan.PrintInfo()
 
     #cut image out of hex datamass
-    (gray_image,DataVerify_image)=GetImage_fromHex_MM8(data_hex,UserManualMemoryScan,UserManualMemoryScan.Offset)
+    (gray_image,DataVerify_image)=GetImage_fromHex(data_hex,UserManualMemoryScan,UserManualMemoryScan.Offset)
 
     #add header graphic if user has established record length discovery
     if UserManualMemoryScan.HeaderStartGuideImg is not None:
