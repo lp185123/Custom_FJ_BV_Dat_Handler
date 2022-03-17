@@ -23,7 +23,8 @@ ColumnSize=30
 PreProcessing=False
 #can force mirroring or it can be found in genparameters
 MirrorImage=False # turn this on if preprocessing is false
-
+#force stretching image in Y if its MM8 data (usually at squashed aspect ratio)
+ForceYStretch=True
 
 
 
@@ -46,7 +47,7 @@ SavedState_GenParams=PreProcessAllImages.GetML_SavedState(Input_S39_ExtractionIm
 #create single images
 PreProcessAllImages.ProcessImages(InputPath=Input_S39_ExtractionImages,
 OutputPath=OutputFolderSingleImages,
-Processing=PreProcessing,MirrorImage=MirrorImage,GenParams=SavedState_GenParams)
+Processing=PreProcessing,MirrorImage=MirrorImage,GenParams=SavedState_GenParams,ForceYStretch=ForceYStretch)
 #create tiled images
 TileImages_for_OCR.TileImage("DISPATCH",
 OutputFolderSingleImages,OutputFolderTiledImages,ColumnSize,20,SavedState_GenParams)

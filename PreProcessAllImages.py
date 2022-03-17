@@ -45,7 +45,7 @@ def GetML_SavedState(InputPath=None,Processing=False):
 
 
 
-def ProcessImages(InputPath=None,OutputPath=None,Processing=False,MirrorImage=True,GenParams=None):#dont use if __name__ == "__main__" yet 
+def ProcessImages(InputPath=None,OutputPath=None,Processing=False,MirrorImage=True,GenParams=None,ForceYStretch=False):#dont use if __name__ == "__main__" yet 
     InputFolder=InputPath#r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
 
     #open json file which may exist from original .dat file extraction process TraceImg_to_DatRecord.json
@@ -112,6 +112,6 @@ def ProcessImages(InputPath=None,OutputPath=None,Processing=False,MirrorImage=Tr
     #build parameters (or not if not processing - but still may need to mirror)
     SNRparams=GeneticAlg_SNR.BuildSNR_Parameters(LastRecord_Parameters,SNR_fitnessTest,None)
     #create folder of single images according to user options (processed/raw/mirrored)
-    SNR_fitnessTest.GenerateSingleImages_and_linkFile(ListAllImg_files,OutputPath,SNRparams,GenParams,Processing,MirrorImage)
+    SNR_fitnessTest.GenerateSingleImages_and_linkFile(ListAllImg_files,OutputPath,SNRparams,GenParams,Processing,MirrorImage,ForceYStretch)
 
     return

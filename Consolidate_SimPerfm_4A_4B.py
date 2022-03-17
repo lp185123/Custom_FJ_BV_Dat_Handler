@@ -1,6 +1,7 @@
 """spin through simulation results and collate all 4A and 4B scoring"""
 import os
-import win32clipboard
+#import pywin
+#from pywin import win32clipboard
 import copy
 #import _3DVisLabLib
 import shutil
@@ -9,7 +10,7 @@ class InfoStrings():
     List_known_4Asuffix=["_Genuine"]
     List_known_4Bsuffix=["_Damage"]#["Clearly","_Damage"]
     #list_known_countries=["Belarus","Brazil","Czech","Hungary","Malaysia","Poland","Mexico","Russia","Turkey","UK","INDIA","USD","USD2","EUR_PREVTB_FIX","EUR POSTVTB_FIX"]
-    list_known_countries=["BRAZIL"]#["INDIA","USD","EUR_PREVTB_FIX","EUR POSTVTB_FIX"]
+    list_known_countries=["Bangladesh"]#["INDIA","USD","EUR_PREVTB_FIX","EUR POSTVTB_FIX"]
     list_known_GenerationTypes=["Minimum","Standard"]
     list_FinalCategories=["CIRCULATIONFIT","COUNTERFEIT","GEN","NEW","TELLERFIT","UNFIT","UNKNOWN","UNKNOWN2"]
 
@@ -25,6 +26,7 @@ def yesno(question):
     return False
 
 def copyToClipboard(text):
+    return
     win32clipboard.OpenClipboard()
     win32clipboard.EmptyClipboard()
     win32clipboard.SetClipboardText(text, win32clipboard.CF_UNICODETEXT)

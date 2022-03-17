@@ -44,5 +44,5 @@ for Index, Img_to_Ocr in enumerate(ListAllImages):
     ReplacedExtension=DelimitedImgFile_LastElem.replace(".jpg",".txt")
     AnswerFile=Result_Output+ "\\" + ReplacedExtension
     print("Saving answer to",AnswerFile)
-    with open(AnswerFile, 'w') as f:
+    with open(AnswerFile, 'w',encoding="utf-8") as f:#encoding="utf-8" for unicode which is handled as standard in python 3
         f.write(OCR_Result)

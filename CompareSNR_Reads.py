@@ -8,6 +8,8 @@ import random
 import os
 import json
 import shutil
+# Set environment variables
+os.environ["PYTHONUTF8"] = "on"
 
 class TracetoSource_Class():
     def __init__(self):
@@ -21,17 +23,17 @@ def CleanUpExternalOCR(InputOCR):
     #clean up external OCR which could contain non alphanumeric characters and spaces etc
     CleanedUpSnr=""
     #remove non alphanumeric chars
-    CleanedUpSnr = re.sub(r'[^a-zA-Z0-9]', '', InputOCR)
+    #CleanedUpSnr = re.sub(r'[^a-zA-Z0-9]', '', InputOCR)
     #remove spaces
-    CleanedUpSnr=CleanedUpSnr.replace(" ","")
+    CleanedUpSnr=InputOCR.replace(" ","")
     #should be left with continous string of alphanumeric characters
     return CleanedUpSnr
 
-class CheckSN_Answers(NoTemplateSNR_CloudOCR_Only=False):
+class CheckSN_Answers():
     #if NoTemplateSNR_CloudOCR_Only is true, it will not attempt to compare template SNR and CLoud OCR (by failing gracefully)
     #if it is false, the system will compare template SNR and Cloud SNR
-    def __init__(self):
-        
+    def __init__(self,NoTemplateSNR_CloudOCR_Only=False):
+        self.NoTemplateSNR_CloudOCR_Only=NoTemplateSNR_CloudOCR_Only
         self.BaseSNR_Folder = input("Please enter images folder: Default is C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput")
         if len(self.BaseSNR_Folder)==0:
             self.BaseSNR_Folder = r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput"
@@ -203,11 +205,25 @@ class CheckSN_Answers(NoTemplateSNR_CloudOCR_Only=False):
 
                         #use tracer object if we have it to get original extracted image
                         if TraceObject is not None:
-                            shutil.copyfile(TraceObject.SourceExtractedImage, self.AnswersFolder + "\\" + ImageFileNameOnly)
+                            if self.NoTemplateSNR_CloudOCR_Only==False:
+                                shutil.copyfile(TraceObject.SourceExtractedImage, self.AnswersFolder + "\\" + ImageFileNameOnly)
+                            else:
+                                #warning - will be unicode so might have lots of strange characters - can sort this out in "clean up external snr" function
+                                shutil.copyfile(TraceObject.SourceExtractedImage, self.AnswersFolder + "\\" + SingleResult.ExternalSNR +".jpg")
+                                #if we have s39 files and we are training the snr for the first time (not checking results)
+                                #we can copy the s39 files and name them as the SN from the external OCR tool
+                                if TraceObject.SourceDat is not None:
+                                    if ".s39" in TraceObject.SourceDat.lower():
+                                        shutil.copyfile(TraceObject.SourceDat, self.AnswersFolder + "\\" + SingleResult.ExternalSNR + "___File" + str(IntIndexer) + ".S39")
                         #otherwise use the single processed files
                         else:
-                            shutil.copyfile(SingleResult_ColImgTrace[IntIndexer], self.AnswersFolder + "\\" + ImageFileNameOnly)
-
+                            #if pre-snr training - rename the output fiesl with the external OCR
+                            #otherwise keep the same filename so we can still trace back to dats
+                            if self.NoTemplateSNR_CloudOCR_Only==False:
+                                shutil.copyfile(SingleResult_ColImgTrace[IntIndexer], self.AnswersFolder + "\\" + ImageFileNameOnly)
+                            else:
+                                #warning - will be unicode so might have lots of strange characters - can sort this out in "clean up external snr" function
+                                shutil.copyfile(SingleResult_ColImgTrace[IntIndexer], self.AnswersFolder + "\\" + SingleResult.ExternalSNR +".jpg")
                     else:
 
                         if ".jpg" in MatchResult.lower():
@@ -237,7 +253,7 @@ class CheckSN_Answers(NoTemplateSNR_CloudOCR_Only=False):
         buildhtml.append("</body>")
         buildhtml.append("</html>")
         #save out report
-        with open(self.AnswersFolder + "\\" + "Report.html", 'w') as my_list_file:
+        with open(self.AnswersFolder + "\\" + "Report.html", 'w',encoding="utf-8") as my_list_file:
             file_content = "\n".join(buildhtml)
             my_list_file.write(file_content)
 
@@ -328,7 +344,7 @@ class CheckSN_Answers(NoTemplateSNR_CloudOCR_Only=False):
         if len(List_ExternalOCRTextFiles)>0:# text files found
             for OCRtext in List_ExternalOCRTextFiles:
                 print("Reading",OCRtext)
-                with open(OCRtext,errors="ignore") as f:#TODO potentially hiding characters - can account for lack of matching
+                with open(OCRtext,errors="ignore",encoding="utf-8") as f:#TODO potentially hiding characters - can account for lack of matching
                     lines = f.read()
                     DelimitedLines=lines.split("DISPATCH")#TODO make this common
                     Cleanedlines=[]

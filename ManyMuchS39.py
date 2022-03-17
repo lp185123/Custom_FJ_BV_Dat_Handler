@@ -531,6 +531,7 @@ class S39Maker:
                 snr = imageExtractor.filter('SRU MM8 image', wave)
                 point = 48 + (self.y * 1632 * 4)
                 point += self.x * 4
+                print(len(s39))
                 image = ''
                 for y in range(0, self.height):
                     if self.y + y < 640:
@@ -578,7 +579,64 @@ class S39Maker:
         allFiles.sort()
         return allFiles
 
-def main_disabled():
+class S39Extractor:
+    def __init__(self):
+
+        self.shouldPrintProgress = True
+        self.directory = '.\\'
+        self.files = []
+        self.images = []
+
+    def start(self):
+        if len(self.files) == 0:
+            self.files = self.getFiles(self.directory)
+            if self.shouldPrintProgress:
+                print('Extracting images from ' + self.directory)
+        elif self.shouldPrintProgress:
+            print('Extracting images from all S39 in same directory or lower')
+
+        for file in self.files:
+            try:
+                with open(file, 'rb') as openedFile:
+                    s39 = openedFile.read().hex()
+            except FileNotFoundError:
+                if ImageExtractor.DEBUG:
+                    print('File named ' + file + ' not found')
+                return None
+            except:
+                if ImageExtractor.DEBUG:
+                    print('An error occurred in opening the file')
+                return None
+
+            width = int(s39[1400:1404], 16)
+            height = int(s39[1404:1408], 16)
+            self.images.append(S39Image(width, height, s39[3376:3376 + (width * height * 2)]))
+
+    def getFiles(self, directory):
+        allFiles = []
+        for root, dirs, files in os.walk(directory):
+            for name in files:
+                if name[-4:len(name)] == '.s39':
+                    allFiles.append(os.path.join(root, name))
+            allFiles.sort()
+        return allFiles
+
+class S39Image:
+    def __init__(self, width, height, image):
+
+        self.width = width
+        self.height = height
+        self.image = image
+        
+    #1400#width
+    #1404#height
+    #3376 where image starts
+
+def main():
+
+    #s39Extractor = S39Extractor()
+    #s39Extractor.start()
+
     s39Maker = S39Maker()
     print('What wave would you like? (type "r", "g", or "b")')
     message = input()
@@ -619,25 +677,35 @@ def main_disabled():
     message = 'not a digit'
     while not message.isdigit():
         message = input()
+        if message.isdigit():
+            numMessage = int(message)
+            if not numMessage % 8 == 0:
+                print('The width must be divisible by 8. Try ' + str(numMessage - (numMessage % 8)) + ' or ' + str((numMessage - (numMessage % 8)) + 8))
+                message = 'not a number'
     s39Maker.width = int(message)
     print('Using ' + str(s39Maker.width) + ' as the width')
     print('Please enter the height of the rectangle:')
     message = 'not a digit'
     while not message.isdigit():
         message = input()
+        if message.isdigit():
+            numMessage = int(message)
+            if not numMessage % 8 == 0:
+                print('The height must be divisible by 8. Try ' + str(numMessage - (numMessage % 8)) + ' or ' + str((numMessage - (numMessage % 8)) + 8))
+                message = 'not a number'
     s39Maker.height = int(message)
     print('Using ' + str(s39Maker.height) + ' as the height')
 
     s39Maker.start()
     print('Process complete. You can find your S39 in the S39 folder.')
 
-#if __name__ == "__main__":
-#    try:
-#        main()
-#        os.system('pause')
-#    except Exception as e:
-#        print(e)
-#        os.system('pause')
+if __name__ == "__main__":
+    try:
+        main()
+        os.system('pause')
+    except Exception as e:
+        print(e)
+        os.system('pause')
 
 # ---ImageMerger---
 #

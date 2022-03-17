@@ -17,6 +17,9 @@ class CloudOCR():
         #set GOOGLE_APPLICATION_CREDENTIALS="C:\Working\FindIMage_In_Dat\VisionAPIDemo\ServiceAccountToken.json
         #pip install --upgrade google-analytics-data
         #pip install --upgrade google-auth
+
+
+    
     def PerformOCR(self,FilePath,ImageObject):
         """Pass in Filepath or Imageobject - currently imageobject is not tested"""
         if (ImageObject is None) and (FilePath is None):
@@ -37,26 +40,54 @@ class CloudOCR():
 
         image = vision.Image(content=content)
 
-        response = self.client.text_detection(image=image)
-        texts = response.text_annotations
-        OutTexts=[]
-        StringOutput=""
-        #TODO looks like first line is the entire read and the rest is the breakdown
-        for text in texts:
-            #print('\n"{}"'.format(text.description))
-            OutTexts.append(text.description)
-            StringOutput=StringOutput+str(text.description)
-            vertices = (['({},{})'.format(vertex.x, vertex.y)for vertex in text.bounding_poly.vertices])
+        #response = self.client.text_detection(image=image)
+        response = self.client.document_text_detection(image=image)
 
-        joined_ReadString = " ".join(OutTexts)
 
-        OutString3=""
-        for Index, Line in enumerate(OutTexts):
-            if Index>0:
-                OutString3=OutString3+Line
+        UnicodeListSymbols=[]
+
+        for page in response.full_text_annotation.pages:
+            for block in page.blocks:
+                print('\nBlock confidence: {}\n'.format(block.confidence))
+
+                for paragraph in block.paragraphs:
+                    print('Paragraph confidence: {}'.format(
+                        paragraph.confidence))
+
+                    for word in paragraph.words:
+                        word_text = ''.join([
+                            symbol.text for symbol in word.symbols
+                        ])
+                        print('Word text: {} (confidence: {})'.format(
+                            word_text, word.confidence))
+
+                        for symbol in word.symbols:
+                            print('\tSymbol: {} (confidence: {})'.format(
+                                symbol.text, symbol.confidence))
+                            UnicodeListSymbols.append(symbol.text)
+
+
+        word_text = ''.join(UnicodeListSymbols)
+        #word_text=word_text.replace(" ","")
+        # texts = response.text_annotations
+        # OutTexts=[]
+        # StringOutput=""
+        # #TODO looks like first line is the entire read and the rest is the breakdown
+        # for text in texts:
+        #     #print('\n"{}"'.format(text.description))
+        #     OutTexts.append(text.description)
+        #     StringOutput=StringOutput+str(text.description)
+        #     vertices = (['({},{})'.format(vertex.x, vertex.y)for vertex in text.bounding_poly.vertices])
+
+        # joined_ReadString = " ".join(OutTexts)
+
+        # OutString3=""
+        # for Index, Line in enumerate(OutTexts):
+        #     if Index>0:
+        #         OutString3=OutString3+Line
 
         #replace all non alphanumeric characters
-        OutString3 = re.sub(r'[^a-zA-Z0-9]', '', OutString3)
+        #OutString3 = re.sub(r'[^a-zA-Z0-9]', '', OutString3)
         #ListOCR_Reads.append(OutString3)
 
         #print(OutTexts)
@@ -66,10 +97,7 @@ class CloudOCR():
             raise Exception(
                 '{}\nFor more info on error messages, check: '
                 'https://cloud.google.com/apis/design/errors'.format(response.error.message))
-        return OutString3
+        return word_text
 
 
 
-
-arse=CloudOCR()
-print("plop")

@@ -630,7 +630,7 @@ class TestSNR_Fitness():
         self.ImgVsPath_dict=None
         #self.CloudOCR=VisionAPI_Demo.CloudOCR()
 
-    def GenerateSingleImages_and_linkFile(self,ImagePaths,OutputFolder,ParameterObject,GenParams,ProcessImg,Mirror):
+    def GenerateSingleImages_and_linkFile(self,ImagePaths,OutputFolder,ParameterObject,GenParams,ProcessImg,Mirror,ForceYStretch):
         #after a successful ML stage will have a folder of input s39 images and an OBJ file which is the saved state
         #run this to generate all the single images processed or unprocessed - then a file which will link the
         #images back to the original images incase we need to trace them back to source
@@ -648,6 +648,9 @@ class TestSNR_Fitness():
         for Index, ImgFile in enumerate(ImagePaths):
             #read in image
             TestImage=cv2.imread(ImgFile,cv2.IMREAD_GRAYSCALE)
+            #stretch image in Y if user requests this (mm8 data has incorrect aspect ratio)
+            
+            if (ProcessImg==False) and (ForceYStretch==True): TestImage=cv2.resize(TestImage, (TestImage.shape[1],TestImage.shape[0]*2))
             #conduct processing (or not) - will still need to mirror image if not processing generally
             if (Mirror==True) and (ProcessImg==False): TestImage=MirrorImage(TestImage)
             #process image
