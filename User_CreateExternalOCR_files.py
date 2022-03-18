@@ -28,6 +28,22 @@ ForceYStretch=True
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #prompt user to check filepaths are OK for deletion
 print("Please check output folders can be deleted:\n",OutputFolderSingleImages,"\n",OutputFolderTiledImages)
 Response=_3DVisLabLib.yesno("Continue?")

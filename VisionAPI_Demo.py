@@ -41,33 +41,34 @@ class CloudOCR():
         image = vision.Image(content=content)
 
         #response = self.client.text_detection(image=image)
+        #image_context={"language_hints": ["bn"]}
         response = self.client.document_text_detection(image=image)
-
+        #print("Google VIsion API using [document_text_detection], can swap mode to [text_detection] to improve results")
 
         UnicodeListSymbols=[]
 
         for page in response.full_text_annotation.pages:
             for block in page.blocks:
-                print('\nBlock confidence: {}\n'.format(block.confidence))
+                #print('\nBlock confidence: {}\n'.format(block.confidence))
 
                 for paragraph in block.paragraphs:
-                    print('Paragraph confidence: {}'.format(
-                        paragraph.confidence))
+                    #print('Paragraph confidence: {}'.format( paragraph.confidence))
 
                     for word in paragraph.words:
                         word_text = ''.join([
                             symbol.text for symbol in word.symbols
                         ])
-                        print('Word text: {} (confidence: {})'.format(
-                            word_text, word.confidence))
+                        #print('Word text: {} (confidence: {})'.format( word_text, word.confidence))
 
                         for symbol in word.symbols:
-                            print('\tSymbol: {} (confidence: {})'.format(
-                                symbol.text, symbol.confidence))
+                            #print('\tSymbol: {} (confidence: {})'.format(symbol.text, symbol.confidence))
                             UnicodeListSymbols.append(symbol.text)
 
 
         word_text = ''.join(UnicodeListSymbols)
+
+
+        
         #word_text=word_text.replace(" ","")
         # texts = response.text_annotations
         # OutTexts=[]

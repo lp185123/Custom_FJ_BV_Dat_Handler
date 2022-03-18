@@ -25,7 +25,7 @@ class GA_Parameters():
         #remember to check "Individual" class for the parameters and the parameter ranges!!
         #****************
 
-        self.No_of_First_gen=100#first generation are the randomly generated cycle, this usually gives the biggest gains, balance with 
+        self.No_of_First_gen=30#first generation are the randomly generated cycle, this usually gives the biggest gains, balance with 
         #time commitment, which depeneds on test image batch size
 
         self.No_TopCandidates=10#how many genomes do we skim off the crop before cross breeding them
@@ -33,26 +33,32 @@ class GA_Parameters():
         self.NewIndividualsPerGen=1#add a random genome each generation- generally doesnt make much difference so is pot luck 
         #worth activating a couple for long running times as theoretically can help if stuck in local minima
 
-        self.TestImageBatchSize=3907#how many images do we test per iteration. For best results use entire dataset, this is tested to work up
+        self.TestImageBatchSize=20#how many images do we test per iteration. For best results use entire dataset, this is tested to work up
         #to 400 images then after that you dont get enough generations to refine solution due to time per evaluation. If you can use entire dataset then
         #set NewImageCycle to 99999 as all it will do is reshuffle the images which isnt necessary
 
-        self.ImageColumnSize=30#how many images we send at a time to external OCR dont want to go more than 40 as performance breaks down
+        self.ImageColumnSize=20#how many images we send at a time to external OCR dont want to go more than 40 as performance breaks down
 
-        self.NewImageCycle=4#how many iterations of same image set before choosing another random subset of main images
+        self.NewImageCycle=4#how many iterations/generations of same image set before choosing another random subset of main images
 
         self.ImageTapOut=99#terminate anything that has poor performance out the box - with collimated tests this doesnt work effectively
 
         self.GradientDescentCycle=10#loops before we start a gradient descent - this is generally not so critical for images
-        # but if commiting to long process time anyway its worth putting it on
+        # but if commiting to long process time anyway its worth putting it on, will enter grad descent then stop if no improvement
         
         self.UseCloudOCR=True
         self.MirrorImage=True#double up image so one is upside down - can have upside down s39 images
 
         self.DictFilename_V_Images=dict()#load this with fitness check images (automatic)
-        self.FilePath=r"C:\Working\FindIMage_In_Dat\Examples\Brazil_set_4\All"#point to folder of extracted images
-        #save out parameter converging image
-        self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"
+        self.FilePath=r"C:\Working\FindIMage_In_Dat\Output"#point to folder of extracted images
+        
+        self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"#save out parameter converging image
+
+
+
+
+
+        #END OF USER OPTIONS
         self.DefaultError=5#if fitness checking breaks what do we set error too - currently cannot handle Null value
         self.LastImage=None
         self.NameOfSavedState=None
@@ -82,6 +88,7 @@ class GA_Parameters():
             print("can continue")
             TotalNoImages=len(ListAllImages)
         if (ColSize)>TotalNoImages:
+            
             raise Exception("ERROR: GetCollimatedTestSet_AndFielding length: User requested",ColSize,"col size from",TotalNoImages, " total images" )
 
         #convert to dictionary so we can remove items easier

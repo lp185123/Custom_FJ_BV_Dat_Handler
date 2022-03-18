@@ -202,28 +202,36 @@ class CheckSN_Answers():
                         #copy failed image?
                         ImageDelimiter=SingleResult_ColImgTrace[IntIndexer].split("\\")
                         ImageFileNameOnly=ImageDelimiter[-1]
+                        try:
 
-                        #use tracer object if we have it to get original extracted image
-                        if TraceObject is not None:
-                            if self.NoTemplateSNR_CloudOCR_Only==False:
-                                shutil.copyfile(TraceObject.SourceExtractedImage, self.AnswersFolder + "\\" + ImageFileNameOnly)
+                            #use tracer object if we have it to get original extracted image
+                            if TraceObject is not None:
+                                if self.NoTemplateSNR_CloudOCR_Only==False:
+                                    shutil.copyfile(TraceObject.SourceExtractedImage, self.AnswersFolder + "\\" + ImageFileNameOnly)
+                                else:
+                                    #warning - will be unicode so might have lots of strange characters - can sort this out in "clean up external snr" function
+                                    shutil.copyfile(TraceObject.SourceExtractedImage, self.AnswersFolder + "\\" + SingleResult.ExternalSNR +".jpg")
+                                    #if we have s39 files and we are training the snr for the first time (not checking results)
+                                    #we can copy the s39 files and name them as the SN from the external OCR tool
+                                    if TraceObject.SourceDat is not None:
+                                        if ".s39" in TraceObject.SourceDat.lower():
+                                            #TempString=self.AnswersFolder + "\\" + SingleResult.ExternalSNR + ".S39"
+                                            TempString=SingleResult.ExternalSNR#.replace("O","0")
+                                            #print("TAKE OUT TEMP FIX FOR JOSH os to 0s")
+                                            shutil.copyfile(TraceObject.SourceDat, self.AnswersFolder + "\\" +TempString + ".S39")
+                            #otherwise use the single processed files
                             else:
-                                #warning - will be unicode so might have lots of strange characters - can sort this out in "clean up external snr" function
-                                shutil.copyfile(TraceObject.SourceExtractedImage, self.AnswersFolder + "\\" + SingleResult.ExternalSNR +".jpg")
-                                #if we have s39 files and we are training the snr for the first time (not checking results)
-                                #we can copy the s39 files and name them as the SN from the external OCR tool
-                                if TraceObject.SourceDat is not None:
-                                    if ".s39" in TraceObject.SourceDat.lower():
-                                        shutil.copyfile(TraceObject.SourceDat, self.AnswersFolder + "\\" + SingleResult.ExternalSNR + "___File" + str(IntIndexer) + ".S39")
-                        #otherwise use the single processed files
-                        else:
-                            #if pre-snr training - rename the output fiesl with the external OCR
-                            #otherwise keep the same filename so we can still trace back to dats
-                            if self.NoTemplateSNR_CloudOCR_Only==False:
-                                shutil.copyfile(SingleResult_ColImgTrace[IntIndexer], self.AnswersFolder + "\\" + ImageFileNameOnly)
-                            else:
-                                #warning - will be unicode so might have lots of strange characters - can sort this out in "clean up external snr" function
-                                shutil.copyfile(SingleResult_ColImgTrace[IntIndexer], self.AnswersFolder + "\\" + SingleResult.ExternalSNR +".jpg")
+                                #if pre-snr training - rename the output fiesl with the external OCR
+                                #otherwise keep the same filename so we can still trace back to dats
+                                if self.NoTemplateSNR_CloudOCR_Only==False:
+                                    shutil.copyfile(SingleResult_ColImgTrace[IntIndexer], self.AnswersFolder + "\\" + ImageFileNameOnly)
+                                else:
+                                    #warning - will be unicode so might have lots of strange characters - can sort this out in "clean up external snr" function
+                                    shutil.copyfile(SingleResult_ColImgTrace[IntIndexer], self.AnswersFolder + "\\" + SingleResult.ExternalSNR +".jpg")
+                        except Exception as e:
+                            print("Error with image")
+                            print(MatchResult)
+                            print(e)
                     else:
 
                         if ".jpg" in MatchResult.lower():
@@ -484,10 +492,6 @@ def CheckSNR_Reads(TemplateSNR,ExternalSNR,Fielding):
         DUmmyResult.RepairedExternalOCR="NA"
 
         return DUmmyResult
-
-
-
-
         raise Exception("Template SNR not formatted correctly []")
     Get_SNR_string=TemplateSNR.split("[")#delimit
     Get_SNR_string=Get_SNR_string[-1]#get last element of delimited string

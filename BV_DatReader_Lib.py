@@ -80,15 +80,15 @@ class UserInputParameters():
 
 
         self.s39_shouldPrintProgress = True
-        self.s39_directory = '.\\'
-        self.s39_outputDirectory = '.\\s39\\'
+        self.s39_directory = '.\\'#repopulated later
+        self.s39_outputDirectory = '.\\s39\\'#repopulated later
         self.s39_wave = 'red' # or green or blue
         self.s39_side = 'front' # or back
         self.s39_validation = '80080103'
         self.s39_width = 336
         self.s39_height = 88
-        self.s39_x = 568+420#add these together
-        self.s39_y = 88#keep scroll point at 320 (weird coordinate systems)
+        self.s39_x = 162#519+336+40+40+40#add these together
+        self.s39_y = 114#keep scroll point at 320 (weird coordinate systems)
 
     def UserPopulateParameters(self):
         self.UserInput_and_test()
