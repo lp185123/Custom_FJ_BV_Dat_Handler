@@ -444,7 +444,7 @@ class CheckSN_Answers():
             #Should have two lists of SNR/OCR results - can now loop through and check the SNRs match
             ResultsObjectList=[]
             for Index,Item in enumerate(TemplateSNR_list):
-                ResultsObjectList.append(CheckSNR_Reads(TemplateSNR_list[Index],ExternalSNR_list[Index],self.Fielding))
+                ResultsObjectList.append(CheckSNR_Reads(TemplateSNR_list[Index],ExternalSNR_list[Index],self.Fielding,"NO ID"))
             #pack results into the dictionary alongside the image, template SNR and external SNR files for later analysis
 
             for CheckElement in ResultsObjectList:
@@ -472,8 +472,9 @@ class OCR_analysisCard_Dummy():
         self.InfoString=None
         self.Pass=None
         self.RepairedExternalOCR=None
+        self.AnalysisId=None
 
-def CheckSNR_Reads(TemplateSNR,ExternalSNR,Fielding):
+def CheckSNR_Reads(TemplateSNR,ExternalSNR,Fielding,AnalysisID):
     ###pass in internal and external SNR and check for match
     #Fielding will be NONE or generated externally
 
@@ -490,6 +491,7 @@ def CheckSNR_Reads(TemplateSNR,ExternalSNR,Fielding):
         DUmmyResult.InfoString="NA"
         DUmmyResult.Pass=False
         DUmmyResult.RepairedExternalOCR="NA"
+        DUmmyResult.AnalysisId=AnalysisID
 
         return DUmmyResult
         raise Exception("Template SNR not formatted correctly []")
@@ -501,7 +503,7 @@ def CheckSNR_Reads(TemplateSNR,ExternalSNR,Fielding):
         if (len(Get_SNR_string))>0:
             Known_SNR_string=Get_SNR_string
             #print(vars(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding)))
-            return(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding))
+            return(SNRTools.CompareOCR_Reads(Known_SNR_string,ExternalSNR,Fielding,AnalysisID))
 #except Exception as e: 
     #print("error extracting known snr string from file " )
     #print(repr(e))

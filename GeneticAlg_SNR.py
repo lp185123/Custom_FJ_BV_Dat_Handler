@@ -22,7 +22,7 @@ class GA_Parameters():
         self.SelfCheck=False
 
         #****************
-        #remember to check "Individual" class for the parameters and the parameter ranges!!
+        #remember to check "Individual" class INIT for the image parameters and the parameter ranges!!
         #****************
 
         self.No_of_First_gen=30#first generation are the randomly generated cycle, this usually gives the biggest gains, balance with 
@@ -46,10 +46,14 @@ class GA_Parameters():
         self.GradientDescentCycle=10#loops before we start a gradient descent - this is generally not so critical for images
         # but if commiting to long process time anyway its worth putting it on, will enter grad descent then stop if no improvement
         
-        self.UseCloudOCR=True
-        self.MirrorImage=True#double up image so one is upside down - can have upside down s39 images
+        self.UseCloudOCR=True#always set to true - offline pytesseract is available but has not been updated and now may not work - but can be reactivated with some development
 
-        self.DictFilename_V_Images=dict()#load this with fitness check images (automatic)
+        self.MirrorImage=False#use if comparing SNRs (to cope with upside down s39 images), turn off if not comparing SNs, but only generating
+
+        self.ForceFieldingLengths=[8]#put in list of expected SN lengths - use this if the s39/images do not yet have SNR answers from the template
+        #set to None if the filenames generated are in the format  "file1[AB12345].jpg" whereby the SN can be found between [] in the filename
+        #can also have multiple lengths =[5,7,8] if a particularly awkward SN task
+        
         self.FilePath=r"C:\Working\FindIMage_In_Dat\Output"#point to folder of extracted images
         
         self.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ParameterConvergeImages"#save out parameter converging image
@@ -59,6 +63,7 @@ class GA_Parameters():
 
 
         #END OF USER OPTIONS
+        self.DictFilename_V_Images=dict()#load this with fitness check images (automatic)
         self.DefaultError=5#if fitness checking breaks what do we set error too - currently cannot handle Null value
         self.LastImage=None
         self.NameOfSavedState=None
@@ -88,7 +93,7 @@ class GA_Parameters():
             print("can continue")
             TotalNoImages=len(ListAllImages)
         if (ColSize)>TotalNoImages:
-            
+            print("please ensure column size is <= image batch size")
             raise Exception("ERROR: GetCollimatedTestSet_AndFielding length: User requested",ColSize,"col size from",TotalNoImages, " total images" )
 
         #convert to dictionary so we can remove items easier

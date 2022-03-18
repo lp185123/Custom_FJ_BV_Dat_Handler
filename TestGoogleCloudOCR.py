@@ -25,5 +25,5 @@ ListAllImages=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
 
 for img in ListAllImages:
     print(img)
-    OCR_Result=GoogleCloudOCR.PerformOCR(img,None)
-    print(OCR_Result)
+    OCR_Result,CharsVConfidence=GoogleCloudOCR.PerformOCR(img,None)
+    print(OCR_Result,CharsVConfidence)

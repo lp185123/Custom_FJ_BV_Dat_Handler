@@ -37,7 +37,7 @@ if len(ListAllImages)==0:
 ListOCR_Reads=[]
 for Index, Img_to_Ocr in enumerate(ListAllImages):
     print("File",str(Index),"/",str(len(ListAllImages)), "_Uploading to Cloud OCR",Img_to_Ocr)
-    OCR_Result=GoogleCloudOCR.PerformOCR(Img_to_Ocr,None)
+    OCR_Result,CharsVConfidence=GoogleCloudOCR.PerformOCR(Img_to_Ocr,None)
     #create matching answer text file
     DelimitedImgFile=Img_to_Ocr.split("\\")
     DelimitedImgFile_LastElem=DelimitedImgFile[-1]

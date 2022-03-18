@@ -129,6 +129,7 @@ class OCR_analysisCard():
         self.InfoString=None
         self.Pass=None
         self.RepairedExternalOCR=None
+        self.AnalysisId=None
 
     def DoubleSetError(self,Error):
         raise Exception("Error - double load of SNR result card, ",Error )
@@ -251,7 +252,7 @@ def Repair_ExternalOCR(TemplateSNR,ExternalSNR,ExpectedFielding):
 
     return OutputString
 
-def CompareOCR_Reads(TemplateSNR,ExternalSNR,ExpectedFielding=None):
+def CompareOCR_Reads(TemplateSNR,ExternalSNR,ExpectedFielding=None,AnalysisID="NO_ID"):
 
     
     #compare OCR reads, and return info card with pass/fail and error messages
@@ -263,6 +264,7 @@ def CompareOCR_Reads(TemplateSNR,ExternalSNR,ExpectedFielding=None):
     OCR_analysis.ExpectedFielding=ExpectedFielding
     OCR_analysis.TemplateSNR=TemplateSNR
     OCR_analysis.ExternalSNR=ExternalSNR
+    OCR_analysis.AnalysisId=AnalysisID
 
     ConfusionPairs=[("8","B"),("S","5"),("I","1"),("3","8"),("G","6"),("0","O"),("6","9"),("I","1")]
     #roll through test cases and break out if test fails
@@ -610,8 +612,8 @@ def GoogleOCR(TestImage,GenParams,GoogleOCR_Object):
         cv2.imwrite(Savestring,TestImage)
         #get OCR from Google VIsion API
         #filtered response - only alphanumeric chars
-        OCR_Result=GoogleOCR_Object.PerformOCR(Savestring,None)
-        return OCR_Result
+        OCR_Result,CharsVConfidence=GoogleOCR_Object.PerformOCR(Savestring,None)
+        return OCR_Result,CharsVConfidence
 
 class TestSNR_Fitness():
 #class which loads images into memory used to test fitness of input parameters
@@ -744,7 +746,7 @@ class TestSNR_Fitness():
             if (len(ListCloudOCR)>0) and (GenParams.UseCloudOCR==True):
                 ProcessedIMg_VS_CloudOCR=dict()
                 for Img in ProcessedColImagesVAnswers:
-                    RawOCRResult=GoogleOCR(ProcessedColImagesVAnswers[Img][2],GenParams,ListCloudOCR[0])
+                    RawOCRResult,CharsVConfidence=GoogleOCR(ProcessedColImagesVAnswers[Img][2],GenParams,ListCloudOCR[0])
                     DelimitedLines=RawOCRResult.split("DISPATCH")#TODO make this common
                     Cleanedlines=[]
                     CountSingleAnswers=0
@@ -756,7 +758,7 @@ class TestSNR_Fitness():
                             CleanedLine=CompareSNR_Reads.CleanUpExternalOCR(Singleline)
                             Cleanedlines.append(CleanedLine)
                             CountSingleAnswers=CountSingleAnswers+1
-                    ProcessedIMg_VS_CloudOCR[Img]=(Cleanedlines,CountSingleAnswers)
+                    ProcessedIMg_VS_CloudOCR[Img]=(Cleanedlines,CountSingleAnswers,CharsVConfidence)
                     if (len(ProcessedColImagesVAnswers[Img][1])!=len(ProcessedIMg_VS_CloudOCR[Img][0])):
                         raise Exception("RunSNR_With_Parameters, answers different lengths",len(ProcessedColImagesVAnswers[Img][1]),len(ProcessedIMg_VS_CloudOCR[Img][0]))
         
@@ -775,25 +777,66 @@ class TestSNR_Fitness():
                 #roll through results and get report card - will handle fielding and other issues
                 ResultsObjectList=[]
                 for Index in range (len(ExternalSNR_list)):
-                    ResultsObjectList.append(CompareSNR_Reads.CheckSNR_Reads(TemplateSNR_list[Index],ExternalSNR_list[Index],GenParams.Fielding))
+                    ResultsObjectList.append(CompareSNR_Reads.CheckSNR_Reads(TemplateSNR_list[Index],ExternalSNR_list[Index],GenParams.Fielding,"NO ID"))
 
-                #tally up results
-                FitnessTally=[]
-                FitnessScore=0
-                for ResultCard in ResultsObjectList:
-                    if ResultCard.Pass==True:
-                        FitnessTally.append(1)
-                        FitnessScore=FitnessScore+1.0
-                    else:
-                        #get comparison ratio
-                        CompareStringScore=round(CheckStringSimilarity(ResultCard.TemplateSNR,ResultCard.RepairedExternalOCR),5)
-                        FitnessTally.append(0.0)
-                        #try having a score of zero instead of a continuum
-                        #FitnessScore=FitnessScore+CompareStringScore
 
-                FinalScore=FitnessScore/len(ResultsObjectList)
-                #print(FinalScore)
-                return TempImage,FinalScore
+
+                #Generating SN - no template SN to check against - so must create quantify read using confidences or another
+                #metric from the external OCR with an ideal target to match
+                if GenParams.ForceFieldingLengths is not None:
+                    if GenParams.Fielding is not None:
+                        #autofielding is used when we are checking template SNR with an external check system
+                        #force fielding is on if we have no template SNR but want to specify SN length to help quantify the
+                        #success of the read
+                        #having both on is most likely a config error 
+                        print("warning: user option [ForceFieldingLengths] is ON and [auto fielding] is populated\n this is potentially a config error")
+
+                    SN_ExpectedReads=len(TemplateSNR_list)
+                    #calculate ideal metric - which should be [# expected reads * # of chars per SN * 1.0] as reported confidence is between 0 and 1
+                    #we may have a list of possible SN lengths from the user [1,5,6]
+                    #until we think of a better strategy - take the max SN length as target , in theory shouldnt matter as score
+                    #will be relative
+                    IdealConfidenceLevel=1.0
+                    #get ideal score for SN reads
+                    IdealScore_justSN=SN_ExpectedReads*max(GenParams.ForceFieldingLengths)*IdealConfidenceLevel
+                    #get ideal score for delimiter - this should always be max unless image processing is really de-optimal
+                    IdealScore_Delimiter=SN_ExpectedReads*len("DISPATCH")*IdealConfidenceLevel
+                    #total
+                    TotalIdealScore=IdealScore_justSN+IdealScore_Delimiter
+
+                    TotalExternalSnrScore=0
+                    for ProcessedImage in ProcessedIMg_VS_CloudOCR:#roll through each image - this can be a column of many SNRs with delimiter
+                        for CharVConfidence in ProcessedIMg_VS_CloudOCR[ProcessedImage][2]:#roll through dictionary which saves character versus read confidence
+                            TotalExternalSnrScore=TotalExternalSnrScore+ProcessedIMg_VS_CloudOCR[ProcessedImage][2][CharVConfidence][1]#add to total score
+                
+                    #normalise score
+                    NormalisedScore=round(TotalExternalSnrScore/TotalIdealScore,7)
+                    return TempImage,NormalisedScore
+
+                #comparing template SN with external checked SN - roll through all SN reads
+                else:
+                    #tally up results
+                    FitnessTally=[]
+                    FitnessScore=0
+                    for ResultCard in ResultsObjectList:
+                        if ResultCard.Pass==True:
+                            FitnessTally.append(1)
+                            FitnessScore=FitnessScore+1.0
+                        else:
+                            #if we don't have a perfect match - we can look at confidences instead
+                            #but we must be careful how we tally this up - 
+                            
+                        #checking template SN vs external SN checker
+                        
+                            #we have fielding so assume that we have an input set of data with pre-existing SNR built into the filename
+                            #which we will want to compare with
+                            #get comparison ratio don't need this right now but is handy
+                            CompareStringScore=round(CheckStringSimilarity(ResultCard.TemplateSNR,ResultCard.RepairedExternalOCR),5)
+                            FitnessTally.append(0.0)
+
+                    FinalScore=FitnessScore/len(ResultsObjectList)
+                    #print(FinalScore)
+                    return TempImage,FinalScore
 
 
 

@@ -44,9 +44,9 @@ class CloudOCR():
         #image_context={"language_hints": ["bn"]}
         response = self.client.document_text_detection(image=image)
         #print("Google VIsion API using [document_text_detection], can swap mode to [text_detection] to improve results")
-
         UnicodeListSymbols=[]
-
+        UnicodeCharVConfidence=dict()
+        SymbolCounter=0
         for page in response.full_text_annotation.pages:
             for block in page.blocks:
                 #print('\nBlock confidence: {}\n'.format(block.confidence))
@@ -62,8 +62,9 @@ class CloudOCR():
 
                         for symbol in word.symbols:
                             #print('\tSymbol: {} (confidence: {})'.format(symbol.text, symbol.confidence))
+                            UnicodeCharVConfidence[SymbolCounter]=(symbol.text,symbol.confidence)
+                            SymbolCounter=SymbolCounter+1
                             UnicodeListSymbols.append(symbol.text)
-
 
         word_text = ''.join(UnicodeListSymbols)
 
@@ -98,7 +99,9 @@ class CloudOCR():
             raise Exception(
                 '{}\nFor more info on error messages, check: '
                 'https://cloud.google.com/apis/design/errors'.format(response.error.message))
-        return word_text
+
+        #return the characters found, and also a dictionary of each character vs confidence
+        return word_text,UnicodeCharVConfidence
 
 
 

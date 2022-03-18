@@ -134,7 +134,7 @@ def TileImages_with_delimiterImage(DelimiterImage,ImgVsPath,ImageY,ImageX,Column
                     else:
                         Get_SNR_string=""
                 else:
-                    print("No SNR in file",ImgFilePath,"dummying out SNR")
+                    #print("No SNR in file",ImgFilePath,"dummying out SNR")
                     Get_SNR_string="NO SNR EMBEDDED IN IMAGE"
                 SNRAnswersList.append(Get_SNR_string + ImgFilePath)
                 SnrAnswersDict[Index]=(Get_SNR_string,ImgFilePath)
