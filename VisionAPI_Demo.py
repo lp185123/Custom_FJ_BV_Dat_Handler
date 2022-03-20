@@ -17,6 +17,7 @@ class CloudOCR():
         #set GOOGLE_APPLICATION_CREDENTIALS="C:\Working\FindIMage_In_Dat\VisionAPIDemo\ServiceAccountToken.json
         #pip install --upgrade google-analytics-data
         #pip install --upgrade google-auth
+        print("Google Vision API initialised")# - this costs approx 3$ an hour (1$ per 1000 images) - same approx price as 125cc motorbike fuel (@60mph)")
 
 
     
@@ -37,12 +38,20 @@ class CloudOCR():
             raise Exception("CloudOCR perform OCR error - ImageObject parameter WIP!! Google API only supports files at time of writing")
             content = ImageObject
         
+        #fakedict=dict()
+        #fakedict["p"]="0.1"
+        #fakedict["l"]="0.1"
+        #fakedict["o"]="0.1"
+        #fakedict["p"]="0.1"
+
+        #return "plop",fakedict
 
         image = vision.Image(content=content)
 
-        #response = self.client.text_detection(image=image)
-        #image_context={"language_hints": ["bn"]}
-        response = self.client.document_text_detection(image=image)
+        #response = self.client.text_detection(image=image,image_context={"language_hints": ["bn","en"]})
+        #image_context={"language_hints": ["bn"]} #https://cloud.google.com/vision/docs/languages more langauge hints
+        response = self.client.document_text_detection(image=image)#,image_context={"language_hints": ["bn"]})
+        #response = self.client.text_detection(image=image,image_context={"language_hints": ["bn"]})
         #print("Google VIsion API using [document_text_detection], can swap mode to [text_detection] to improve results")
         UnicodeListSymbols=[]
         UnicodeCharVConfidence=dict()
@@ -62,7 +71,7 @@ class CloudOCR():
 
                         for symbol in word.symbols:
                             #print('\tSymbol: {} (confidence: {})'.format(symbol.text, symbol.confidence))
-                            UnicodeCharVConfidence[SymbolCounter]=(symbol.text,symbol.confidence)
+                            UnicodeCharVConfidence[SymbolCounter]=(symbol.text,symbol.confidence,symbol.bounding_box)
                             SymbolCounter=SymbolCounter+1
                             UnicodeListSymbols.append(symbol.text)
 
@@ -101,6 +110,8 @@ class CloudOCR():
                 'https://cloud.google.com/apis/design/errors'.format(response.error.message))
 
         #return the characters found, and also a dictionary of each character vs confidence
+        Cost=0.001
+        #print("word_text",word_text)
         return word_text,UnicodeCharVConfidence
 
 

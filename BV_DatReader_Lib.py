@@ -13,6 +13,7 @@ import enum
 import DatScraper_tool
 import json
 import ManyMuchS39
+import os
 
 class OperationCodes(enum.Enum):
     ERROR="error"
@@ -83,12 +84,12 @@ class UserInputParameters():
         self.s39_directory = '.\\'#repopulated later
         self.s39_outputDirectory = '.\\s39\\'#repopulated later
         self.s39_wave = 'red' # or green or blue
-        self.s39_side = 'front' # or back
+        self.s39_side = 'back' # or back
         self.s39_validation = '80080103'
         self.s39_width = 336
         self.s39_height = 88
-        self.s39_x = 162#519+336+40+40+40#add these together
-        self.s39_y = 114#keep scroll point at 320 (weird coordinate systems)
+        self.s39_x = 632+432#519+336+40+40+40#add these together
+        self.s39_y = 143#keep scroll point at 320 (weird coordinate systems)
 
     def UserPopulateParameters(self):
         self.UserInput_and_test()
@@ -244,7 +245,7 @@ def AutomaticExtraction(UserParameters):
         #        shutil.copy(s39File,s39File_to_datfile_Ext)
 
         for FileIndex, DatFile in enumerate(InputFiles_cleaned):
-            
+            print(FileIndex,"/",len(InputFiles_cleaned))
             #for nested folder, chop off the top file path string
             NestedFolder=DatFile.replace(UserParameters.InputFilePath,"")
 
@@ -272,6 +273,7 @@ def AutomaticExtraction(UserParameters):
                 DelimitedDat_LastElem=DelimitedDat[-1]
                 ReplacedExtension=DelimitedDat_LastElem.lower().replace(".s39",".jpg")
                 Savestring=UserParameters.OutputFilePath +"\\" +ReplacedExtension
+                print("Saving to ",Savestring)
                 cv2.imwrite(Savestring,OutputImage)
                 #add to record, but add it as a DAT file - this is cheating but otherwise will introduce headaches
 
@@ -440,7 +442,16 @@ def AutomaticExtraction(UserParameters):
             except:
                 print("error with file",DatFile)
     #save out dictionary so we can trace images back to dat files and record number
+    #if it already exists - user may want to merge JSONs together as has decided not to delete output folder
+
+    
+
     Savestring=UserParameters.OutputFilePath +"\\TraceImg_to_DatRecord.json" 
+    #if os.path.exists(Savestring):
+    #    print("Trace file already exists in output folder - merging (user declined to delete output folder)")
+    #    with open(Savestring) as json_file:
+    #        ImgVDatFile_andRecord_tomerge=json.load(Savestring)
+
     with open(Savestring, 'w') as outfile:
         json.dump(ImgVDatFile_andRecord, outfile)
 

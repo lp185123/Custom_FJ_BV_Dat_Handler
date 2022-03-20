@@ -58,7 +58,7 @@ class SNR_Parameters():
         self.tessedit_char_whitelist='0123456789'#use if necessary
         self.AlphaBlend=1#one means raw image, 0 is processed image
         self.CropPixels=0
-        self.Mirror=True
+        self.Mirror=False
         self.PSM=3#default is 3
         self.Denoise=0
         self.Negative=0
@@ -574,10 +574,11 @@ def ProcessImage(TestImage,ParameterObject):
     ProcessedImage=TestImage.copy()
 #if ParameterObject.NoProcessing<0.5:#skip all modification of pixel values except for resizing and mirror
     if ParameterObject.MedianBlurDist!=0:
-        ProcessedImage = cv2.medianBlur(ProcessedImage,ParameterObject.MedianBlurDist)
-
+        #ProcessedImage = cv2.medianBlur(ProcessedImage,ParameterObject.MedianBlurDist)
+        ProcessedImage = cv2.GaussianBlur(ProcessedImage, (ParameterObject.MedianBlurDist, ParameterObject.MedianBlurDist), 0)
+        
     if ParameterObject.AdapativeThreshold!=0:
-        ProcessedImage = cv2.GaussianBlur(ProcessedImage, (7, 7), 0)
+        #ProcessedImage = cv2.GaussianBlur(ProcessedImage, (7, 7), 0)
         ProcessedImage=cv2.adaptiveThreshold(ProcessedImage, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV,ParameterObject.GausSize_Threshold,ParameterObject.SubtractMean)
         #ProcessedImage = cv2.adaptiveThreshold(ProcessedImage, ParameterObject.AdapativeThreshold, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,ParameterObject.GausSize_Threshold,ParameterObject.SubtractMean) #cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11,2)[1]
     
@@ -779,7 +780,16 @@ class TestSNR_Fitness():
                 for Index in range (len(ExternalSNR_list)):
                     ResultsObjectList.append(CompareSNR_Reads.CheckSNR_Reads(TemplateSNR_list[Index],ExternalSNR_list[Index],GenParams.Fielding,"NO ID"))
 
-
+                #image for user with superimposed SNR read from external source
+                #need to make sure text fits
+                #cant do !! OPencv doesnt like unicode it seems - research this later
+                #Need to use PIL - try here:
+                #https://stackoverflow.com/questions/50854235/how-to-draw-chinese-text-on-the-image-using-cv2-puttextcorrectly-pythonopen#:~:text=According%20to%20this%20opencv%20forum,like%20chinese%20and%20arabic%20characters.
+                #or search "how to use unicode text with opencv in python"
+                #TextScale=_3DVisLabLib.get_optimal_font_scale(ExternalSNR_list[0],TempImage.shape[1],TempImage.shape[0]-0)#warning: this does not assume the same font
+                #font = cv2.FONT_HERSHEY_SIMPLEX
+                #cv2.putText(TempImage, ExternalSNR_list[0], (30,30), font, TextScale, (0, 0, 0), 2, cv2.LINE_AA)
+                #_3DVisLabLib.ImageViewer_Quick_no_resize(TempImage,0,False,False)
 
                 #Generating SN - no template SN to check against - so must create quantify read using confidences or another
                 #metric from the external OCR with an ideal target to match
@@ -801,16 +811,38 @@ class TestSNR_Fitness():
                     IdealScore_justSN=SN_ExpectedReads*max(GenParams.ForceFieldingLengths)*IdealConfidenceLevel
                     #get ideal score for delimiter - this should always be max unless image processing is really de-optimal
                     IdealScore_Delimiter=SN_ExpectedReads*len("DISPATCH")*IdealConfidenceLevel
-                    #total
-                    TotalIdealScore=IdealScore_justSN+IdealScore_Delimiter
+                    #total - multiply by how many images we have coming back
+                    TotalIdealScore=(IdealScore_justSN+IdealScore_Delimiter)#have made an error somewhere and can end up with total score >1
+                    #this isnt clever TODO 
+                    TotalIdealCharCount=TotalIdealScore/IdealConfidenceLevel
 
+                    #variables to build up score
                     TotalExternalSnrScore=0
+                    CharCount=0
+                    BuildString=[]
                     for ProcessedImage in ProcessedIMg_VS_CloudOCR:#roll through each image - this can be a column of many SNRs with delimiter
                         for CharVConfidence in ProcessedIMg_VS_CloudOCR[ProcessedImage][2]:#roll through dictionary which saves character versus read confidence
                             TotalExternalSnrScore=TotalExternalSnrScore+ProcessedIMg_VS_CloudOCR[ProcessedImage][2][CharVConfidence][1]#add to total score
-                
+                            CharCount=CharCount+1
+                            BuildString.append(ProcessedIMg_VS_CloudOCR[ProcessedImage][2][CharVConfidence][0])
                     #normalise score
+                    #TODO - need a penalty if we get too many characters!! Or score can go negative
+                    
+                    
+                    if CharCount>TotalIdealCharCount:#if detecting too many characters - need a penalty
+                        OverCount=CharCount-TotalIdealCharCount#get excess chars
+                        Penalty=IdealConfidenceLevel*OverCount#remove overcount chars
+                        Penalty=Penalty*2#Stricter penalty as could potentially get perfect score if subtracting excess
+                        TotalExternalSnrScore=TotalExternalSnrScore-Penalty
+                        print("overchar count - adding penalty, if this happens a lot check [force fielding] parameter matches SN length(s)")
+                        #print(BuildString)
+                    #make sure not below zero- can potentially happen, but if happens a lot is a logic error
+                    if TotalExternalSnrScore<0:
+                        print("Warning: TotalExternalSnrScore<0",TotalExternalSnrScore,"if frequent may be a logic error in [RunSNR_with_parameters]")
+                    TotalExternalSnrScore=max(TotalExternalSnrScore,0)
+
                     NormalisedScore=round(TotalExternalSnrScore/TotalIdealScore,7)
+                    #print("NormalisedScore",NormalisedScore)
                     return TempImage,NormalisedScore
 
                 #comparing template SN with external checked SN - roll through all SN reads

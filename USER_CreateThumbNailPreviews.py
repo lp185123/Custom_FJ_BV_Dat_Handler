@@ -1,4 +1,5 @@
 
+from logging import getLogger
 import cv2
 import numpy as np
 from pathlib import Path
@@ -10,16 +11,18 @@ import gc
 import ManyMuchS39
 gc.disable()
 
-def main(S39_only=False):
+def main(MacroParameters=False):
     
     #get parameters object will be loaded with user selection
     GetParametersFromUser=BV_DatReader_Lib.UserInputParameters()
-    if _3DVisLabLib.yesno("Delete output folder" + GetParametersFromUser.OutputFilePath):
-        _3DVisLabLib.DeleteFiles_RecreateFolder(GetParametersFromUser.OutputFilePath)
 
-    if S39_only==False:
+    if MacroParameters==False:
+        
+        if _3DVisLabLib.yesno("Delete output folder" + GetParametersFromUser.OutputFilePath):
+            _3DVisLabLib.DeleteFiles_RecreateFolder(GetParametersFromUser.OutputFilePath)
         GetParametersFromUser.UserPopulateParameters()
     else:
+        _3DVisLabLib.DeleteFiles_RecreateFolder(GetParametersFromUser.OutputFilePath)
         # #load parameter with S39 specific data
         # GetParametersFromUser.AutomaticMode=True
         # GetParametersFromUser.BlockTypeWave='None'
@@ -30,17 +33,17 @@ def main(S39_only=False):
         # GetParametersFromUser.InputFilePath=GetParametersFromUser.InputFilePath
         # GetParametersFromUser.OutputFilePath=GetParametersFromUser.OutputFilePath
 
-        
         #load parameter with S39 specific data
         GetParametersFromUser.AutomaticMode=True
+        GetParametersFromUser.GenerateS39orImageFromS39=True
         GetParametersFromUser.BlockTypeWave='C'
         GetParametersFromUser.BlockType_ImageFormat='SRU MM1 side image'
         GetParametersFromUser.FirstImageOnly=True
         GetParametersFromUser.GetRGBImage=True
         GetParametersFromUser.GetSNR=False
-        Result = input("Please enter folder for analysis:")
-        GetParametersFromUser.InputFilePath=Result
-        GetParametersFromUser.OutputFilePath=GetParametersFromUser.OutputFilePath
+        Result = input("Please enter folder for analysis, default is "+ str(GetParametersFromUser.InputFilePath))
+        if Result!="":
+            GetParametersFromUser.InputFilePath=Result
 
 
         

@@ -144,7 +144,11 @@ def TileImages_with_delimiterImage(DelimiterImage,ImgVsPath,ImageY,ImageX,Column
 
             # with open(OutputFolder +"\\" + str(Counter) + "" + ".json", 'w') as outfile:
             #     json.dump(SnrAnswersDict, outfile)
-            
+
+
+            #special function to not use delimiter
+            if ColumnSize==1:
+                OutputColumn=LoadImage
             ImgPath_VS_ImageAndAnswer[OutputFolder +"\\" + str(Counter) + ".jpg"]=(OutputFolder +"\\" + str(Counter) + "" + ".json",copy.deepcopy(SnrAnswersDict),OutputColumn.copy())
 
 

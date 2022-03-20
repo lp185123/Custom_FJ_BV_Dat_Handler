@@ -25,32 +25,35 @@ class GA_Parameters():
         #remember to check "Individual" class INIT for the image parameters and the parameter ranges!!
         #****************
 
-        self.No_of_First_gen=30#first generation are the randomly generated cycle, this usually gives the biggest gains, balance with 
+        self.No_of_First_gen=10#first generation are the randomly generated cycle, this usually gives the biggest gains, balance with 
         #time commitment, which depeneds on test image batch size
 
-        self.No_TopCandidates=10#how many genomes do we skim off the crop before cross breeding them
+        self.No_TopCandidates=8#how many are skimmed off the top after cross-breeding and fitness testing
+        #during cross breeding this number can become 4 times as large which will impact process time
+        #making this too low and using image subsets(see later) can make older surviving genomes get pushed out if a few sets of non-typical data
 
         self.NewIndividualsPerGen=1#add a random genome each generation- generally doesnt make much difference so is pot luck 
         #worth activating a couple for long running times as theoretically can help if stuck in local minima
 
-        self.TestImageBatchSize=20#how many images do we test per iteration. For best results use entire dataset, this is tested to work up
+        self.TestImageBatchSize=60#how many images do we test per iteration. For best results use entire dataset, this is tested to work up
         #to 400 images then after that you dont get enough generations to refine solution due to time per evaluation. If you can use entire dataset then
         #set NewImageCycle to 99999 as all it will do is reshuffle the images which isnt necessary
 
-        self.ImageColumnSize=20#how many images we send at a time to external OCR dont want to go more than 40 as performance breaks down
+        self.ImageColumnSize=30#how many images we send at a time to external OCR, don't go more than 40 as performance breaks down
 
-        self.NewImageCycle=4#how many iterations/generations of same image set before choosing another random subset of main images
+        self.NewImageCycle=9999#how many iterations/generations of same image set before choosing another random subset of main images. If you set this too low frequency for image switching it could overtrain to the subset
 
-        self.ImageTapOut=99#terminate anything that has poor performance out the box - with collimated tests this doesnt work effectively
+        self.ImageTapOut=99#terminate anything that has poor performance out the box - with collimated data this doesnt work effectively
 
-        self.GradientDescentCycle=10#loops before we start a gradient descent - this is generally not so critical for images
+        self.GradientDescentCycle=9999#loops before we start a gradient descent - this is generally not so critical for images
         # but if commiting to long process time anyway its worth putting it on, will enter grad descent then stop if no improvement
         
-        self.UseCloudOCR=True#always set to true - offline pytesseract is available but has not been updated and now may not work - but can be reactivated with some development
+        self.UseCloudOCR=True#always set to true - offline pytesseract is available but has not been updated and now may now be inoperable - but can be reactivated with some development
+        self.LanguageHints=None#not implemented yet but if using google cloud better results with language hint
 
-        self.MirrorImage=False#use if comparing SNRs (to cope with upside down s39 images), turn off if not comparing SNs, but only generating
+        self.MirrorImage=False#use if comparing SNRs (to cope with upside down s39 images), turn off if not comparing SNs only generating
 
-        self.ForceFieldingLengths=[8]#put in list of expected SN lengths - use this if the s39/images do not yet have SNR answers from the template
+        self.ForceFieldingLengths=[9]#put in list of expected SN lengths - use this if the s39/images do not yet have SNR answers from the template
         #set to None if the filenames generated are in the format  "file1[AB12345].jpg" whereby the SN can be found between [] in the filename
         #can also have multiple lengths =[5,7,8] if a particularly awkward SN task
         
@@ -70,6 +73,7 @@ class GA_Parameters():
         self.Generation=0
         self.BestPerformerTemp=None
         self.Fielding=None
+        self.ImageSendCount=0
 
         self.GetCollimatedTestSet_AndFielding(self.ImageColumnSize,self.TestImageBatchSize)
 
@@ -204,6 +208,8 @@ class GA_Parameters():
                 #application specific fitness check
                 fitness, Tapout,ReturnImg=ExternalCheckFitness_SNR(InputParameters,self.DictFilename_V_Images,SNR_fitnessTest,self.ImageTapOut,GenParams)
                 Error=1-fitness
+                #monitor external image sends (imagecolumnsize is image stack size, sent as a single image)
+                GenParams.ImageSendCount=GenParams.ImageSendCount+(len(self.DictFilename_V_Images)/GenParams.ImageColumnSize)
             except Exception as e:
                 print("error with checking fitness using parameters")
                 print(InputParameters)
@@ -235,17 +241,20 @@ class Individual():
         #user populate this area - each parameter has Upper, Lower, range,  test value and if integer
         self.UserInputParamsDict=dict()
         #self.UserInputParamsDict["PSM"]=self.ParameterDetails(3,3,[3,5,6,7,8,13],3,True)#tesseract psm is always 3 so can disable 
-        self.UserInputParamsDict["ResizeX"]=self.ParameterDetails(150,50,[],100,True)
-        self.UserInputParamsDict["ResizeY"]=self.ParameterDetails(150,50,[],100,True)#india x50 y156
         
-        self.UserInputParamsDict["AdapativeThreshold"]=self.ParameterDetails(1,0,[1,0],1,True)
-        self.UserInputParamsDict["MedianBlurDist"]=self.ParameterDetails(23,1,[1,3,5,7,9,11,13,15,17,19,21,23],3,True)
-        self.UserInputParamsDict["GausSize_Threshold"]=self.ParameterDetails(21,3,[3,5,7,9,11,13,15,17,19,21],15,True)
-        self.UserInputParamsDict["SubtractMean"]=self.ParameterDetails(20,3,[],7,True)
-        self.UserInputParamsDict["AlphaBlend"]=self.ParameterDetails(0,1,[],0.5,False)
+        
+        #with s39 images seems that Y needs resized - so dont bother resizing X
+        #self.UserInputParamsDict["ResizeX"]=self.ParameterDetails(100,100,[],100,True)
+        self.UserInputParamsDict["ResizeY"]=self.ParameterDetails(200,100,[],150,True)#india x50 y156
+        
+        #self.UserInputParamsDict["AdapativeThreshold"]=self.ParameterDetails(1,0,[1,0],1,True)#keep it always on
+        #self.UserInputParamsDict["MedianBlurDist"]=self.ParameterDetails(11,0,[0,1,3,5,7,9,11],3,True)#zero will turn it off while otherwise must have odd numbers for the filter
+        #self.UserInputParamsDict["GausSize_Threshold"]=self.ParameterDetails(9,3,[3,5,7,9],5,True)#must be 3 or greater or breaks
+        #self.UserInputParamsDict["SubtractMean"]=self.ParameterDetails(20,1,[],7,True)
+        #self.UserInputParamsDict["AlphaBlend"]=self.ParameterDetails(1,0,[],0.5,False)
         #self.UserInputParamsDict["Denoise"]=self.ParameterDetails(1,0,[0,1],1,True)
-        self.UserInputParamsDict["Negative"]=self.ParameterDetails(1,0,[0,1],1,True)
-        self.UserInputParamsDict["Equalise"]=self.ParameterDetails(1,0,[0,1],1,True)
+        #self.UserInputParamsDict["Negative"]=self.ParameterDetails(1,0,[0,1],0,True)
+        #self.UserInputParamsDict["Equalise"]=self.ParameterDetails(1,0,[0,1],1,True)
 
 
         #self.UserInputParamsDict["Canny"]=self.ParameterDetails(1,0,[],0,True)
@@ -254,7 +263,7 @@ class Individual():
         #self.UserInputParamsDict["CropPixels"]=self.ParameterDetails(0,0,[],2,True)
 
 
-
+        ##custom groupings if we want to stop genomes being split during cross-over (for instance if some work as a collection)
         # self.ParamGroupDict=dict()
         # self.ParamGroupDict["Resizer"]=("ResizeX","ResizeY")
         # self.ParamGroupDict["Cannies"]=("Canny","CannyThresh1","CannyThresh2")
@@ -787,7 +796,7 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
     print("name", InputGenDict[DictOfFitness[SortedFitness[0]]].name)
     print("Parameters", InputGenDict[DictOfFitness[SortedFitness[0]]].ApplicationSpecificMapping())
     #print("All fitness:", SortedFitness[:])
-
+    print("Estimated cost",round(GenParams.ImageSendCount*0.001,3),"$   (@March2022 prices 1$ per 1000 Vision OCR calls)")
     #save best performer - this is pretty lazy way to do this
     GenParams.BestPerformerTemp=copy.deepcopy(InputGenDict[DictOfFitness[SortedFitness[0]]])
     # if SortedFitness[0]<2:
@@ -805,7 +814,7 @@ def CheckFitness_Multi(InputGenDict,GenParams,SNR_fitnessTest):
     
     #save out best image #TODO make this formal rather than hard coded- pass in genparams object
     if InputGenDict[DictOfFitness[SortedFitness[0]]].LastImage is not None:
-        filepath=GenParams.OutputFolder + "\\" + (str(InputGenDict[DictOfFitness[SortedFitness[0]]].Fitness).replace(".","")) + ".jpg"
+        filepath=GenParams.OutputFolder + "\\ImgPreview_Gen0" + str(GenParams.Generation)  + ".jpg"
         cv2.imwrite(filepath,InputGenDict[DictOfFitness[SortedFitness[0]]].LastImage)
 
     #save out some plots
@@ -1143,8 +1152,9 @@ if __name__ == "__main__":
         CloudOCRObject=VisionAPI_Demo.CloudOCR()
    
     #load saved state into memory if it exists
-    filepath=GenParams.OutputFolder +"\\" + "SavedState" + ".obj"
+    filepath=GenParams.FilePath +"\\" + "SavedState" + ".obj"
     if os.path.isfile(filepath)==True:
+        print("Saved state.obj detected:",filepath)
         print("Previous state detected - load state? WARNING - if saved state generated by older version of script may cause error")
         #get input from user after previous state detected
         if _3DVisLabLib.yesno("load previous state?")==True:
@@ -1284,11 +1294,17 @@ if __name__ == "__main__":
             #cant pickle the cloud object
             SaveList=[GenParams,DictFitCandidates]
             #make sure we can save and load state
-            filepath=GenParams.OutputFolder +"\\" + "SavedState" + ".obj"
-            GenParams.NameOfSavedState=filepath
-            file_pi = open(filepath, 'wb') 
+            filepath_working=GenParams.OutputFolder +"\\" + "SavedState" + ".obj" 
+            filepath_local=GenParams.FilePath +"\\" + "SavedState" + ".obj"
+            GenParams.NameOfSavedState=filepath_local
+            #save local copy
+            file_pi = open(filepath_local, 'wb') 
             pickle.dump((SaveList), file_pi)
             file_pi.close()
+            #save working copy
+            file_working = open(filepath_working, 'wb') 
+            pickle.dump((SaveList), file_working)
+            file_working.close()
 
         #keep persistant generation aligned
         GenParams.Generation=GenParams.Generation+1

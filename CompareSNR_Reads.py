@@ -179,7 +179,8 @@ class CheckSN_Answers():
                 if MatchResult in CollimatedImageVsImageLink_dict.keys():
                     SingleResult_ColImgTrace=CollimatedImageVsImageLink_dict[MatchResult]
                 else:
-                    raise Exception("BuildReport, could not find MatchResult in CollimatedImageVsImageLink_dict - logic error")
+                    SingleResult_ColImgTrace=None
+                    #raise Exception("BuildReport, could not find MatchResult in CollimatedImageVsImageLink_dict - logic error")
 
             for IntIndexer, SingleResult in enumerate(MatchResults_dict[MatchResult][0]):
                 if SingleResult.Pass==True:
@@ -210,7 +211,10 @@ class CheckSN_Answers():
                                     shutil.copyfile(TraceObject.SourceExtractedImage, self.AnswersFolder + "\\" + ImageFileNameOnly)
                                 else:
                                     #warning - will be unicode so might have lots of strange characters - can sort this out in "clean up external snr" function
-                                    shutil.copyfile(TraceObject.SourceExtractedImage, self.AnswersFolder + "\\" + SingleResult.ExternalSNR +".jpg")
+                                    SavePath=self.AnswersFolder + "\\" + SingleResult.ExternalSNR + ".jpg"
+                                    if os.path.exists(SavePath):
+                                        print("WARNING: File Already Exists - will be overwritten",SavePath)
+                                    shutil.copyfile(TraceObject.SourceExtractedImage, SavePath)
                                     #if we have s39 files and we are training the snr for the first time (not checking results)
                                     #we can copy the s39 files and name them as the SN from the external OCR tool
                                     if TraceObject.SourceDat is not None:
@@ -323,10 +327,16 @@ class CheckSN_Answers():
             if ("[" in imgfilepath) and ("]" in imgfilepath):#bookends for embedded SNR#TODO warning magic letter!! make this a common variable or function
                 ListEmbeddedFormatSNR.append(imgfilepath)
                 OutputDictionary[imgfilepath]=[imgfilepath]
+            else:
+                OutputDictionary[imgfilepath]=[""]
 
         print(len(ListEmbeddedFormatSNR),"possible template SNR found embedded in images")
         if len(ListEmbeddedFormatSNR)==0:
-            raise Exception("no embedded SNR in images found (format = xx[SNR]xx", self.BaseSNR_Folder)
+            if self.NoTemplateSNR_CloudOCR_Only==False:
+                raise Exception("no embedded SNR in images found (format = xx[SNR]xx", self.BaseSNR_Folder)
+            else:
+                #images are not expected to have any SNR embedded in the files
+                pass
         #return non-collimated images = false with fielding found , and empty OutputDictionary_CollimatedImageLinks
         return(OutputDictionary,False,SNRTools.GenerateSN_Fielding(ListEmbeddedFormatSNR),OutputDictionary_CollimatedImageLinks)
 
