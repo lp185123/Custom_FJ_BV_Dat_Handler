@@ -3,6 +3,8 @@ import _3DVisLabLib
 import statistics
 import shutil
 import os
+import pickle
+
 
 MaxLength_of_SN=9
 DictOfFilterCats=dict()
@@ -20,6 +22,14 @@ FolderFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(BaseSNR_Folder)
 Files_s39=[]
 S39_and_image=dict()
 CharacterSet=dict()
+
+CharacAnalysis_database=None
+try:
+    with open(BaseSNR_Folder+"\\CharAnalysis.ca", 'rb') as pickle_file:
+        CharacAnalysis_database = pickle.load(pickle_file)
+except:
+    print("Could not load Character analysis database",BaseSNR_Folder+"\\CharAnalysis.ca")
+    print("this error can be ignored")
 
 
 for CheckExt in FolderFiles:

@@ -71,8 +71,8 @@ class CloudOCR():
 
                         for symbol in word.symbols:
                             #print('\tSymbol: {} (confidence: {})'.format(symbol.text, symbol.confidence))
-                            UnicodeCharVConfidence[SymbolCounter]=(symbol.text,symbol.confidence,symbol.bounding_box)
                             SymbolCounter=SymbolCounter+1
+                            UnicodeCharVConfidence[SymbolCounter]=(symbol.text,symbol.confidence,symbol.bounding_box,str(symbol.property.detected_languages))
                             UnicodeListSymbols.append(symbol.text)
 
         word_text = ''.join(UnicodeListSymbols)

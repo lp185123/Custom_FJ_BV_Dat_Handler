@@ -7,6 +7,7 @@ import re
 import random
 import os
 import json
+import pickle
 import shutil
 # Set environment variables
 os.environ["PYTHONUTF8"] = "on"
@@ -346,6 +347,15 @@ class CheckSN_Answers():
   
 
     def GetExternalOCR_Answers(self):
+        #first try and get character analysis file - this may not exist
+        CharacAnalysis_database=None
+        try:
+            with open(self.AnswersFolder+"\\CharAnalysis.ca", 'rb') as pickle_file:
+                CharacAnalysis_database = pickle.load(pickle_file)
+        except:
+            print("Could not load Character analysis database",self.AnswersFolder+"\\CharAnalysis.ca")
+            print("this error can be ignored")
+
         #answers folder from external OCR service should have same filename as 
         #input text with txt prefix
         InputFiles_ExternalOCR=_3DVisLabLib.GetAllFilesInFolder_Recursive(self.AnswersFolder)
@@ -366,14 +376,34 @@ class CheckSN_Answers():
                     lines = f.read()
                     DelimitedLines=lines.split("DISPATCH")#TODO make this common
                     Cleanedlines=[]
+
+                    AnalysisDB_Indexer=0#trace character positions if we have multiple lines of different lengths and delimiter text
                     #can get empty lines with delimiter
                     for Index, Singleline in enumerate(DelimitedLines):
                         #delimiter may give us an empty final line which can throw up an error for alignment
                         #and may also legimiately get empty lines back from external OCR
                         if (Index< len(DelimitedLines)-1) or (len(DelimitedLines)==1):
-                            CleanedLine=CleanUpExternalOCR(Singleline)
+                            CleanedLine=Singleline#CleanUpExternalOCR(Singleline)
                             Cleanedlines.append(CleanedLine)
                             CountSingleAnswers=CountSingleAnswers+1
+                        
+                            #at this point can filter characters according to metrics from external OCR
+                            #try and make this robust if we have manually modified file system
+                            if CharacAnalysis_database is not None:
+                                #check that file exists in database - even if it does its not a guarantee to be a match
+                                if OCRtext in CharacAnalysis_database:
+                                    for CHA_INDEX, Cha in enumerate(CleanedLine):
+                                        #[OCRtext] is the text file with external OCR [2] is the dictionary with index of char as key, with tuple containing info such as 
+                                        #language, bounding box, confidence, and character
+                                        CharAnalysisChar=CharacAnalysis_database[OCRtext][2][CHA_INDEX+AnalysisDB_Indexer+1][0]
+                                        Confidence=CharacAnalysis_database[OCRtext][2][CHA_INDEX+AnalysisDB_Indexer+1][1]
+                                        BoundingBox=CharacAnalysis_database[OCRtext][2][CHA_INDEX+AnalysisDB_Indexer+1][2]
+                                        Language=CharacAnalysis_database[OCRtext][2][CHA_INDEX+AnalysisDB_Indexer+1][3]
+                                        if Cha!=CharAnalysisChar:
+                                            print("error with getting char confidences- delete .ca file ")
+                                        else:
+                                            print(CharAnalysisChar,Confidence,Language)
+                        AnalysisDB_Indexer=AnalysisDB_Indexer+len(CleanedLine)+len("DISPATCH")
                     OutputDictionary[OCRtext]=Cleanedlines
             
             print(len(OutputDictionary),"answer files found")

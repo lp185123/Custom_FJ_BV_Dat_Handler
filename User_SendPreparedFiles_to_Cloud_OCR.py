@@ -1,6 +1,7 @@
 import VisionAPI_Demo
 import _3DVisLabLib
-
+import json
+import pickle
 
 #instancing class will initialise Cloud service and attempt to authenticate agent
 GoogleCloudOCR=VisionAPI_Demo.CloudOCR()
@@ -35,6 +36,7 @@ if len(ListAllImages)==0:
 
 #loop through images, get OCR read from cloud service and save file to output folder
 ListOCR_Reads=[]
+Dictionary_CharAnalysisDataBase=dict()
 for Index, Img_to_Ocr in enumerate(ListAllImages):
     print("File",str(Index),"/",str(len(ListAllImages)), "_Uploading to Cloud OCR",Img_to_Ocr)
     OCR_Result,CharsVConfidence=GoogleCloudOCR.PerformOCR(Img_to_Ocr,None)
@@ -46,3 +48,19 @@ for Index, Img_to_Ocr in enumerate(ListAllImages):
     print("Saving answer to",AnswerFile)
     with open(AnswerFile, 'w',encoding="utf-8") as f:#encoding="utf-8" for unicode which is handled as standard in python 3
         f.write(OCR_Result)
+    Dictionary_CharAnalysisDataBase[AnswerFile]=(Img_to_Ocr,OCR_Result,CharsVConfidence)
+
+
+
+
+
+#save out all data pertaining to analysis
+#currently this is character, confidence, bounding box, language
+OutputAnalysis=Result_Output +"\\CharAnalysis.ca"
+print("Saving complete analysis file to",OutputAnalysis)
+file_pi = open(OutputAnalysis, 'wb') 
+pickle.dump((Dictionary_CharAnalysisDataBase), file_pi)
+file_pi.close()
+
+#with open(OutputAnalysis, 'rb') as pickle_file:
+#    test = pickle.load(pickle_file)
