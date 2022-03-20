@@ -25,7 +25,7 @@ class GA_Parameters():
         #remember to check "Individual" class INIT for the image parameters and the parameter ranges!!
         #****************
 
-        self.No_of_First_gen=10#first generation are the randomly generated cycle, this usually gives the biggest gains, balance with 
+        self.No_of_First_gen=50#first generation are the randomly generated cycle, this usually gives the biggest gains, balance with 
         #time commitment, which depeneds on test image batch size
 
         self.No_TopCandidates=8#how many are skimmed off the top after cross-breeding and fitness testing
@@ -35,15 +35,15 @@ class GA_Parameters():
         self.NewIndividualsPerGen=1#add a random genome each generation- generally doesnt make much difference so is pot luck 
         #worth activating a couple for long running times as theoretically can help if stuck in local minima
 
-        self.TestImageBatchSize=60#how many images do we test per iteration. For best results use entire dataset, this is tested to work up
+        self.TestImageBatchSize=150#how many images do we test per iteration. For best results use entire dataset, this is tested to work up
         #to 400 images then after that you dont get enough generations to refine solution due to time per evaluation. If you can use entire dataset then
         #set NewImageCycle to 99999 as all it will do is reshuffle the images which isnt necessary
 
         self.ImageColumnSize=30#how many images we send at a time to external OCR, don't go more than 40 as performance breaks down
 
-        self.NewImageCycle=9999#how many iterations/generations of same image set before choosing another random subset of main images. If you set this too low frequency for image switching it could overtrain to the subset
+        self.NewImageCycle=3#how many iterations/generations of same image set before choosing another random subset of main images. If you set this too low frequency for image switching it could overtrain to the subset
 
-        self.ImageTapOut=99#terminate anything that has poor performance out the box - with collimated data this doesnt work effectively
+        self.ImageTapOut=1#terminate anything that has poor performance out the box - with collimated data this doesnt work effectively
 
         self.GradientDescentCycle=9999#loops before we start a gradient descent - this is generally not so critical for images
         # but if commiting to long process time anyway its worth putting it on, will enter grad descent then stop if no improvement
@@ -245,16 +245,16 @@ class Individual():
         
         #with s39 images seems that Y needs resized - so dont bother resizing X
         #self.UserInputParamsDict["ResizeX"]=self.ParameterDetails(100,100,[],100,True)
-        self.UserInputParamsDict["ResizeY"]=self.ParameterDetails(200,100,[],150,True)#india x50 y156
+        self.UserInputParamsDict["ResizeY"]=self.ParameterDetails(200,200,[],150,True)#india x50 y156
         
-        #self.UserInputParamsDict["AdapativeThreshold"]=self.ParameterDetails(1,0,[1,0],1,True)#keep it always on
-        #self.UserInputParamsDict["MedianBlurDist"]=self.ParameterDetails(11,0,[0,1,3,5,7,9,11],3,True)#zero will turn it off while otherwise must have odd numbers for the filter
-        #self.UserInputParamsDict["GausSize_Threshold"]=self.ParameterDetails(9,3,[3,5,7,9],5,True)#must be 3 or greater or breaks
-        #self.UserInputParamsDict["SubtractMean"]=self.ParameterDetails(20,1,[],7,True)
-        #self.UserInputParamsDict["AlphaBlend"]=self.ParameterDetails(1,0,[],0.5,False)
+        self.UserInputParamsDict["AdapativeThreshold"]=self.ParameterDetails(1,0,[1,0],1,True)#keep it always on
+        self.UserInputParamsDict["MedianBlurDist"]=self.ParameterDetails(11,0,[0,1,3,5,7,9,11],3,True)#zero will turn it off while otherwise must have odd numbers for the filter
+        self.UserInputParamsDict["GausSize_Threshold"]=self.ParameterDetails(9,3,[3,5,7,9],5,True)#must be 3 or greater or breaks
+        self.UserInputParamsDict["SubtractMean"]=self.ParameterDetails(20,1,[],7,True)
+        self.UserInputParamsDict["AlphaBlend"]=self.ParameterDetails(1,0,[],0.5,False)
         #self.UserInputParamsDict["Denoise"]=self.ParameterDetails(1,0,[0,1],1,True)
-        #self.UserInputParamsDict["Negative"]=self.ParameterDetails(1,0,[0,1],0,True)
-        #self.UserInputParamsDict["Equalise"]=self.ParameterDetails(1,0,[0,1],1,True)
+        self.UserInputParamsDict["Negative"]=self.ParameterDetails(1,0,[0,1],0,True)
+        self.UserInputParamsDict["Equalise"]=self.ParameterDetails(1,0,[0,1],1,True)
 
 
         #self.UserInputParamsDict["Canny"]=self.ParameterDetails(1,0,[],0,True)

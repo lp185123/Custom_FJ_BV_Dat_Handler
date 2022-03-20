@@ -24,7 +24,7 @@ PreProcessing=False
 #can force mirroring or it can be found in genparameters
 MirrorImage=False # turn this on if preprocessing is false
 #force stretching image in Y if its MM8 data (usually at squashed aspect ratio) - if preprocessing is on this will be overridden by preprocess parameters
-ForceYStretch=True
+ForceYStretch=2#set to None if not used
 
 
 

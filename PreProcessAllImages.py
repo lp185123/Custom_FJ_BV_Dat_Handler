@@ -45,7 +45,7 @@ def GetML_SavedState(InputPath=None,Processing=False):
 
 
 
-def ProcessImages(InputPath=None,OutputPath=None,Processing=False,MirrorImage=True,GenParams=None,ForceYStretch=False):#dont use if __name__ == "__main__" yet 
+def ProcessImages(InputPath=None,OutputPath=None,Processing=False,MirrorImage=True,GenParams=None,ForceYStretch=None):#dont use if __name__ == "__main__" yet 
     InputFolder=InputPath#r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
 
     #open json file which may exist from original .dat file extraction process TraceImg_to_DatRecord.json
