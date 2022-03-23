@@ -33,7 +33,8 @@ def CleanUpExternalOCR(InputOCR):
 class CheckSN_Answers():
     #if NoTemplateSNR_CloudOCR_Only is true, it will not attempt to compare template SNR and CLoud OCR (by failing gracefully)
     #if it is false, the system will compare template SNR and Cloud SNR
-    def __init__(self,NoTemplateSNR_CloudOCR_Only=False):
+    def __init__(self,NoTemplateSNR_CloudOCR_Only=False,Language=None,FilterConfidenceInput=0.1):
+        #Language gets filtered in "getexternalOCR", if for a character the language matches, the char will be filtered by the confidence and replace with "%"
         self.NoTemplateSNR_CloudOCR_Only=NoTemplateSNR_CloudOCR_Only
         self.BaseSNR_Folder = input("Please enter images folder: Default is C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput")
         if len(self.BaseSNR_Folder)==0:
@@ -49,6 +50,28 @@ class CheckSN_Answers():
         #self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\SNR_Answers_Single"
 
 
+
+        #delete old extracted s39 and jpgs if they exist - these can be regenerated so will not lose work
+        DeleteExistingItems=None
+        for Item in _3DVisLabLib.GetAllFilesInFolder_Recursive(self.AnswersFolder):
+            if ".s39" in Item.lower() or ".jpg" in Item.lower():
+                if DeleteExistingItems is None:
+                    if _3DVisLabLib.yesno("s39 and jpg files found in answers folders? Delete and regenerate?"):
+                        DeleteExistingItems=True
+                    else:
+                        DeleteExistingItems=False
+                if DeleteExistingItems==True:
+                    print("Deleting",Item)
+                    TryAgain=True
+                    while TryAgain and os.path.exists(Item):
+                        try:
+                            os.remove(Item)
+                        except:
+                            print("Error deleting",Item," :try again?")
+                            TryAgain=_3DVisLabLib.yesno("")
+
+
+
         self.Collimated=None#set boolean to single images or collimated images which handle answers differently
         self.SingleImages=None#set this boolean correctly after asserting if working on single or collimated images
         self.ImageVS_TemplateSNR_dict=None#each image (whether single or collimated) will have list of SNR
@@ -57,7 +80,7 @@ class CheckSN_Answers():
         #populate variables - CollimatedImageVsImageLink_dict is populated if using collimated images - and allows us to 
         #trace back to find original image used to create columns. THis is NONE if using single images with embedded SNR
         self.ImageVS_TemplateSNR_dict,self.Collimated,self.Fielding,self.CollimatedImageVsImageLink_dict=self.BuildTemplate_SNR_Info()#automatically create alpanumeric fielding for SNR
-        self.ImageVS_ExternalSNR_dict=self.GetExternalOCR_Answers()
+        self.ImageVS_ExternalSNR_dict=self.GetExternalOCR_Answers(InputLanguage=Language,FilterConfidence=FilterConfidenceInput)
         #make sure dictionaries align
         if self.CheckBoth_setsAnswers_align(self.ImageVS_TemplateSNR_dict,self.ImageVS_ExternalSNR_dict)==True:
             MatchResults_dict=self.Check_TemplateAndExternal_OCR(self.ImageVS_TemplateSNR_dict,self.ImageVS_ExternalSNR_dict)
@@ -212,16 +235,24 @@ class CheckSN_Answers():
                                     shutil.copyfile(TraceObject.SourceExtractedImage, self.AnswersFolder + "\\" + ImageFileNameOnly)
                                 else:
                                     #warning - will be unicode so might have lots of strange characters - can sort this out in "clean up external snr" function
-                                    SavePath=self.AnswersFolder + "\\" + SingleResult.ExternalSNR + ".jpg"
-                                    if os.path.exists(SavePath):
+                                    SavePath=self.AnswersFolder + "\\" + str(SingleResult.ExternalSNR) + ".jpg"
+                                    SavePath_UniqueID=1
+                                    while os.path.exists(SavePath):
+                                        #if file exists - start adding unique ID at end - but might already exist so continue in loop
                                         print("WARNING: File Already Exists - will be overwritten",SavePath)
-                                    shutil.copyfile(TraceObject.SourceExtractedImage, SavePath)
+                                        SavePath=self.AnswersFolder + "\\" + str(SingleResult.ExternalSNR)  + "[" + str(SavePath_UniqueID) + "]" + ".jpg"
+                                        SavePath_UniqueID=SavePath_UniqueID+1
+
+                                    #double check filename is valid
+                                    if SingleResult.ExternalSNR is not None:
+                                        if str(SingleResult.ExternalSNR) !="":
+                                            shutil.copyfile(TraceObject.SourceExtractedImage, SavePath)
                                     #if we have s39 files and we are training the snr for the first time (not checking results)
                                     #we can copy the s39 files and name them as the SN from the external OCR tool
                                     if TraceObject.SourceDat is not None:
                                         if ".s39" in TraceObject.SourceDat.lower():
                                             #TempString=self.AnswersFolder + "\\" + SingleResult.ExternalSNR + ".S39"
-                                            TempString=SingleResult.ExternalSNR#.replace("O","0")
+                                            TempString=str(SingleResult.ExternalSNR) #.replace("O","0")
                                             #print("TAKE OUT TEMP FIX FOR JOSH os to 0s")
                                             shutil.copyfile(TraceObject.SourceDat, self.AnswersFolder + "\\" +TempString + ".S39")
                             #otherwise use the single processed files
@@ -232,7 +263,7 @@ class CheckSN_Answers():
                                     shutil.copyfile(SingleResult_ColImgTrace[IntIndexer], self.AnswersFolder + "\\" + ImageFileNameOnly)
                                 else:
                                     #warning - will be unicode so might have lots of strange characters - can sort this out in "clean up external snr" function
-                                    shutil.copyfile(SingleResult_ColImgTrace[IntIndexer], self.AnswersFolder + "\\" + SingleResult.ExternalSNR +".jpg")
+                                    shutil.copyfile(SingleResult_ColImgTrace[IntIndexer], self.AnswersFolder + "\\" + str(SingleResult.ExternalSNR) +".jpg")
                         except Exception as e:
                             print("Error with image")
                             print(MatchResult)
@@ -250,7 +281,7 @@ class CheckSN_Answers():
                     buildhtml.append("<h3>" + "AutoFielding:" + str(SingleResult.ExpectedFielding) +  "</h2>")
                     buildhtml.append("<h3>" + "     Details:" + SingleResult.InfoString +  "</h2>")
                     buildhtml.append("<h3>" + "       Error:" + SingleResult.Error +  "</h2>")
-                    buildhtml.append("<h3>" + "Raw CloudOCR:" + SingleResult.ExternalSNR +  "</h2>")
+                    buildhtml.append("<h3>" + "Raw CloudOCR:" + str(SingleResult.ExternalSNR) +  "</h2>")
                     #if we have trace object - can get dat file and record number as well
                     if TraceObject is not None:
                         buildhtml.append("<h3>" + "Source Trace (warning:may be offset by 1 in viewer): " + str(TraceObject.SourceDat) + " record " + str(TraceObject.SourceDat_Record) +  "</h2>")
@@ -346,7 +377,7 @@ class CheckSN_Answers():
 
   
 
-    def GetExternalOCR_Answers(self):
+    def GetExternalOCR_Answers(self,InputLanguage=None,FilterConfidence=0.1):
         #first try and get character analysis file - this may not exist
         CharacAnalysis_database=None
         try:
@@ -362,6 +393,8 @@ class CheckSN_Answers():
         List_ExternalOCRTextFiles=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles_ExternalOCR,([".txt"]))#name of function misnomer
         #create dictionary of image key vs list of snr value(s) (even if single answer)
         OutputDictionary=dict()
+        CharacterDictionary=dict()
+        TotalCharAnalysis_Dict=dict()
         CountSingleAnswers=0
         print("Folder of SNR Answers - using folder (nested)",self.AnswersFolder)
         #if no text - nothing can proceed
@@ -369,6 +402,7 @@ class CheckSN_Answers():
             raise Exception("no images found in folder", self.BaseSNR_Folder)
 
         #if text files are in folders - may be collimated answers
+        FileCounter=0
         if len(List_ExternalOCRTextFiles)>0:# text files found
             for OCRtext in List_ExternalOCRTextFiles:
                 print("Reading",OCRtext)
@@ -376,10 +410,11 @@ class CheckSN_Answers():
                     lines = f.read()
                     DelimitedLines=lines.split("DISPATCH")#TODO make this common
                     Cleanedlines=[]
-
+                    FilteredLines=[]
                     AnalysisDB_Indexer=0#trace character positions if we have multiple lines of different lengths and delimiter text
                     #can get empty lines with delimiter
                     for Index, Singleline in enumerate(DelimitedLines):
+                        FileCounter=FileCounter+1
                         #delimiter may give us an empty final line which can throw up an error for alignment
                         #and may also legimiately get empty lines back from external OCR
                         if (Index< len(DelimitedLines)-1) or (len(DelimitedLines)==1):
@@ -387,11 +422,22 @@ class CheckSN_Answers():
                             Cleanedlines.append(CleanedLine)
                             CountSingleAnswers=CountSingleAnswers+1
                         
+
+
                             #at this point can filter characters according to metrics from external OCR
                             #try and make this robust if we have manually modified file system
                             if CharacAnalysis_database is not None:
                                 #check that file exists in database - even if it does its not a guarantee to be a match
                                 if OCRtext in CharacAnalysis_database:
+                                    FilteredLine=[]
+
+                                    #associated these items with a filename which can then be used as a look-up
+                                    Ext_Confidences=[]
+                                    Ext_Char=[]
+                                    Ext_Language=[]
+                                    Ext_BoundingBox=[]
+                                    Ext_AssociatedImage_KeyTex=[OCRtext]
+
                                     for CHA_INDEX, Cha in enumerate(CleanedLine):
                                         #[OCRtext] is the text file with external OCR [2] is the dictionary with index of char as key, with tuple containing info such as 
                                         #language, bounding box, confidence, and character
@@ -399,16 +445,79 @@ class CheckSN_Answers():
                                         Confidence=CharacAnalysis_database[OCRtext][2][CHA_INDEX+AnalysisDB_Indexer+1][1]
                                         BoundingBox=CharacAnalysis_database[OCRtext][2][CHA_INDEX+AnalysisDB_Indexer+1][2]
                                         Language=CharacAnalysis_database[OCRtext][2][CHA_INDEX+AnalysisDB_Indexer+1][3]
+
+                                        Ext_Char.append(CharAnalysisChar)
+                                        Ext_Confidences.append(Confidence)
+                                        Ext_Language.append(Language)
+                                        #have trouble persisting this with pickle or json so break it out manually
+                                        Ext_BoundingBox.append({"vertices[0].x":BoundingBox.vertices[0].x,
+                                        "vertices[0].y":BoundingBox.vertices[0].y,
+                                        "vertices[1].x":BoundingBox.vertices[1].x,
+                                        "vertices[1].y":BoundingBox.vertices[1].y,
+                                        "vertices[2].x":BoundingBox.vertices[2].x,
+                                        "vertices[2].y":BoundingBox.vertices[2].y,
+                                        "vertices[3].x":BoundingBox.vertices[3].x,
+                                        "vertices[3].y":BoundingBox.vertices[3].y})
+
+
                                         if Cha!=CharAnalysisChar:
                                             print("error with getting char confidences- delete .ca file ")
                                         else:
-                                            print(CharAnalysisChar,Confidence,Language)
+
+                                            if InputLanguage is not None:
+                                                if Confidence>FilterConfidence and InputLanguage in Language:
+                                                    #print("char",CharAnalysisChar,"pass confidence for language",InputLanguage,round(Confidence,3))
+                                                    FilteredLine.append(CharAnalysisChar)
+
+                                                    #if character does not exist - add it
+                                                    if CharAnalysisChar not in CharacterDictionary:
+                                                        CharacterDictionary[CharAnalysisChar]=0
+                                                    CharacterDictionary[CharAnalysisChar]=CharacterDictionary[CharAnalysisChar]+1
+
+                                                elif InputLanguage in Language:
+                                                    print("char",CharAnalysisChar,"filtered for confidence",InputLanguage,round(Confidence,3),round(FilterConfidence,3))
+                                                    FilteredLine.append("%")
+                                                else:
+                                                    print("Filtering out non-input language char",CharAnalysisChar)
+                                                    
+                                                    pass
+                                            else:
+                                                print("no filtering applied to char",InputLanguage,Confidence)
+                                                #if character does not exist - add it
+                                                if CharAnalysisChar not in CharacterDictionary:
+                                                    CharacterDictionary[CharAnalysisChar]=0
+                                                CharacterDictionary[CharAnalysisChar]=CharacterDictionary[CharAnalysisChar]+1
+                                                FilteredLine.append(CharAnalysisChar)
+                                    FilteredLine=''.join(FilteredLine)
+                                    #FilteredLines.append(FilteredLine)
+                                    FileTrackerName=str(FileCounter) +"_" + str(FilteredLine)
+                                    FilteredLines.append(FileTrackerName)
+                                    
+
+                                    #save into character analysis dictionary which holds all data needed to filter out in a subsequent stage
+                                    TotalCharAnalysis_Dict[FileTrackerName]={"CONFIDENCE":Ext_Confidences,
+                                    "CHARACTER":Ext_Char,"LANGUAGE":Ext_Language,"BOUNDINGBOX":Ext_BoundingBox,"TXTFILE_TO_FIND_IMAGE":Ext_AssociatedImage_KeyTex}
+                                    #if len(FilteredLine)!=len(CleanedLine):
+                                    #    print("len(FilteredLine)!=len(CleanedLine)")
+                                    #    raise Exception("problem with character analysis DB, delete .ca file to prevent code running")
+                        #need to get character index, which is complicated by length of delimiter
                         AnalysisDB_Indexer=AnalysisDB_Indexer+len(CleanedLine)+len("DISPATCH")
-                    OutputDictionary[OCRtext]=Cleanedlines
+
+                    #if there is a characvter analysis database - this will be the filtered line with question marks for low confidence chars
+                    if CharacAnalysis_database is  None:
+                        OutputDictionary[OCRtext]=Cleanedlines#Cleanedlines
+                    else:
+                        OutputDictionary[OCRtext]=FilteredLines#FilteredLines
             
             print(len(OutputDictionary),"answer files found")
             print(CountSingleAnswers,"External SNR answers found")
+        #save out character dictionary if it exists
+        if TotalCharAnalysis_Dict is not None:
+            _3DVisLabLib.JSON_Save(self.AnswersFolder +"\\FoundCharDic.fc",TotalCharAnalysis_Dict)
+
         return OutputDictionary
+
+    
                             
     def GetPath_WO_filename(self,InputDictionary):
         ExternalOCR_Filepath=random.choice(list(InputDictionary.keys()))

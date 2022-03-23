@@ -4,9 +4,13 @@ import statistics
 import shutil
 import os
 import pickle
-
+import random
 
 MaxLength_of_SN=9
+MinConfidence=0.8#from 0.0 to 1.0
+LanguageFilter='[language_code: "bn"\n]'
+RareChars_Unfiltered=5#we dont want to filter out rare characters - so save them in a seperate folder 
+
 DictOfFilterCats=dict()
 
 BaseSNR_Folder = input("Please enter images folder: Default is C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR")
@@ -14,10 +18,28 @@ if len(BaseSNR_Folder)==0:
     BaseSNR_Folder = r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR"
 
 OutputFolder=BaseSNR_Folder +"\\FilterOutput"
+BestMatches=BaseSNR_Folder +"\\FilterOutput\\Topmatches\\"
+BestCharMatchesOnly=BaseSNR_Folder +"\\FilterOutput\\BestCharMatchesOnly\\"
+RareCharactersNoFilter=BaseSNR_Folder +"\\FilterOutput\\RareCharactersNoFilter\\"
 print("Creating output folder",OutputFolder)
 _3DVisLabLib.DeleteFiles_RecreateFolder(OutputFolder)
-
+_3DVisLabLib.DeleteFiles_RecreateFolder(BestMatches)
+_3DVisLabLib.DeleteFiles_RecreateFolder(BestCharMatchesOnly)
+_3DVisLabLib.DeleteFiles_RecreateFolder(RareCharactersNoFilter)
 FolderFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(BaseSNR_Folder)
+
+#randomise files
+Randdict=dict()
+for item in FolderFiles:
+    Randdict[item]=item
+#rebuild files
+FolderFiles=[]
+while len(Randdict)>0:
+    Randomchoice=random.choice(list(Randdict))
+    FolderFiles.append(Randomchoice)
+    del Randdict[Randomchoice]
+
+
 
 Files_s39=[]
 S39_and_image=dict()
@@ -30,6 +52,16 @@ try:
 except:
     print("Could not load Character analysis database",BaseSNR_Folder+"\\CharAnalysis.ca")
     print("this error can be ignored")
+
+
+#load in character set - might be pre-filtered already so make sure you dont use unicode block area sigma filtering if it has - could cut off characters!
+CharacterDictionary=None
+try:
+    CharacterDictionary = _3DVisLabLib.JSON_Open(BaseSNR_Folder+"\\FoundCharDic.fc")
+except:
+    print("Could not load Character analysis database",BaseSNR_Folder+"\\FoundCharDic.fc")
+    print("this error can be ignored")
+
 
 
 for CheckExt in FolderFiles:
@@ -45,6 +77,82 @@ if len(Files_s39)==0:
     raise Exception("not handled yet")
 
 
+#roll through the dictionary which has the jpg/s39 filename sans extension as a key, then details of the OCR answer (unfiltered)
+
+#firstly create folder of perfect matches
+#BestMatches
+for trackname in CharacterDictionary:
+    TotalGoodChars=0
+    if len(CharacterDictionary[trackname]['CHARACTER'])==MaxLength_of_SN:
+    
+        for Indexer,Charac_confidence in enumerate(CharacterDictionary[trackname]['CONFIDENCE']):
+            if LanguageFilter in CharacterDictionary[trackname]['LANGUAGE'][Indexer]:
+                if Charac_confidence>=MinConfidence:
+                    TotalGoodChars=TotalGoodChars+1
+            if TotalGoodChars==MaxLength_of_SN:
+                #if files exist, copy to output folder
+                if os.path.exists(BaseSNR_Folder + "\\" + trackname + ".jpg"):
+                    shutil.copy(BaseSNR_Folder + "\\" + trackname + ".jpg",BestMatches+ "\\" + trackname + ".jpg")
+                #if files exist, copy to output folder
+                if os.path.exists(BaseSNR_Folder + "\\" + trackname + ".s39"):
+                    shutil.copy(BaseSNR_Folder + "\\" + trackname + ".s39",BestMatches+ "\\" + trackname + ".s39")
+
+
+
+#BestCharMatchesOnly
+for Index, trackname in enumerate(CharacterDictionary):
+    TotalGoodChars=0
+    if len(CharacterDictionary[trackname]['CHARACTER'])==MaxLength_of_SN:
+        for Indexer,Charac_confidence in enumerate(CharacterDictionary[trackname]['CONFIDENCE']):
+            if LanguageFilter in CharacterDictionary[trackname]['LANGUAGE'][Indexer]:
+                if Charac_confidence>=MinConfidence:
+                    TotalGoodChars=TotalGoodChars+1
+            
+            if TotalGoodChars==2:
+                #if files exist, copy to output folder
+                if os.path.exists(BaseSNR_Folder + "\\" + trackname + ".jpg"):
+                    shutil.copy(BaseSNR_Folder + "\\" + trackname + ".jpg",BestCharMatchesOnly+ "\\" + trackname + ".jpg")
+                #if files exist, copy to output folder
+                if os.path.exists(BaseSNR_Folder + "\\" + trackname + ".s39"):
+                    shutil.copy(BaseSNR_Folder + "\\" + trackname + ".s39",BestCharMatchesOnly+ "\\" + trackname + ".s39")
+            if Index==2:
+                continue
+
+
+
+
+#get frequency of characters
+DictCharCount=dict()
+for Index, trackname in enumerate(CharacterDictionary):
+    TotalGoodChars=0
+    #roll through each character
+    for Indexer,Charac_tocheck in enumerate(CharacterDictionary[trackname]['CHARACTER']):
+        #ensure correct language
+        if LanguageFilter in CharacterDictionary[trackname]['LANGUAGE'][Indexer]:
+            if Charac_tocheck not in DictCharCount:
+                DictCharCount[Charac_tocheck]=[]
+            DictCharCount[Charac_tocheck].append(trackname)
+
+#Restrict characters frequency so we can roll through (randomised) list of input files
+#and create limited examples of each
+RareChars_dict=()
+for Index, CharSymbol in enumerate(DictCharCount):
+    try:
+        if len(DictCharCount[CharSymbol])<=RareChars_Unfiltered:
+            print("rare unfiltered character",CharSymbol)
+            if os.path.exists(BaseSNR_Folder + "\\" + trackname + ".jpg"):
+                shutil.copy(BaseSNR_Folder + "\\" + trackname + ".jpg",RareCharactersNoFilter+ "\\" + trackname + ".jpg")
+            #if files exist, copy to output folder
+            if os.path.exists(BaseSNR_Folder + "\\" + trackname + ".s39"):
+                shutil.copy(BaseSNR_Folder + "\\" + trackname + ".s39",RareCharactersNoFilter+ "\\" + trackname + ".s39")
+    except:
+        print("bad symbol, skipping - cannot print in case causes further error")
+
+
+
+
+
+#first filter - find unicode 
 UnicodeList=[]
 SN_Length=[]
 for S39File in Files_s39:
