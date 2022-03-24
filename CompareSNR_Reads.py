@@ -490,7 +490,7 @@ class CheckSN_Answers():
                                                 FilteredLine.append(CharAnalysisChar)
                                     FilteredLine=''.join(FilteredLine)
                                     #FilteredLines.append(FilteredLine)
-                                    FileTrackerName=str(FileCounter) +"_" + str(FilteredLine)
+                                    FileTrackerName="[" + str(FileCounter) +"]" + str(FilteredLine)
                                     FilteredLines.append(FileTrackerName)
                                     
 

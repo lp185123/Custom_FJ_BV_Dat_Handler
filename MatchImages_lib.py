@@ -628,7 +628,7 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
     # else:
     #     ImageColour= cv2.resize(OriginalImage_col, (120, 120))
 
-    ImageColour= cv2.resize(OriginalImage_col, (120, 120))
+    ImageColour= cv2.resize(OriginalImage_col, (140, 140))
 
     #ImageGrayscale=Resize_toPixel_keepRatio(ImageInfo.ImageGrayscale[0], 120, 120)
 
@@ -671,7 +671,7 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
                 HistogramCentralis_mask = np.zeros((Img_colour.shape[0],Img_colour.shape[1],3), np.uint8)
                 #get radius
                 Diameter=min((HistogramCentralis_mask.shape[0]),(HistogramCentralis_mask.shape[1]))
-                Radius=int((Diameter/2)*0.50)#percentage of smallest dimension
+                Radius=int((Diameter/2)*0.90)#percentage of smallest dimension
                 cv2.circle(HistogramCentralis_mask,(int(HistogramCentralis_mask.shape[1]/2),int(HistogramCentralis_mask.shape[0]/2)), Radius, (255,255,255), -1)
                 HistogramCentralis_mask = cv2.cvtColor(HistogramCentralis_mask, cv2.COLOR_BGR2GRAY)
                 #_3DVisLabLib.ImageViewer_Quick_no_resize(grayImage,0,True,True)

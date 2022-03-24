@@ -6,10 +6,14 @@ import os
 import pickle
 import random
 
+#expect a folder with txt files containing ocr answers, and files which can trace the text files
+#back to images/s39 images and other jsons with data for each character read (confidence, language etc)
 MaxLength_of_SN=9
-MinConfidence=0.8#from 0.0 to 1.0
+MinConfidence=0.4#from 0.0 to 1.0
 LanguageFilter='[language_code: "bn"\n]'
 RareChars_Unfiltered=5#we dont want to filter out rare characters - so save them in a seperate folder 
+InstancesOfChar=10 # maximum instances of character to create a manageable subset for training
+
 
 DictOfFilterCats=dict()
 
@@ -21,11 +25,13 @@ OutputFolder=BaseSNR_Folder +"\\FilterOutput"
 BestMatches=BaseSNR_Folder +"\\FilterOutput\\Topmatches\\"
 BestCharMatchesOnly=BaseSNR_Folder +"\\FilterOutput\\BestCharMatchesOnly\\"
 RareCharactersNoFilter=BaseSNR_Folder +"\\FilterOutput\\RareCharactersNoFilter\\"
+TrainingSetFolder=BaseSNR_Folder +"\\FilterOutput\\TrainingSets\\" 
 print("Creating output folder",OutputFolder)
 _3DVisLabLib.DeleteFiles_RecreateFolder(OutputFolder)
 _3DVisLabLib.DeleteFiles_RecreateFolder(BestMatches)
 _3DVisLabLib.DeleteFiles_RecreateFolder(BestCharMatchesOnly)
 _3DVisLabLib.DeleteFiles_RecreateFolder(RareCharactersNoFilter)
+_3DVisLabLib.DeleteFiles_RecreateFolder(TrainingSetFolder)
 FolderFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(BaseSNR_Folder)
 
 #randomise files
@@ -63,6 +69,13 @@ except:
     print("this error can be ignored")
 
 
+#randomise char dictionary as well
+CharacterDictionary_rand=dict()
+while len(CharacterDictionary)>0:
+    RandomChoice_item=random.choice(list(CharacterDictionary))
+    CharacterDictionary_rand[RandomChoice_item]=CharacterDictionary[RandomChoice_item]
+    del CharacterDictionary[RandomChoice_item]
+CharacterDictionary=CharacterDictionary_rand
 
 for CheckExt in FolderFiles:
     try:
@@ -79,8 +92,11 @@ if len(Files_s39)==0:
 
 #roll through the dictionary which has the jpg/s39 filename sans extension as a key, then details of the OCR answer (unfiltered)
 
-#firstly create folder of perfect matches
-#BestMatches
+#firstly create folder of perfect matches - with mindset to use straight into the SNR tool
+#every char will have to be greater than the confidence - so a situation may arise whereby a low-confidence number 
+#(of which we have many examples) may result in filtering out a low-frequency alpha character - so use the second
+#segment of logic to keep all rare characters no matter what confidnece level is associated
+BestMatchAllChars_CharDictionary=dict()
 for trackname in CharacterDictionary:
     TotalGoodChars=0
     if len(CharacterDictionary[trackname]['CHARACTER'])==MaxLength_of_SN:
@@ -96,10 +112,16 @@ for trackname in CharacterDictionary:
                 #if files exist, copy to output folder
                 if os.path.exists(BaseSNR_Folder + "\\" + trackname + ".s39"):
                     shutil.copy(BaseSNR_Folder + "\\" + trackname + ".s39",BestMatches+ "\\" + trackname + ".s39")
+                #add all characters to the dictionary
+                for CharacToAdd in CharacterDictionary[trackname]['CHARACTER']:
+                    if not CharacToAdd in BestMatchAllChars_CharDictionary:
+                        BestMatchAllChars_CharDictionary[CharacToAdd]=[]
+                    BestMatchAllChars_CharDictionary[CharacToAdd].append(trackname)
 
 
 
-#BestCharMatchesOnly
+#BestCharMatchesOnly - so we dont filter out characters for more frequent numerals
+BestCharactersOnly_CharDictionary=dict()
 for Index, trackname in enumerate(CharacterDictionary):
     TotalGoodChars=0
     if len(CharacterDictionary[trackname]['CHARACTER'])==MaxLength_of_SN:
@@ -115,42 +137,112 @@ for Index, trackname in enumerate(CharacterDictionary):
                 #if files exist, copy to output folder
                 if os.path.exists(BaseSNR_Folder + "\\" + trackname + ".s39"):
                     shutil.copy(BaseSNR_Folder + "\\" + trackname + ".s39",BestCharMatchesOnly+ "\\" + trackname + ".s39")
+                #add all characters to the dictionary
+                for CharacToAdd in CharacterDictionary[trackname]['CHARACTER']:
+                    if not CharacToAdd in BestCharactersOnly_CharDictionary:
+                        BestCharactersOnly_CharDictionary[CharacToAdd]=[]
+                    BestCharactersOnly_CharDictionary[CharacToAdd].append(trackname)
+
+            
             if Index==2:
                 continue
 
+    
 
 
 
-#get frequency of characters
-DictCharCount=dict()
+
+#get frequency of all characters
+DictCharCount_Unfiltered=dict()
 for Index, trackname in enumerate(CharacterDictionary):
     TotalGoodChars=0
     #roll through each character
     for Indexer,Charac_tocheck in enumerate(CharacterDictionary[trackname]['CHARACTER']):
         #ensure correct language
         if LanguageFilter in CharacterDictionary[trackname]['LANGUAGE'][Indexer]:
-            if Charac_tocheck not in DictCharCount:
-                DictCharCount[Charac_tocheck]=[]
-            DictCharCount[Charac_tocheck].append(trackname)
+            if Charac_tocheck not in DictCharCount_Unfiltered:
+                DictCharCount_Unfiltered[Charac_tocheck]=[]
+            DictCharCount_Unfiltered[Charac_tocheck].append(trackname)
 
 #Restrict characters frequency so we can roll through (randomised) list of input files
 #and create limited examples of each
-RareChars_dict=()
-for Index, CharSymbol in enumerate(DictCharCount):
+RareChars_dict=dict()
+for Index, CharSymbol in enumerate(DictCharCount_Unfiltered):
     try:
-        if len(DictCharCount[CharSymbol])<=RareChars_Unfiltered:
+        if len(DictCharCount_Unfiltered[CharSymbol])<=RareChars_Unfiltered:
             print("rare unfiltered character",CharSymbol)
-            if os.path.exists(BaseSNR_Folder + "\\" + trackname + ".jpg"):
-                shutil.copy(BaseSNR_Folder + "\\" + trackname + ".jpg",RareCharactersNoFilter+ "\\" + trackname + ".jpg")
-            #if files exist, copy to output folder
-            if os.path.exists(BaseSNR_Folder + "\\" + trackname + ".s39"):
-                shutil.copy(BaseSNR_Folder + "\\" + trackname + ".s39",RareCharactersNoFilter+ "\\" + trackname + ".s39")
+            CharacterFolder=RareCharactersNoFilter  + str(len(DictCharCount_Unfiltered[CharSymbol])) + "___"+ str(CharSymbol)
+            _3DVisLabLib.DeleteFiles_RecreateFolder(CharacterFolder)
+            for RandomCHoiceFilename in DictCharCount_Unfiltered[CharSymbol]:
+                if os.path.exists(BaseSNR_Folder + "\\" + RandomCHoiceFilename + ".jpg"):
+                    shutil.copy(BaseSNR_Folder + "\\" + RandomCHoiceFilename + ".jpg",CharacterFolder+ "\\" + RandomCHoiceFilename + ".jpg")
+                #if files exist, copy to output folder
+                if os.path.exists(BaseSNR_Folder + "\\" + RandomCHoiceFilename + ".s39"):
+                    shutil.copy(BaseSNR_Folder + "\\" + RandomCHoiceFilename + ".s39",CharacterFolder+ "\\" + RandomCHoiceFilename + ".s39")
+                #add all characters to the dictionary
+                if not CharSymbol in RareChars_dict:
+                    RareChars_dict[CharSymbol]=[]
+                RareChars_dict[CharSymbol].append(trackname)
+
+
     except:
         print("bad symbol, skipping - cannot print in case causes further error")
 
 
 
+#we want to create a manageable training set
+#run through the character set found for every read (without filtering)
+#then create folders for each character using a combination of the other dictionaryies
+#be mindful of accidently missing characters - for example, a symbol mayb be very frequent but low-confidence
+#so we might add rare characters, add filtered characters - then miss the low confidence ones as they will fall through
+#the cracks
+CharForTraining_Dict=dict()
+for CharForTraining in DictCharCount_Unfiltered:
+    if CharForTraining in CharForTraining_Dict: raise Exception("TrainSNRFilter Logic error, should not be able to add char twice")
+    CharForTraining_Dict[CharForTraining]={"PROVENANCE": [],"FILE":[]}#create empty list to populate with files associated with this character
+    if CharForTraining in BestMatchAllChars_CharDictionary:
+        for FileName in BestMatchAllChars_CharDictionary[CharForTraining]:
+            CharForTraining_Dict[CharForTraining]["FILE"].append(FileName)
+            CharForTraining_Dict[CharForTraining]["PROVENANCE"].append("3")#Arbitrary rating, higher is better
+            #if we have enough insgtances of the character we can move to next
+            if len(CharForTraining_Dict[CharForTraining])==InstancesOfChar:
+                continue
+        #if we still don't have enough instances of character - the next best place is the dictionary
+        #that only tests confidence for the alpha characters - so in this case we could have some noise
+    if CharForTraining in BestCharactersOnly_CharDictionary:
+        for FileName in BestCharactersOnly_CharDictionary[CharForTraining]:
+            CharForTraining_Dict[CharForTraining]["FILE"].append(FileName)
+            CharForTraining_Dict[CharForTraining]["PROVENANCE"].append("2")#Arbitrary rating, higher is better
+            #if we have enough insgtances of the character we can move to next
+            if len(CharForTraining_Dict[CharForTraining])==InstancesOfChar:
+                continue
+    
+    if CharForTraining in RareChars_dict:
+        for FileName in RareChars_dict[CharForTraining]:
+            CharForTraining_Dict[CharForTraining]["FILE"].append(FileName)
+            CharForTraining_Dict[CharForTraining]["PROVENANCE"].append("1")#Arbitrary rating, higher is better
+            #if we have enough insgtances of the character we can move to next
+            if len(CharForTraining_Dict[CharForTraining])==InstancesOfChar:
+                continue
 
+    #worst case scenario - have to take characters from the unfiltered set
+    if CharForTraining in DictCharCount_Unfiltered:
+        for FileName in DictCharCount_Unfiltered[CharForTraining]:
+            CharForTraining_Dict[CharForTraining]["FILE"].append(FileName)
+            CharForTraining_Dict[CharForTraining]["PROVENANCE"].append("0")#Arbitrary rating, higher is better
+            #if we have enough insgtances of the character we can move to next
+            if len(CharForTraining_Dict[CharForTraining])==InstancesOfChar:
+                continue
+    
+
+
+
+        
+
+#create training sets now for each character, and anther folder with everything by
+#rolling through the dictionary with the best examples we have 
+
+okokok
 
 #first filter - find unicode 
 UnicodeList=[]
