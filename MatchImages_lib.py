@@ -76,7 +76,8 @@ def GetFFT_OfImage(InputGraySCaleImg,CropPercent_100,Blur):
     
     if Blur==True:
         #a lot of noise - lets see if we can remove noise
-        kernel = np.ones((3,3),np.float32)/25#kernel size for smoothing - maybe make smoother as such small images
+        KernelSize=3
+        kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing - maybe make smoother as such small images
         dst = cv2.filter2D(FFT_magnitude_spectrum,-1,kernel)
         FFT_magnitude_spectrum_visualise=cv2.convertScaleAbs(dst)
     
@@ -628,15 +629,16 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
     # else:
     #     ImageColour= cv2.resize(OriginalImage_col, (120, 120))
 
-    ImageColour= cv2.resize(OriginalImage_col, (140, 140))
+    ImageColour= cv2.resize(OriginalImage_col, (160, 160))
 
     #ImageGrayscale=Resize_toPixel_keepRatio(ImageInfo.ImageGrayscale[0], 120, 120)
 
-    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,100,90,3,False)
-    kernel = np.ones((5,5),np.float32)/25#kernel size for smoothing
+    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,120,95,6,False)
+    KernelSize=5
+    kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing
 
     
-
+    #_3DVisLabLib.ImageViewer_Quick_no_resize(Canvas,0,True,True)
 
     #HISTOGRAM OF ORIENTATED GRADIENTS FEATURE MATCH
     if "HM_data_HOG_Dist" in Metrics_dict:
@@ -663,7 +665,7 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
     for Img_colour in List_CroppingImg:
         #get grayscale
         Img_grayscale=cv2.cvtColor(Img_colour, cv2.COLOR_BGR2GRAY)
-        
+        #_3DVisLabLib.ImageViewer_Quick_no_resize(Img_colour,0,True,True)
         if "HM_data_HistogramCentralis" in Metrics_dict:
             #create a masked histogram with just central position
             global HistogramCentralis_mask
@@ -671,7 +673,7 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
                 HistogramCentralis_mask = np.zeros((Img_colour.shape[0],Img_colour.shape[1],3), np.uint8)
                 #get radius
                 Diameter=min((HistogramCentralis_mask.shape[0]),(HistogramCentralis_mask.shape[1]))
-                Radius=int((Diameter/2)*0.90)#percentage of smallest dimension
+                Radius=int((Diameter/2)*1.0)#percentage of smallest dimension (1=100%)
                 cv2.circle(HistogramCentralis_mask,(int(HistogramCentralis_mask.shape[1]/2),int(HistogramCentralis_mask.shape[0]/2)), Radius, (255,255,255), -1)
                 HistogramCentralis_mask = cv2.cvtColor(HistogramCentralis_mask, cv2.COLOR_BGR2GRAY)
                 #_3DVisLabLib.ImageViewer_Quick_no_resize(grayImage,0,True,True)
@@ -697,7 +699,8 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
         #get small image to experiment with macro structure matching
             
             MacroStructure_img = cv2.resize(Img_colour, (19, 19))
-            kernel = np.ones((3,3),np.float32)/25#kernel size for smoothing
+            KernelSize=3
+            kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing
             MacroStructure_img = cv2.filter2D(MacroStructure_img,-1,kernel)
             #MacroStructure_img=MacroStructure_img/np.sqrt(np.sum(MacroStructure_img**2))
             ImageInfo.Metrics_functions["HM_data_MacroStructure"].append(MacroStructure_img)
@@ -709,12 +712,12 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
                HistogramStripulus_Centralis = np.zeros((Img_colour.shape[0],Img_colour.shape[1],3), np.uint8)
                #get radius
                Diameter=min((HistogramCentralis_mask.shape[0]),(HistogramCentralis_mask.shape[1]))
-               Radius=int((Diameter/2)*1)#percentage of smallest dimension
+               Radius=int((Diameter/2)*1)#percentage of smallest dimension (1=100%)
                cv2.circle(HistogramStripulus_Centralis,(int(HistogramStripulus_Centralis.shape[1]/2),int(HistogramStripulus_Centralis.shape[0]/2)), Radius, (255,255,255), -1)
                HistogramStripulus_Centralis = cv2.cvtColor(HistogramStripulus_Centralis, cv2.COLOR_BGR2GRAY)
             #MacroStructure_img = cv2.resize(Img_colour, (25, 25))
             HistoStripes = cv2.filter2D(Img_colour,-1,kernel)
-            HistoStripes=Histogram_Stripes(HistoStripes,8,8,HistogramStripulus_Centralis)
+            HistoStripes=Histogram_Stripes(HistoStripes,15,8,None)
             ImageInfo.Metrics_functions["HM_data_HistogramStriping"].append(HistoStripes)
 
         #POWER SPECTRAL DENSITY
@@ -917,7 +920,8 @@ def PrepareImageMetrics_NotesSide(PrepareMatchImages,ImagePath,Index,ImageReview
     FFT_magnitude_spectrum=FFT_magnitude_spectrum[BufferX:-BufferX,BufferY:-BufferY]
     
     #a lot of noise - lets see if we can remove noise
-    kernel = np.ones((5,5),np.float32)/25#kernel size for smoothing - maybe make smoother as such small images
+    KernelSize=5
+    kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing - maybe make smoother as such small images
     dst = cv2.filter2D(FFT_magnitude_spectrum,-1,kernel)
     FFT_magnitude_spectrum_visualise=cv2.convertScaleAbs(dst)
     if Index<3: ImageReviewDict["FFT_magnitude_spectrum_visualise"]=FFT_magnitude_spectrum_visualise
@@ -1077,14 +1081,49 @@ def CreateCropInMatrixOfImage(Image,StartCropPc_100pc,EndCropPC_100pc,steps,Pola
 
     if len(Image.shape)!=3:
         raise Exception("CreateCropInMatrixOfImage, please use colour image as input, or convert to 3 channels")
+
+    if StartCropPc_100pc>400:raise Exception("Currently cannot support CreateCropInMatrixOfImage of greater than 200%")
+    if EndCropPC_100pc>100:raise Exception("Currently cannot support CreateCropInMatrixOfImage of greater than 100%")
+
+
     StartCropPc=StartCropPc_100pc/100
     EndCropPC=EndCropPC_100pc/100
+
+
+    
+    
+    #if we are cropping out(zoom out) - have to create a start image with bigger canvas and fill in the pixels somehow
+    #  
+    if StartCropPc_100pc>100:
+        #create bigger canvas
+        #create random colour noise canvas so we dont blow out the histogram - TODO probably better sending back a mask
+        RandomNoiseImg=np.random.randint(255, size=(int(StartCropPc*Image.shape[0]), int(StartCropPc*Image.shape[1]),3),dtype="uint8")
+        KernelSize=3
+        kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing - maybe make smoother as such small images
+        RandomNoiseImg=cv2.filter2D(RandomNoiseImg,-1,kernel)#blur it
+        #now place the original image in the middle of this random pixel colour field
+        OffsetX=int((RandomNoiseImg.shape[0]-Image.shape[0])/2)#how far off from the left
+        OffsetY=int((RandomNoiseImg.shape[1]-Image.shape[1])/2)#how far off from the top
+        #now drop the input image into the center of the larger image
+        RandomNoiseImg[OffsetX:Image.shape[0]+OffsetX,OffsetY:Image.shape[1]+OffsetY,:]=Image[:,:,:]
+        #redefine input image to be bigger canvas
+        #RandomNoiseImg=cv2.resize(RandomNoiseImg,(Image.shape[1],Image.shape[0]))
+        OperationalImage=RandomNoiseImg
+        #set the start crop size at 100 % - this is a pretty shonky way to do this - not truly dynamic
+        StartCropPc_100pc=100
+        StartCropPc=1.0
+        #_3DVisLabLib.ImageViewer_Quick_no_resize(OperationalImage,0,True,True)
+    else:
+        OperationalImage=Image
+
+
+
     #for each crop, resize it back to original input image dimensions
     #create canvas - stretch it horizontally - matrix maybe isnt necessary
     Canvas=cv2.resize(Image,(Image.shape[1]*steps,Image.shape[0]))
     #_3DVisLabLib.ImageViewer_Quick_no_resize(Canvas,0,True,True)
-    StepsX=np.linspace(StartCropPc*Image.shape[1],EndCropPC*Image.shape[1],steps)
-    StepsY=np.linspace(StartCropPc*Image.shape[0],EndCropPC*Image.shape[0],steps)
+    StepsX=np.linspace(StartCropPc*OperationalImage.shape[1],EndCropPC*Image.shape[1],steps)
+    StepsY=np.linspace(StartCropPc*OperationalImage.shape[0],EndCropPC*Image.shape[0],steps)
     StepsX = [int(x) for x in StepsX]
     StepsY = [int(x) for x in StepsY]
 
@@ -1092,22 +1131,36 @@ def CreateCropInMatrixOfImage(Image,StartCropPc_100pc,EndCropPC_100pc,steps,Pola
     SideOffsetX=[]
     SideOffsetY=[]
     for StepIndex,StepACtion in enumerate(StepsX):
-        SideOffsetX.append((Image.shape[1]-StepsX[StepIndex]))
-        SideOffsetY.append((Image.shape[0]-StepsY[StepIndex]))
+        SideOffsetX.append((OperationalImage.shape[1]-StepsX[StepIndex]))
+        SideOffsetY.append((OperationalImage.shape[0]-StepsY[StepIndex]))
 
     #convert to ints
     SideOffsetX = [int(x) for x in SideOffsetX]
     SideOffsetY = [int(x) for x in SideOffsetY]
     
+
+
+    #for quilted image use original image size
     List_CroppingImg=[]
     for stepaction in range(0,steps):
         Xposition_start=stepaction*Image.shape[1]#position horizontally
         Xposition_end=(stepaction+1)*Image.shape[1]
+
+       
         #crop into input image
-        CroppedImage=Image[SideOffsetY[stepaction]:StepsY[stepaction],SideOffsetX[stepaction]:StepsX[stepaction],:]
+        CroppedImage=OperationalImage[SideOffsetY[stepaction]:StepsY[stepaction],SideOffsetX[stepaction]:StepsX[stepaction],:]
+        
+        #make sure not too cropped
+        if CroppedImage.shape[0]==0 or CroppedImage.shape[1]==0:
+            print("Warning:CreateCropInMatrixOfImage  overcrop, image is null, please check parameters. Using dummy data")
+            #use dummy data
+            List_CroppingImg.append(Image)
+            continue
+        #_3DVisLabLib.ImageViewer_Quick_no_resize(CroppedImage,0,True,True)
         if PolarWrapMode==True:
              CroppedImage=GetPhaseCorrelationReadyImage(CroppedImage)
         #_3DVisLabLib.ImageViewer_Quick_no_resize(CroppedImage,0,True,True)
+        #resize back to original input shape
         CroppedImage_resize=cv2.resize(CroppedImage,(Image.shape[1],Image.shape[0]))
         List_CroppingImg.append(CroppedImage_resize)
         if PolarWrapMode==False:
