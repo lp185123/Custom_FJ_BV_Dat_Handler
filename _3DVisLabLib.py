@@ -1403,8 +1403,8 @@ def DelFiles_inFolder(Folderpath):#v1
 
 def Deltree(Folderpath):
       # check if folder exists
-    if len(Folderpath)<10:
-        raise("Input:" + str(Folderpath))
+    if len(Folderpath)<6:
+        raise("Input:" + str(Folderpath),"too short - danger")
         raise ValueError("Deltree error - path too short warning might be root!")
         return
     if os.path.exists(Folderpath):

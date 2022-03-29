@@ -56,15 +56,15 @@ class MatchImagesObject():
         #self.InputFolder=r"C:\Working\TempImages\Furniture"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
-        self.InputFolder=r"E:\NCR\TestImages\Randos"
+        #self.InputFolder=r"E:\NCR\TestImages\Randos"
         #self.InputFolder=r"C:\Working\TempImages\butterflys"
-        #self.InputFolder=r"E:\NCR\Currencies\Bangladesh_SR2800\Bangladesh\SR DC\MM8\05_1000(2020)"
+        self.InputFolder=r"X:\Output"
         #self.InputFolder=r"C:\Working\TempImages\Food\images"
         ##################################################
         ##set subset of data - will select random images
         ##if cross checking for similarity will be in O^ (n/2) time complexity
         ##################################################
-        self.SubSetOfData = int(200)  # subset of data
+        self.SubSetOfData = int(7000)  # subset of data
         ################################################################
         ##select what function will be used, which will load image,crop,resize
         ##etc for all analytical procesess
@@ -79,33 +79,35 @@ class MatchImagesObject():
         ######################################################################
         # what metrics to use
         self.Use__FeatureMatch = False  # match detailed areas of image - quite slow
-        self.Use__histogram = True  # match how close the image colour distribution is - structure does not matter
+        self.Use__histogram = False  # match how close the image colour distribution is - structure does not matter
         self.Use__FourierDifference = True  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
         self.Use__PhaseCorrelation = True  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
         #in theory can convert for instance fourier magnitude image, polar unwrap it and check using phase correlation - but has to be proven
         self.Use__HOG_featureMatch = False  # dense feature match - good for small images - very effective for mm side
         self.Use__EigenVectorDotProd = False  #SQUARE IMAGE ONLY how close are principle components orientated- doesnt seem to work correctly yet - MUST BE SQUARE!
         self.Use__EigenValueDifference = False  #SQUARE IMAGE ONLY how close are principle component lengths for COLOUR - works pretty well - still needs a look at in how to package up matrix, and if using non -square do we use SVD instead?
-        self.Use__FourierPowerDensity = True  # histogram of frequencies found in image - works very well
+        self.Use__FourierPowerDensity = False  # histogram of frequencies found in image - works very well
         self.Use__MacroStructure=True#very small image to compare macrostructure - experimental
         self.Use__StructuralPCA_dotProd=False#Principle component analysis on binarised image - a geometrical PCA
         self.Use__StructuralPCA_VectorValue = False  # for STRUCTURE Principle component analysis on binarised image - a geometrical PCA
         self.Use__TemplateMatching = False # match templates by sliding one over the other - can be different sizes so bear that in mind
-        self.Use__HistogramStriping = True#to handle images with aspect ratio changes or scaling, uses a spherical mask
-        self.Use__HistogramCentralis = True#create a histogram mask so just look at centre of image - not good for images with translation problem but may be effective for general image matching
+        self.Use__HistogramStriping = True#to handle images with aspect ratio changes or scaling, can use a spherical mask
+        self.Use__HistogramCentralis = False#create a histogram mask so just look at centre of image - not good for images with translation problem but may be effective for general image matching
         #self.Use__QuiltScan==True
         ######################################################
         ##set multi process behaviour - can force no threading if memory issues are encountered (imgs > 3000)
         #######################################################
         # set this to "1" to force inline processing, otherwise to limit cores set to the cores you wish to use then add one (as system will remove one for safety regardless)
         self.MemoryError_ReduceLoad = (True,11)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
+        #sometimes establishing a new worker fork can spike memory usage 200+% which can cause unexpected memory errors
+
         self.BeastMode = False  # Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
-        # self.OutputImageOrganisation=self.ProcessTerms.Sequential.value
+
         self.HyperThreading = True  # Experimental - hyperthreads are virtual cores so may not work for metrics like Feature Matching (except HOG)
         #but its not possible to predict how windows will distribute processes to which cores
 
         #***This option very slow still under development***#currently 150 images vs 12 input match takes 4min with on-fly but 12 seconds pre processed
-        self.ProcessImagesOnFly=False#currently only works with MULTIPLE IMAGE function - if using a large amount of images
+        self.ProcessImagesOnFly=True#currently only works with MULTIPLE IMAGE function - if using a large amount of images
         #setting this to true will not load image processing details into memory but process on the fly, this
         #is much slower and much less efficient but is currently only solution to large datasets. Parallel processing may
         #mitigate some slowness- TIPS - move data onto internal harddrive if faster, or even ramdrive even if that sounds circular

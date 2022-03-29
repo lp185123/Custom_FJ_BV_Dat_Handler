@@ -1,19 +1,17 @@
 
-import shutil
+
 import cv2
 import numpy as np
 import time
 import copy
 from pathlib import Path
-#sys.path.append('H:/CURRENT/PythonStuff/CUSTOM/')
 import _3DVisLabLib
-from copy import deepcopy
-from collections import namedtuple
+#from copy import deepcopy
+#from collections import namedtuple
 import enum
 import DatScraper_tool
 import json
 import ManyMuchS39
-import os
 
 class OperationCodes(enum.Enum):
     ERROR="error"

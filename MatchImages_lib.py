@@ -618,7 +618,7 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
     #even if just one image its still in list format to keep logic common
     #ImageColour = Resize_toPixel_keepRatio(OriginalImage_col, 120, 120)
     #NOTES
-    #ImageColour=_Crop_Pixels(OriginalImage_col,(0,63),(0,130))#Y range then X range
+    ImageColour=_Crop_Pixels(OriginalImage_col,(0,63),(0,130))#Y range then X range
     #FACES
     #ImageColour=_Crop_Pixels(OriginalImage_col,(35,190),(25,160))##Y range then X range
 
@@ -629,11 +629,11 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
     # else:
     #     ImageColour= cv2.resize(OriginalImage_col, (120, 120))
 
-    ImageColour= cv2.resize(OriginalImage_col, (160, 160))
+    #ImageColour= cv2.resize(OriginalImage_col, (160, 160))
 
     #ImageGrayscale=Resize_toPixel_keepRatio(ImageInfo.ImageGrayscale[0], 120, 120)
 
-    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,120,95,6,False)
+    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,120,95,0,False)
     KernelSize=5
     kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing
 
@@ -711,13 +711,13 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
             if HistogramStripulus_Centralis is None:#check global object is populated with mask or not
                HistogramStripulus_Centralis = np.zeros((Img_colour.shape[0],Img_colour.shape[1],3), np.uint8)
                #get radius
-               Diameter=min((HistogramCentralis_mask.shape[0]),(HistogramCentralis_mask.shape[1]))
+               Diameter=min((HistogramStripulus_Centralis.shape[0]),(HistogramStripulus_Centralis.shape[1]))
                Radius=int((Diameter/2)*1)#percentage of smallest dimension (1=100%)
                cv2.circle(HistogramStripulus_Centralis,(int(HistogramStripulus_Centralis.shape[1]/2),int(HistogramStripulus_Centralis.shape[0]/2)), Radius, (255,255,255), -1)
                HistogramStripulus_Centralis = cv2.cvtColor(HistogramStripulus_Centralis, cv2.COLOR_BGR2GRAY)
             #MacroStructure_img = cv2.resize(Img_colour, (25, 25))
             HistoStripes = cv2.filter2D(Img_colour,-1,kernel)
-            HistoStripes=Histogram_Stripes(HistoStripes,15,8,None)
+            HistoStripes=Histogram_Stripes(HistoStripes,4,8,None)
             ImageInfo.Metrics_functions["HM_data_HistogramStriping"].append(HistoStripes)
 
         #POWER SPECTRAL DENSITY
@@ -1548,6 +1548,8 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
     #debug final data
     MatchImages.HM_data_All=MatchImages.HM_data_MetricDistances
 
+    #save metrics for exporting to json
+    ExportMetrics_dict=dict()
     #for every image or subsets of images, roll through heatmap finding nearest best match then
     #cross referencing it
     OrderedImages=dict()
@@ -1577,7 +1579,7 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
     MatchMetric_all=[]
 
     while len(OrderedImages)+1<len(MatchImages.ImagesInMem_Pairing):#+1 is a fudge or it crashes out with duplicate image bug - cant figure this out 
-        Counter=Counter+1
+        
         #print(len(OrderedImages),"/",len(MatchImages.ImagesInMem_Pairing))
         #FilePath=MatchImages.OutputPairs +"\\00" + str(Counter) +  str(OutOfUse) +("HM_data_All") +".jpg"
         #PlotAndSave_2datas("HM_data_All",FilePath,normalize_2d(HM_data_All))
@@ -1599,11 +1601,15 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
         #add to output images
         
         for imgIndex, Images in enumerate (MatchImages.ImagesInMem_Pairing[Element][0]):
+            Counter=Counter+1
             #if len(Images)>1:y
                 #raise Exception("too many images")
             SplitImagePath=Images.split("\\")[-1]
             FilePath=MatchImages.OutputPairs +"\\00" +str(Counter)+ "_ImgNo_" + str(BaseImageList) + "_score_" + str(round(MatchImages.HM_data_All[Element,BaseImageList],3))+ "_" + SplitImagePath
             ImagePath=MatchImages.ImagesInMem_to_Process[Images].OriginalImageFilePath
+
+            #add to dictionary to export details for subsequent operations such as find unique sets of images
+            ExportMetrics_dict[Counter]={"SequencedImgFilePath":FilePath,"OriginalImgFlePath":ImagePath,"MatchScore":MatchImages.HM_data_All[Element,BaseImageList]}
 
             shutil.copyfile(ImagePath, FilePath)
             #cv2.imwrite(FilePath,MatchImages.ImagesInMem_to_Process[Images].OriginalImage)
@@ -1648,6 +1654,10 @@ def SequentialMatchingPerImage(MatchImages,PlotAndSave_2datas,PlotAndSave):
     #summed metric saved out seperately
     PlotAndSave("MatchMetric_all",MatchImages.OutputPairs +"\\MatchMetric_all.jpg",MatchMetric_all,1)
 
+    #save out image filenames and match score to use later
+    ExportMetrics_filename=MatchImages.OutputPairs +"\\ExportedMatchData.md"
+    _3DVisLabLib.JSON_Save(ExportMetrics_filename,ExportMetrics_dict)
+    print("saved metrics to ",ExportMetrics_filename)
 
     #MatchImages.Endtime= time.time()
     #print("time taken (hrs):",round((MatchImages.Endtime- MatchImages.startTime)/60/60,2))
@@ -1729,7 +1739,8 @@ def ProcessSimilarity(Input):
         #get first image, can also use the list for this
         #get info for test images
         if (CountIterations%500)==0 and (CountIterations>0):
-            print("Position",TestImageList,"/",len(MatchImages.ImagesInMem_Pairing),"of item",CurrentBaseImage)
+            pass
+            #print("Position",TestImageList,"/",len(MatchImages.ImagesInMem_Pairing),"of item",CurrentBaseImage)
 
         Test_Image_name=MatchImages.ImagesInMem_Pairing[TestImageList][1].FirstImage
 

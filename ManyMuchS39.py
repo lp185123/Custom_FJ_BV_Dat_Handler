@@ -467,6 +467,7 @@ class S39Maker:
         self.x = 0
         self.y = 0
         self.images = []
+        self.mm8 = []
 
     def start(self):
         if self.shouldPrintProgress:
@@ -475,7 +476,12 @@ class S39Maker:
                 print('Using directory: ' + self.directory)
         if len(self.files) == 0:
             self.files = self.getFiles(self.directory)
-        self.extractS39()
+        for file in self.files:
+            imageExtractor = ImageExtractor(file)
+            mm8Images = imageExtractor.getByType('SRU MM8 image')
+            if len(mm8Images) > 0:
+                self.mm8.append(MM8(imageExtractor, file))
+                #self.extractS39()
 
     def ensureDirectory(self, directory):
         if not os.path.exists(directory):
@@ -497,78 +503,77 @@ class S39Maker:
         return hexNumber
 
     def extractS39(self):
-        for file in self.files:
-            imageExtractor = ImageExtractor(file)
-            mm8Images = imageExtractor.getByType('SRU MM8 image')
-            if len(mm8Images) > 0:
-                s39 = self.validation
-                firstBlock = imageExtractor.getByType('Image Correction Data1')
-                s39 += firstBlock[1].data[56:1448]
-                s39 += self.intToBigEndianHex(self.width) + self.intToBigEndianHex(self.height)
-                s39 += firstBlock[1].data[1456:]
-                if self.wave == 'red':
-                    if self.side == 'front':
-                        wave = 'F1'
-                        waveDesignation = '41'
-                    elif self.side == 'back':
-                        wave = 'F2'
-                        waveDesignation = '42'
-                elif self.wave == 'green':
-                    if self.side == 'front':
-                        wave = 'C'
-                        waveDesignation = '21'
-                    elif self.side == 'back':
-                        wave = 'D'
-                        waveDesignation = '22'
-                elif self.wave == 'blue':
-                    if self.side == 'front':
-                        wave = 'E1'
-                        waveDesignation = '31'
-                    elif self.side == 'back':
-                        wave = 'E2'
-                        waveDesignation = '32'
+        for mm8 in self.mm8:
+            imageExtractor = mm8.imageExtractor
+            file = mm8.file
+            s39 = self.validation
+            firstBlock = imageExtractor.getByType('Image Correction Data1')
+            s39 += firstBlock[1].data[56:1448]
+            s39 += self.intToBigEndianHex(self.width) + self.intToBigEndianHex(self.height)
+            s39 += firstBlock[1].data[1456:]
+            if self.wave == 'red':
+                if self.side == 'front':
+                    wave = 'F1'
+                    waveDesignation = '41'
+                elif self.side == 'back':
+                    wave = 'F2'
+                    waveDesignation = '42'
+            elif self.wave == 'green':
+                if self.side == 'front':
+                    wave = 'C'
+                    waveDesignation = '21'
+                elif self.side == 'back':
+                    wave = 'D'
+                    waveDesignation = '22'
+            elif self.wave == 'blue':
+                if self.side == 'front':
+                    wave = 'E1'
+                    waveDesignation = '31'
+                elif self.side == 'back':
+                    wave = 'E2'
+                    waveDesignation = '32'
 
-                snr = imageExtractor.filter('SRU MM8 image', wave)
-                point = 48 + (self.y * 1632 * 4)
-                point += self.x * 4
-                print(len(s39))
-                image = ''
-                for y in range(0, self.height):
-                    if self.y + y < 640:
-                        for x in range(0, self.width):
-                            if self.x + x < 1632:
-                                grayscale16 = int(ImageExtractor.littleEndianHexToInt(snr[1].data[point + (x * 4):point + (x * 4) + 4]) / 16)
-                                correctedPixel = hex(grayscale16)[2:]
-                                correctedPixel = correctedPixel[-2:]
-                                while len(correctedPixel) < 2:
-                                    correctedPixel = '0' + correctedPixel
-                                image += correctedPixel
-                        point += 1632 * 4
+            snr = imageExtractor.filter('SRU MM8 image', wave)
+            point = 48 + (self.y * 1632 * 4)
+            point += self.x * 4
+            print(len(s39))
+            image = ''
+            for y in range(0, self.height):
+                if self.y + y < 640:
+                    for x in range(0, self.width):
+                        if self.x + x < 1632:
+                            grayscale16 = int(ImageExtractor.littleEndianHexToInt(snr[1].data[point + (x * 4):point + (x * 4) + 4]) / 16)
+                            correctedPixel = hex(grayscale16)[2:]
+                            correctedPixel = correctedPixel[-2:]
+                            while len(correctedPixel) < 2:
+                                correctedPixel = '0' + correctedPixel
+                            image += correctedPixel
+                    point += 1632 * 4
 
-                self.images.append(image)
-                s39 += image
-                remaining = 66320 - len(s39)
+            self.images.append(image)
+            s39 += image
+            remaining = 66320 - len(s39)
 
-                for x in range(0, remaining, 4):
-                    s39 += '0000'
+            for x in range(0, remaining, 4):
+                s39 += '0000'
 
-                secondBlock = imageExtractor.getByType('Image Correction Data2')
-                thirdBlock = imageExtractor.getByType('Image Correction Data3')
+            secondBlock = imageExtractor.getByType('Image Correction Data2')
+            thirdBlock = imageExtractor.getByType('Image Correction Data3')
 
-                hexHeight = hex(self.height)
+            hexHeight = hex(self.height)
 
-                #       size    type (0x12 = 18 = SNR Image Type 1)                                                                                        data storage type
-                s39 += '1880000012000000' + waveDesignation + '000000' + self.intToLittleEndianHex(self.width) + self.intToLittleEndianHex(self.height) + '01000000'
+            #       size    type (0x12 = 18 = SNR Image Type 1)                                                                                        data storage type
+            s39 += '1880000012000000' + waveDesignation + '000000' + self.intToLittleEndianHex(self.width) + self.intToLittleEndianHex(self.height) + '01000000'
 
-                s39 += secondBlock[1].data[48:]
-                s39 += thirdBlock[1].data[48:4834]
-                s39 += waveDesignation
-                s39 += thirdBlock[1].data[4836:]
-                directories = file.split('\\')
-                self.ensureDirectory(self.outputDirectory);
-                with open(self.outputDirectory + directories[len(directories) - 1][:-4] + '.s39', "bw+") as output:
-                    output.write(binascii.unhexlify(s39))
-                print(self.outputDirectory + directories[len(directories) - 1][:-4] + '.s39')
+            s39 += secondBlock[1].data[48:]
+            s39 += thirdBlock[1].data[48:4834]
+            s39 += waveDesignation
+            s39 += thirdBlock[1].data[4836:]
+            directories = file.split('\\')
+            self.ensureDirectory(self.outputDirectory);
+            with open(self.outputDirectory + directories[len(directories) - 1][:-4] + '.s39', "bw+") as output:
+                output.write(binascii.unhexlify(s39))
+            print(self.outputDirectory + directories[len(directories) - 1][:-4] + '.s39')
 
     def getFiles(self, directory):
         allFiles = []
@@ -578,6 +583,11 @@ class S39Maker:
                     allFiles.append(os.path.join(root, name))
         allFiles.sort()
         return allFiles
+
+class MM8:
+    def __init__(self, imageExtractor, file):
+        self.imageExtractor = imageExtractor
+        self.file = file
 
 class S39Extractor:
     def __init__(self):
@@ -627,85 +637,85 @@ class S39Image:
         self.width = width
         self.height = height
         self.image = image
-        
+
     #1400#width
     #1404#height
     #3376 where image starts
 
-def main():
+# def main():
 
     #s39Extractor = S39Extractor()
     #s39Extractor.start()
 
-    s39Maker = S39Maker()
-    print('What wave would you like? (type "r", "g", or "b")')
-    message = input()
-    if message == 'r':
-        s39Maker.wave = 'red'
-    elif message == 'g':
-        s39Maker.wave = 'green'
-    else:
-        s39Maker.wave = 'blue'
-    print('Using ' + s39Maker.wave)
-    print('Front or back? (type "f" or "b", or leave empty and use front')
-    message = input()
-    if message == 'b':
-        s39Maker.side = 'back'
-    else:
-        s39Maker.side = 'front'
-    print('Using ' + s39Maker.side)
-    s39Maker.validation = ''
-    while len(s39Maker.validation) != 8:
-        print('Please enter the validation code you will use for these S39 (should be 8 hex digits long) or leave empty to use Euro:')
-        s39Maker.validation = input()
-        if s39Maker.validation == '':
-            s39Maker.validation = '80080103'
-    print('Using ' + s39Maker.validation)
-    print('Please enter the x position of the rectangle:')
-    message = 'not a digit'
-    while not message.isdigit():
-        message = input()
-    s39Maker.x = int(message)
-    print('Using ' + str(s39Maker.x) + ' as the x position')
-    print('Please enter the y position of the rectangle:')
-    message = 'not a digit'
-    while not message.isdigit():
-        message = input()
-    s39Maker.y = int(message)
-    print('Using ' + str(s39Maker.y) + ' as the y position')
-    print('Please enter the width of the rectangle:')
-    message = 'not a digit'
-    while not message.isdigit():
-        message = input()
-        if message.isdigit():
-            numMessage = int(message)
-            if not numMessage % 8 == 0:
-                print('The width must be divisible by 8. Try ' + str(numMessage - (numMessage % 8)) + ' or ' + str((numMessage - (numMessage % 8)) + 8))
-                message = 'not a number'
-    s39Maker.width = int(message)
-    print('Using ' + str(s39Maker.width) + ' as the width')
-    print('Please enter the height of the rectangle:')
-    message = 'not a digit'
-    while not message.isdigit():
-        message = input()
-        if message.isdigit():
-            numMessage = int(message)
-            if not numMessage % 8 == 0:
-                print('The height must be divisible by 8. Try ' + str(numMessage - (numMessage % 8)) + ' or ' + str((numMessage - (numMessage % 8)) + 8))
-                message = 'not a number'
-    s39Maker.height = int(message)
-    print('Using ' + str(s39Maker.height) + ' as the height')
+    # s39Maker = S39Maker()
+    # print('What wave would you like? (type "r", "g", or "b")')
+    # message = input()
+    # if message == 'r':
+    #     s39Maker.wave = 'red'
+    # elif message == 'g':
+    #     s39Maker.wave = 'green'
+    # else:
+    #     s39Maker.wave = 'blue'
+    # print('Using ' + s39Maker.wave)
+    # print('Front or back? (type "f" or "b", or leave empty and use front')
+    # message = input()
+    # if message == 'b':
+    #     s39Maker.side = 'back'
+    # else:
+    #     s39Maker.side = 'front'
+    # print('Using ' + s39Maker.side)
+    # s39Maker.validation = ''
+    # while len(s39Maker.validation) != 8:
+    #     print('Please enter the validation code you will use for these S39 (should be 8 hex digits long) or leave empty to use Euro:')
+    #     s39Maker.validation = input()
+    #     if s39Maker.validation == '':
+    #         s39Maker.validation = '80080103'
+    # print('Using ' + s39Maker.validation)
+    # print('Please enter the x position of the rectangle:')
+    # message = 'not a digit'
+    # while not message.isdigit():
+    #     message = input()
+    # s39Maker.x = int(message)
+    # print('Using ' + str(s39Maker.x) + ' as the x position')
+    # print('Please enter the y position of the rectangle:')
+    # message = 'not a digit'
+    # while not message.isdigit():
+    #     message = input()
+    # s39Maker.y = int(message)
+    # print('Using ' + str(s39Maker.y) + ' as the y position')
+    # print('Please enter the width of the rectangle:')
+    # message = 'not a digit'
+    # while not message.isdigit():
+    #     message = input()
+    #     if message.isdigit():
+    #         numMessage = int(message)
+    #         if not numMessage % 8 == 0:
+    #             print('The width must be divisible by 8. Try ' + str(numMessage - (numMessage % 8)) + ' or ' + str((numMessage - (numMessage % 8)) + 8))
+    #             message = 'not a number'
+    # s39Maker.width = int(message)
+    # print('Using ' + str(s39Maker.width) + ' as the width')
+    # print('Please enter the height of the rectangle:')
+    # message = 'not a digit'
+    # while not message.isdigit():
+    #     message = input()
+    #     if message.isdigit():
+    #         numMessage = int(message)
+    #         if not numMessage % 8 == 0:
+    #             print('The height must be divisible by 8. Try ' + str(numMessage - (numMessage % 8)) + ' or ' + str((numMessage - (numMessage % 8)) + 8))
+    #             message = 'not a number'
+    # s39Maker.height = int(message)
+    # print('Using ' + str(s39Maker.height) + ' as the height')
+    #
+    # s39Maker.start()
+    # print('Process complete. You can find your S39 in the S39 folder.')
 
-    s39Maker.start()
-    print('Process complete. You can find your S39 in the S39 folder.')
-
-if __name__ == "__main__":
-    try:
-        main()
-        os.system('pause')
-    except Exception as e:
-        print(e)
-        os.system('pause')
+# if __name__ == "__main__":
+#     try:
+#         main()
+#         os.system('pause')
+#     except Exception as e:
+#         print(e)
+#         os.system('pause')
 
 # ---ImageMerger---
 #
