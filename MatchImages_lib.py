@@ -618,7 +618,7 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
     #even if just one image its still in list format to keep logic common
     #ImageColour = Resize_toPixel_keepRatio(OriginalImage_col, 120, 120)
     #NOTES
-    ImageColour=_Crop_Pixels(OriginalImage_col,(0,63),(0,130))#Y range then X range
+    #ImageColour=_Crop_Pixels(OriginalImage_col,(0,63),(0,130))#Y range then X range
     #FACES
     #ImageColour=_Crop_Pixels(OriginalImage_col,(35,190),(25,160))##Y range then X range
 
@@ -629,11 +629,11 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
     # else:
     #     ImageColour= cv2.resize(OriginalImage_col, (120, 120))
 
-    #ImageColour= cv2.resize(OriginalImage_col, (160, 160))
+    ImageColour= cv2.resize(OriginalImage_col, (120, 120))
 
     #ImageGrayscale=Resize_toPixel_keepRatio(ImageInfo.ImageGrayscale[0], 120, 120)
 
-    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,120,95,0,False)
+    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,100,100,0,False)
     KernelSize=5
     kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing
 
@@ -676,7 +676,7 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
                 Radius=int((Diameter/2)*1.0)#percentage of smallest dimension (1=100%)
                 cv2.circle(HistogramCentralis_mask,(int(HistogramCentralis_mask.shape[1]/2),int(HistogramCentralis_mask.shape[0]/2)), Radius, (255,255,255), -1)
                 HistogramCentralis_mask = cv2.cvtColor(HistogramCentralis_mask, cv2.COLOR_BGR2GRAY)
-                #_3DVisLabLib.ImageViewer_Quick_no_resize(grayImage,0,True,True)
+                #_3DVisLabLib.ImageViewer_Quick_no_resize(HistogramCentralis_mask,0,True,True)
             hist = cv2.calcHist([Img_colour], [0, 1, 2], HistogramCentralis_mask, [8, 8, 8],[0, 256, 0, 256, 0, 256])
             hist = cv2.normalize(hist, hist).flatten()
             ImageInfo.Metrics_functions["HM_data_HistogramCentralis"].append(hist)
@@ -704,6 +704,8 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
             MacroStructure_img = cv2.filter2D(MacroStructure_img,-1,kernel)
             #MacroStructure_img=MacroStructure_img/np.sqrt(np.sum(MacroStructure_img**2))
             ImageInfo.Metrics_functions["HM_data_MacroStructure"].append(MacroStructure_img)
+            #_3DVisLabLib.ImageViewer_Quick_no_resize(MacroStructure_img,0,True,True)
+
 
         #HISTOGRAM STRIPING - vertical and horizontal histogram 
         if "HM_data_HistogramStriping" in Metrics_dict:
@@ -716,8 +718,9 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
                cv2.circle(HistogramStripulus_Centralis,(int(HistogramStripulus_Centralis.shape[1]/2),int(HistogramStripulus_Centralis.shape[0]/2)), Radius, (255,255,255), -1)
                HistogramStripulus_Centralis = cv2.cvtColor(HistogramStripulus_Centralis, cv2.COLOR_BGR2GRAY)
             #MacroStructure_img = cv2.resize(Img_colour, (25, 25))
+            #_3DVisLabLib.ImageViewer_Quick_no_resize(HistogramStripulus_Centralis,0,True,True)
             HistoStripes = cv2.filter2D(Img_colour,-1,kernel)
-            HistoStripes=Histogram_Stripes(HistoStripes,4,8,None)
+            HistoStripes=Histogram_Stripes(HistoStripes,9,16,HistogramStripulus_Centralis)
             ImageInfo.Metrics_functions["HM_data_HistogramStriping"].append(HistoStripes)
 
         #POWER SPECTRAL DENSITY
@@ -1738,9 +1741,9 @@ def ProcessSimilarity(Input):
         #test images - this is where different strategies may come in
         #get first image, can also use the list for this
         #get info for test images
-        if (CountIterations%500)==0 and (CountIterations>0):
-            pass
-            #print("Position",TestImageList,"/",len(MatchImages.ImagesInMem_Pairing),"of item",CurrentBaseImage)
+        if (CountIterations%1000)==0 and (CountIterations>0):
+            #pass
+            print("Position",TestImageList,"/",len(MatchImages.ImagesInMem_Pairing),"of item",CurrentBaseImage)
 
         Test_Image_name=MatchImages.ImagesInMem_Pairing[TestImageList][1].FirstImage
 

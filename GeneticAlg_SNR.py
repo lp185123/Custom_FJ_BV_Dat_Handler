@@ -39,9 +39,9 @@ class GA_Parameters():
         #to 400 images then after that you dont get enough generations to refine solution due to time per evaluation. If you can use entire dataset then
         #set NewImageCycle to 99999 as all it will do is reshuffle the images which isnt necessary
 
-        self.ImageColumnSize=30#how many images we send at a time to external OCR, don't go more than 40 as performance breaks down
+        self.ImageColumnSize=20#how many images we send at a time to external OCR, don't go more than 40 as performance breaks down
 
-        self.NewImageCycle=3#how many iterations/generations of same image set before choosing another random subset of main images. If you set this too low frequency for image switching it could overtrain to the subset
+        self.NewImageCycle=5#how many iterations/generations of same image set before choosing another random subset of main images. If you set this too low frequency for image switching it could overtrain to the subset
 
         self.ImageTapOut=1#terminate anything that has poor performance out the box - with collimated data this doesnt work effectively
 
@@ -51,9 +51,9 @@ class GA_Parameters():
         self.UseCloudOCR=True#always set to true - offline pytesseract is available but has not been updated and now may now be inoperable - but can be reactivated with some development
         self.LanguageHints=None#not implemented yet but if using google cloud better results with language hint
 
-        self.MirrorImage=False#use if comparing SNRs (to cope with upside down s39 images), turn off if not comparing SNs only generating
+        self.MirrorImage=True#use if comparing SNRs (to cope with upside down s39 images), turn off if not comparing SNs only generating
 
-        self.ForceFieldingLengths=[9]#put in list of expected SN lengths - use this if the s39/images do not yet have SNR answers from the template
+        self.ForceFieldingLengths=None#put in list of expected SN lengths - use this if the s39/images do not yet have SNR answers from the template
         #set to None if the filenames generated are in the format  "file1[AB12345].jpg" whereby the SN can be found between [] in the filename
         #can also have multiple lengths =[5,7,8] if a particularly awkward SN task
         
@@ -245,7 +245,7 @@ class Individual():
         
         #with s39 images seems that Y needs resized - so dont bother resizing X
         #self.UserInputParamsDict["ResizeX"]=self.ParameterDetails(100,100,[],100,True)
-        self.UserInputParamsDict["ResizeY"]=self.ParameterDetails(200,200,[],150,True)#india x50 y156
+        self.UserInputParamsDict["ResizeY"]=self.ParameterDetails(200,100,[],150,True)#india x50 y156
         
         self.UserInputParamsDict["AdapativeThreshold"]=self.ParameterDetails(1,0,[1,0],1,True)#keep it always on
         self.UserInputParamsDict["MedianBlurDist"]=self.ParameterDetails(11,0,[0,1,3,5,7,9,11],3,True)#zero will turn it off while otherwise must have odd numbers for the filter

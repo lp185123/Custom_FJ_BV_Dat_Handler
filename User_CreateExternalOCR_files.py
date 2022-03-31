@@ -18,13 +18,13 @@ OutputFolderSingleImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ProcessSing
 #output folder tiled images
 OutputFolderTiledImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput"
 #column size of tiled images - if a ML saved state is available this will be overridden
-ColumnSize=30#column size of 1 will be treated differently - with no delimiter image
+ColumnSize=20#column size of 1 will be treated differently - with no delimiter image
 #Preprocessing on/off - if ML optimisation has been used - will look in same folder as media
-PreProcessing=False
+PreProcessing=True
 #can force mirroring or it can be found in genparameters
-MirrorImage=False # turn this on if preprocessing is false
+MirrorImage=True # turn this on if preprocessing is false
 #force stretching image in Y if its MM8 data (usually at squashed aspect ratio) - if preprocessing is on this will be overridden by preprocess parameters
-ForceYStretch=2#set to None if not used
+ForceYStretch=None#set to None if not used
 
 
 

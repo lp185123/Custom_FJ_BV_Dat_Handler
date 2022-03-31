@@ -102,7 +102,11 @@ class CheckSN_Answers():
             #build report - pass in matchresults but if using collimated images wwe need self.CollimatedImageVsImageLink_dict as well
             #so we can trace where images came from 
             self.BuildReport(MatchResults_dict,self.CollimatedImageVsImageLink_dict,self.SourceTraceDict)
-
+        else:
+            print("OCR alignment problem - delimiter may not be found in answer text file due to OCR external response error")
+            print("if this is so - add the delimiter code as many times as there are items in the JSON to ")
+            print("allow the system to align internal to external answers")
+            print("this issue is to be fixed soon - by detecting lack of delimiter and allowing process to continue")
 
     def Find_Sources_Dats_images(self,CollimatedImageVsImageLink_dict):
         ##Try and find the source dat records of the images, and also the unprocessed images
@@ -479,10 +483,9 @@ class CheckSN_Answers():
                                                     FilteredLine.append("%")
                                                 else:
                                                     print("Filtering out non-input language char",CharAnalysisChar)
-                                                    
                                                     pass
                                             else:
-                                                print("no filtering applied to char",InputLanguage,Confidence)
+                                                print("no filtering applied to char:",CharAnalysisChar)
                                                 #if character does not exist - add it
                                                 if CharAnalysisChar not in CharacterDictionary:
                                                     CharacterDictionary[CharAnalysisChar]=0

@@ -110,7 +110,7 @@ def ProcessImages(InputPath=None,OutputPath=None,Processing=False,MirrorImage=Tr
     #initialise image processing object
     SNR_fitnessTest=Snr_test_fitness.TestSNR_Fitness()
     #build parameters (or not if not processing - but still may need to mirror)
-    SNRparams=GeneticAlg_SNR.BuildSNR_Parameters(LastRecord_Parameters,SNR_fitnessTest,None)
+    SNRparams=GeneticAlg_SNR.BuildSNR_Parameters(LastRecord_Parameters,SNR_fitnessTest,GenParams)
     #create folder of single images according to user options (processed/raw/mirrored)
     SNR_fitnessTest.GenerateSingleImages_and_linkFile(ListAllImg_files,OutputPath,SNRparams,GenParams,Processing,MirrorImage,ForceYStretch)
 

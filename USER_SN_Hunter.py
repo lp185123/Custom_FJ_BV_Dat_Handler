@@ -4,31 +4,49 @@ import cv2
 import BV_DatReader_Lib
 import _3DVisLabLib
 import enum
+import numpy as np
+import copy
+
 # initialize the list of reference points and boolean indicating
 # whether cropping is being performed or not
 refPt = []
 cropping = False
 Global_Image=None
+GlobalMousePos=None
+
+def RotateImage(InputImage,RotationDeg):
+    #set point of rotation to centre of image - can offset if we need to
+    #less verbose method would be to use imutils library
+    M = cv2.getRotationMatrix2D((int((InputImage.shape[1])/2), int((InputImage.shape[0])/2)), RotationDeg, 1.0)
+    rotated = cv2.warpAffine(InputImage, M, (InputImage.shape[1], InputImage.shape[0]))
+    cv2.imshow("Rotated by Arbitrary Point", rotated)
+    cv2.waitKey(0)
+
+
 def click_and_crop(event, x, y, flags, param):
+    
     #https://pyimagesearch.com/2015/03/09/capturing-mouse-click-events-with-python-and-opencv/#:~:text=Anytime%20a%20mouse%20event%20happens,details%20to%20our%20click_and_crop%20function.
 	# grab references to the global variables
-	global refPt, cropping
+    global refPt, cropping,GlobalMousePos
+
+    
 	# if the left mouse button was clicked, record the starting
 	# (x, y) coordinates and indicate that cropping is being
 	# performed
-	if event == cv2.EVENT_LBUTTONDOWN:
-		refPt = [(x, y)]
-		cropping = True
+    GlobalMousePos=(x, y)
+    
+    if event == cv2.EVENT_LBUTTONDOWN:
+        refPt = [(x, y)]
+        cropping = True
 	# check to see if the left mouse button was released
-	elif event == cv2.EVENT_LBUTTONUP:
-		# record the ending (x, y) coordinates and indicate that
-		# the cropping operation is finished
-		refPt.append((x, y))
-		cropping = False
-		# draw a rectangle around the region of interest
-		cv2.rectangle(Global_Image, refPt[0], refPt[1], (0, 255, 0), 2)
-		cv2.imshow("image", Global_Image)
-
+    elif event == cv2.EVENT_LBUTTONUP:
+        # record the ending (x, y) coordinates and indicate that
+        # the cropping operation is finished
+        refPt.append((x, y))
+        cropping = False
+        # draw a rectangle around the region of interest
+        #cv2.rectangle(Global_Image, refPt[0], refPt[1], (0, 255, 0), 2)
+        #cv2.imshow("image", Global_Image)
 
 class SNunter_UserParams():
     def __init__(self) -> None:
@@ -37,7 +55,7 @@ class SNunter_UserParams():
         self.s39_shouldPrintProgress = False
         self.s39_directory = '.\\'#repopulated later
         self.s39_outputDirectory = '.\\s39\\'#repopulated later
-        self.s39_wave = 'red' # or green or blue
+        self.s39_wave = 'colour' # or green or blue
         self.s39_side = 'front' # or back
         self.s39_validation = '80080103'
         self.s39_width = 336
@@ -48,7 +66,13 @@ class SNunter_UserParams():
         self.ColourBackGroundB=None
         self.WorkingImage=None
         self.FlipHorizontal=False
-
+        self.SearchTemplate_col=None
+        self.SearchTemplate_bw=None
+        self.SearchTemplate_localArea_bw=None
+        self.SearchTemplate_localArea_RotationSeries=[]
+        self.LocalAreaBuffer=50#add to area once user has selected serial number
+        self.RotationRange_deg=45#rotation range - bear in mind first note may be badly skewed already
+        self.RotationSteps=20#how many steps to cover range of rotation
 
 def SetImageParams(SNunter_UserParamsSide_int,FlipSide,FlipWave,FlipHoriz):
     #this can probably be done more easily using enums
@@ -67,7 +91,6 @@ def SetImageParams(SNunter_UserParamsSide_int,FlipSide,FlipWave,FlipHoriz):
             SNunter_UserParamsSide_int.s39_wave="colour"
         elif SNunter_UserParamsSide_int.s39_wave=="colour":
             SNunter_UserParamsSide_int.s39_wave="red"
-
 
     SNunter_UserParamsSide_int.FlipHorizontal=FlipHoriz
     
@@ -135,7 +158,13 @@ def GetWorkingImage_FromParameters(SNunter_UserParams_Loaded_int):
     if SNunter_UserParams_Loaded_int.s39_wave == 'blue':
         OutputImage[:,:,1]=OutputImage[:,:,0]
         OutputImage[:,:,2]=OutputImage[:,:,0]
-        
+    
+    if SNunter_UserParams_Loaded_int.FlipHorizontal==True:
+        # Use Flip code 0 to flip vertically
+        OutputImage = cv2.flip(OutputImage, 0)
+
+    OutputImage=cv2.resize(OutputImage,(int(OutputImage.shape[1]),int(OutputImage.shape[0]*2)))
+
     return OutputImage
 
 def SN_HuntLoop(SNunter_UserParams_Loaded):
@@ -180,40 +209,166 @@ def SN_HuntLoop(SNunter_UserParams_Loaded):
     #_3DVisLabLib.ImageViewer_Quickv2_UserControl(SNunter_UserParams_Loaded.ColourBackGroundF,0,True,True)
 
     global Global_Image
+    global refPt
+    global GlobalMousePos
+
     cv2.namedWindow("image")
     cv2.setMouseCallback("image", click_and_crop)
     # keep looping until the 'q' key is pressed
+    Blur=1
+    LaB=0
+    print("Use keys 1/2/3 to cycle through viewmodes")
+    print("select area in correct wave with mouse then press C to cut out Region of Interest")
+
     while True:
          #update image
         Global_Image=GetWorkingImage_FromParameters(SNunter_UserParams_Loaded)
         clone=Global_Image.copy()
-        try:
+        
+        if len(refPt)==2:
+            #smoothly reduce blurring if user has finished selecting area
+            if Blur>1: Blur=Blur-1
+            if LaB<SNunter_UserParams_Loaded.LocalAreaBuffer:LaB=LaB+8 
+            if LaB>SNunter_UserParams_Loaded.LocalAreaBuffer:LaB=SNunter_UserParams_Loaded.LocalAreaBuffer
+            #draw rectangle around area selected by user
             cv2.rectangle(Global_Image, refPt[0], refPt[1], (0, 255, 0), 2)
-        except:
-            pass
+            #buffer rectangle (for grabbing more local features to help match template)
+            #cv2.rectangle(Global_Image, (refPt[0][0]-LaB,refPt[0][1]-LaB), (refPt[1][0]+LaB,refPt[1][1]+LaB), (20, 150, 20), 1)
+            #Draw Circle
+            #get max dimension
+            #DistanceDiagX=abs((refPt[0][0]-LaB)-(refPt[1][0]+LaB))
+            MidPointX=int((refPt[0][0]+refPt[1][0])/2)
+            MidPointY=int((refPt[0][1]+refPt[1][1])/2)
+            Length=max(abs(refPt[0][0]-refPt[1][0]),abs(refPt[0][1]-refPt[1][1]))#assume X axis will be longes,
+            cv2.circle(Global_Image, (MidPointX,MidPointY), int(Length/2), (20, 150, 20), 1)
+        elif len(refPt)==1:
+            LaB=0
+            if Blur<35: Blur=Blur+2
+            #cut out area of interest
+            SNunter_UserParams_Loaded_temp=copy.deepcopy(SNunter_UserParams_Loaded)
+            SNunter_UserParams_Loaded_temp.s39_wave = 'red'
+            Global_Image_temp=GetWorkingImage_FromParameters(SNunter_UserParams_Loaded_temp)
+            AoI=Global_Image_temp[refPt[0][1]:GlobalMousePos[1],refPt[0][0]:GlobalMousePos[0],:]
+            #blur original image
+            KernelSize=Blur
+            kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing
+            Global_Image = cv2.filter2D(Global_Image,-1,kernel)
+            #place back AoI
+            Global_Image[refPt[0][1]:GlobalMousePos[1],refPt[0][0]:GlobalMousePos[0],:]=AoI
+            #draw on rectangle
+            #cv2.rectangle(Global_Image, refPt[0], GlobalMousePos, (255, 0, 0), 2)
+        else:
+            if Blur>1: Blur=Blur-2
+            LaB=0
+    
         # display the image and wait for a keypress
         cv2.imshow("image", Global_Image)
         key = cv2.waitKey(1) & 0xFF
         # if the 'r' key is pressed, reset the cropping region
         if key == ord("r"):
-            Global_Image=GetWorkingImage_FromParameters(SNunter_UserParams_Loaded)
+            refPt=[]#clear out cropping rectangle
         # if the 'c' key is pressed, break from the loop
         if key == ord("1"):
-            SNunter_UserParams_Loaded=SetImageParams(SNunter_UserParams_Loaded,True,False,False)
+            SNunter_UserParams_Loaded=SetImageParams(SNunter_UserParams_Loaded,True,False, SNunter_UserParams_Loaded.FlipHorizontal)
         if key == ord("2"):
-            SNunter_UserParams_Loaded=SetImageParams(SNunter_UserParams_Loaded,False,True,False)
+            SNunter_UserParams_Loaded=SetImageParams(SNunter_UserParams_Loaded,False,True, SNunter_UserParams_Loaded.FlipHorizontal)
         if key == ord("3"):
-            SNunter_UserParams_Loaded=SetImageParams(SNunter_UserParams_Loaded,False,False,True)
+            SNunter_UserParams_Loaded=SetImageParams(SNunter_UserParams_Loaded,False,False,not SNunter_UserParams_Loaded.FlipHorizontal)
         elif key == ord("c"):
-            break
+            if len(refPt) == 2:
+                Global_Image=clone.copy()
+                break
        
     # if there are two reference points, then crop the region of interest
-    # from teh image and display it
+    # from the image and display it
     if len(refPt) == 2:
-        roi = clone[refPt[0][1]:refPt[1][1], refPt[0][0]:refPt[1][0]]
-        cv2.imshow("ROI", roi)
-        cv2.waitKey(0)
+        print("User parameter clipping - press any key to continue")
+        Global_Image=GetWorkingImage_FromParameters(SNunter_UserParams_Loaded)
+        roi_user = Global_Image[refPt[0][1]:refPt[1][1], refPt[0][0]:refPt[1][0]]
+        cv2.imshow("imageclip", roi_user)
+        #cv2.waitKey(0)
+        #get pattern we will use to search other notes (full colour)
+        print("Search clipping- press any key to continue")
+        SNunter_UserParams_Loaded_temp=copy.deepcopy(SNunter_UserParams_Loaded)
+        SNunter_UserParams_Loaded_temp.s39_wave = 'colour'
+        Global_Image=GetWorkingImage_FromParameters(SNunter_UserParams_Loaded_temp)
+        roi_searchPattern = Global_Image[refPt[0][1]:refPt[1][1], refPt[0][0]:refPt[1][0]]
+        #populate search template
+        SNunter_UserParams_Loaded.SearchTemplate_col=roi_searchPattern#colour template for reference
+        SNunter_UserParams_Loaded.SearchTemplate_bw=cv2.cvtColor(roi_searchPattern, cv2.COLOR_BGR2GRAY)#single channels template used for matching
+        cv2.imshow("imageclip", roi_searchPattern)
+        #cv2.waitKey(0)
+        #get a larger area of the note to help the template matcher
+        #get the colour image again - double up the code incase we want to move this out
+        SNunter_UserParams_Loaded_temp=copy.deepcopy(SNunter_UserParams_Loaded)
+        SNunter_UserParams_Loaded_temp.s39_wave = 'colour'
+        Global_Image=GetWorkingImage_FromParameters(SNunter_UserParams_Loaded_temp)
+        #use buffer parameter to increase size of selection to grab local features for template matching
+        LaB=SNunter_UserParams_Loaded.LocalAreaBuffer
+        SNunter_UserParams_Loaded.SearchTemplate_localArea_bw=cv2.cvtColor(Global_Image[refPt[0][1]-LaB:refPt[1][1]+LaB, refPt[0][0]-LaB:refPt[1][0]+LaB], cv2.COLOR_BGR2GRAY)
+        cv2.imshow("imageclip", SNunter_UserParams_Loaded.SearchTemplate_localArea_bw)
+        #cv2.waitKey(0)
+        
+    else:
+        raise Exception("No area selected - cannot proceed")
 
+    #ready for checking through all MM8 data to find serial number matching
+    #we must handle 4 note orientations and variations of angle
+    #first - build template matching rotation series
+
+    #create circular area cut - so have same blackspace during rotation - otherwise
+    #if rectangular blackspace from rotation may affect template matching score
+
+    MidPointX=int((refPt[0][0]+refPt[1][0])/2)
+    MidPointY=int((refPt[0][1]+refPt[1][1])/2)
+    Length=max(abs(refPt[0][0]-refPt[1][0]),abs(refPt[0][1]-refPt[1][1]))
+    #create random noise image
+    RandomNoiseImg=np.random.randint(255, size=(int(Length), int(Length),3),dtype="uint8")
+    cv2.imshow("imageclip", RandomNoiseImg)
+    cv2.waitKey(0)
+    #probably need circular mask
+    Mask_circle=Global_Image[0:Length,0:Length,:]#use any donor image to avoid using Numpy library until we need it (keep size of exe down)
+    Mask_circle[:,:,:]=0#set everything to 0
+    cv2.imshow("imageclip", Mask_circle)
+    cv2.waitKey(0)
+    #create mask, of black image with white circle in the middle to be used as mask
+    cv2.circle(Mask_circle,(int(Mask_circle.shape[0]/2),int(Mask_circle.shape[1]/2)),int(Length/2),(255, 255, 255),-1)
+    cv2.imshow("imageclip", Mask_circle)
+    cv2.waitKey(0)
+    
+    #create inverted version of mask
+    Mask_circle_inverted= cv2.bitwise_not(Mask_circle)#set everything to 0
+    cv2.imshow("imageclip", Mask_circle_inverted)
+    cv2.waitKey(0)
+
+    #create noise around edges of square only and leave a circle to later add the rotation template
+    MaskedNoise=cv2.subtract(RandomNoiseImg,Mask_circle)
+    cv2.imshow("imageclip", MaskedNoise)
+    cv2.waitKey(0)
+
+
+    #grab a square area of the image to be used for template matching
+    #get coords from midpoint
+    Y_up=int(MidPointY-Length/2)
+    Y_down=int(MidPointY+Length/2)
+    X_left=int(MidPointX-Length/2)
+    X_right=int(MidPointX+Length/2)
+    #get full colour image again in case we want to move code
+    Global_Image=GetWorkingImage_FromParameters(SNunter_UserParams_Loaded_temp)
+    SquareCutRegion=Global_Image[Y_up:Y_up+Length,X_left:X_left+Length,:]
+    #subtract noise
+    SquareCutRegion=cv2.subtract(SquareCutRegion,Mask_circle_inverted)
+    cv2.imshow("imageclip", SquareCutRegion)
+    cv2.waitKey(0)
+    #https://pyimagesearch.com/2021/01/20/opencv-rotate-image/
+
+    #add together for composite image
+    CompositeImage=cv2.add(SquareCutRegion,MaskedNoise)
+    cv2.imshow("imageclip", CompositeImage)
+    cv2.waitKey(0)
+    #RotateImage(SNunter_UserParams_Loaded.SearchTemplate_localArea_bw,45)
+
+    
 SNunter_UserParams_toLoad=SNunter_UserParams()
 
 SN_HuntLoop(SNunter_UserParams_toLoad)

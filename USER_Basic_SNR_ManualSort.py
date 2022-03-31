@@ -8,7 +8,7 @@ import TileImages_for_OCR
 import shutil
 import json
 import os
-import pyttsx3
+#import pyttsx3
 #hardcoded output folders
 OutputGoodSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ManualCheck_GoodSNR"
 OutputBadSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ManualCheck_BadSNR"
@@ -24,8 +24,8 @@ InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(InputFolder)
 #filter out non images
 ListAllImages=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles)
 #voice synth
-Voicesynthesizer = pyttsx3.init()
-Voicesynthesizer.setProperty('rate', 150)
+#Voicesynthesizer = pyttsx3.init()
+#Voicesynthesizer.setProperty('rate', 150)
 
 
 
@@ -82,7 +82,7 @@ for index,img in enumerate(ImgPathVsRawImages):
             Get_SNR_string="NO_SNR"
     else:
             Get_SNR_string="NO_SNR"
-
+    
     #get image with SNR
     #convert list to dict
     #DictAllImages=dict()

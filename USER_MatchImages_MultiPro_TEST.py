@@ -53,18 +53,18 @@ class MatchImagesObject():
         #self.InputFolder=r"C:\Working\TempImages\TestMatches"
         #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         #self.InputFolder=r"E:\NCR\TestImages\UK_1000"
-        #self.InputFolder=r"C:\Working\TempImages\Furniture"
+        #self.InputFolder=r"C:\Working\TempImages"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
-        #self.InputFolder=r"E:\NCR\TestImages\Randos"
+        self.InputFolder=r"C:\Working\TempImages\Artwork"
         #self.InputFolder=r"C:\Working\TempImages\butterflys"
-        self.InputFolder=r"X:\Output"
+        #self.InputFolder=r"X:\Output"
         #self.InputFolder=r"C:\Working\TempImages\Food\images"
         ##################################################
         ##set subset of data - will select random images
         ##if cross checking for similarity will be in O^ (n/2) time complexity
         ##################################################
-        self.SubSetOfData = int(7000)  # subset of data
+        self.SubSetOfData = int(90000)  # subset of data
         ################################################################
         ##select what function will be used, which will load image,crop,resize
         ##etc for all analytical procesess
@@ -78,15 +78,16 @@ class MatchImagesObject():
         ##than useful metrics depending on images to analyse
         ######################################################################
         # what metrics to use
+        self.Use_MODE_Centralis=False# to be developed - use centralis mode on everyhting - input image will be masked with circular noise
         self.Use__FeatureMatch = False  # match detailed areas of image - quite slow
         self.Use__histogram = False  # match how close the image colour distribution is - structure does not matter
-        self.Use__FourierDifference = True  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
+        self.Use__FourierDifference = False  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
         self.Use__PhaseCorrelation = True  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
         #in theory can convert for instance fourier magnitude image, polar unwrap it and check using phase correlation - but has to be proven
-        self.Use__HOG_featureMatch = False  # dense feature match - good for small images - very effective for mm side
+        self.Use__HOG_featureMatch = True  # dense feature match - good for small images - very effective for mm side
         self.Use__EigenVectorDotProd = False  #SQUARE IMAGE ONLY how close are principle components orientated- doesnt seem to work correctly yet - MUST BE SQUARE!
         self.Use__EigenValueDifference = False  #SQUARE IMAGE ONLY how close are principle component lengths for COLOUR - works pretty well - still needs a look at in how to package up matrix, and if using non -square do we use SVD instead?
-        self.Use__FourierPowerDensity = False  # histogram of frequencies found in image - works very well
+        self.Use__FourierPowerDensity = True  # histogram of frequencies found in image - works very well
         self.Use__MacroStructure=True#very small image to compare macrostructure - experimental
         self.Use__StructuralPCA_dotProd=False#Principle component analysis on binarised image - a geometrical PCA
         self.Use__StructuralPCA_VectorValue = False  # for STRUCTURE Principle component analysis on binarised image - a geometrical PCA
@@ -123,8 +124,8 @@ class MatchImagesObject():
         ##################################################
         #self.MatchFindFolder = r"C:\Working\TempImages\Faces\MatcherFolder"
         #self.MatchFindFolder = r"E:\NCR\TestImages\UK_Side_Small_15sets10_findmatch"
-        self.MatchFindFolder = r"C:\Working\TempImages\MatchPerson2\cropped"
-        self.MatchInputSet = False  # if a list of input images are provided the system will find similarities only with them, rather than
+        self.MatchFindFolder = r"C:\Working\TempImages\Faces\Match2Art"
+        self.MatchInputSet = True  # if a list of input images are provided the system will find similarities only with them, rather than
         # attempt to match every image sequentially.
 
 
@@ -544,9 +545,15 @@ def main():
         #try:
         #test that image is valid first
         if MatchImages_lib.TestImage(ImagePath):
-            
+
+            #check not bad file name
+            if ImagePath.count(".")>1:
+                print("bad filename", ImagePath,"skipping")
+                continue
+
             ImageInfo=PrepareMatchImages.PrepareImagesFunction(PrepareMatchImages,ImagePath,Index,ImageReviewDict)
 
+            
             #populate dictionary
             if ImageInfo is not None:
                 PrepareMatchImages.ImagesInMem_to_Process[ImagePath]=(ImageInfo)
