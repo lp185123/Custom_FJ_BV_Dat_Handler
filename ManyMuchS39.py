@@ -536,7 +536,7 @@ class S39Maker:
             snr = imageExtractor.filter('SRU MM8 image', wave)
             point = 48 + (self.y * 1632 * 4)
             point += self.x * 4
-            print(len(s39))
+            #print(len(s39))
             image = ''
             for y in range(0, self.height):
                 if self.y + y < 640:
@@ -573,7 +573,7 @@ class S39Maker:
             self.ensureDirectory(self.outputDirectory);
             with open(self.outputDirectory + directories[len(directories) - 1][:-4] + '.s39', "bw+") as output:
                 output.write(binascii.unhexlify(s39))
-            print(self.outputDirectory + directories[len(directories) - 1][:-4] + '.s39')
+            #print(self.outputDirectory + directories[len(directories) - 1][:-4] + '.s39')
 
     def getFiles(self, directory):
         allFiles = []

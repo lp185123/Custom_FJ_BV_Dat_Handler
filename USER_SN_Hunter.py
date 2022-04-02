@@ -6,13 +6,16 @@ import _3DVisLabLib
 import enum
 import numpy as np
 import copy
-
+import random
+import time
+import datetime
 # initialize the list of reference points and boolean indicating
 # whether cropping is being performed or not
-refPt = []
+refPt = []#global object to handle recording mouse position
 cropping = False
-Global_Image=None
-GlobalMousePos=None
+Global_Image=None#
+GlobalMousePos=None#need to be global to handle capturing mouse on opencv UI
+ImgView_Resize=5#HD image doesnt fit on screen
 
 def RotateImage(InputImage,RotationDeg):
     #set point of rotation to centre of image - can offset if we need to
@@ -25,7 +28,7 @@ def click_and_crop(event, x, y, flags, param):
     
     #https://pyimagesearch.com/2015/03/09/capturing-mouse-click-events-with-python-and-opencv/#:~:text=Anytime%20a%20mouse%20event%20happens,details%20to%20our%20click_and_crop%20function.
 	# grab references to the global variables
-    global refPt, cropping,GlobalMousePos
+    global refPt, cropping,GlobalMousePos,ImgView_Resize
 
     
 	# if the left mouse button was clicked, record the starting
@@ -34,13 +37,13 @@ def click_and_crop(event, x, y, flags, param):
     GlobalMousePos=(x, y)
     
     if event == cv2.EVENT_LBUTTONDOWN:
-        refPt = [(x, y)]
+        refPt = [(x*ImgView_Resize, y*ImgView_Resize)]
         cropping = True
 	# check to see if the left mouse button was released
     elif event == cv2.EVENT_LBUTTONUP:
         # record the ending (x, y) coordinates and indicate that
         # the cropping operation is finished
-        refPt.append((x, y))
+        refPt.append((x*ImgView_Resize, y*ImgView_Resize))
         cropping = False
 
 class SNunter_UserParams():
@@ -72,6 +75,11 @@ class SNunter_UserParams():
         self.LocalAreaBuffer=50#add to area once user has selected serial number
         self.RotationRange_deg=45#rotation range - bear in mind first note may be badly skewed already
         self.RotationStepSize=2#how many steps to cover range of rotation
+        self.MM8_fullResX=1632#1632
+        self.MM8_fullResY=640#640
+        self.PatternSearchDivideImg=3#resize image - might help search as template matching seems to die if we make image too big
+        self.PatternSearchBlur=5#a little blur can help matching
+        self.SubSetOfData=9999
 
 def SetImageParams(SNunter_UserParamsSide_int,FlipSide,FlipWave,FlipHoriz):
     #this can probably be done more easily using enums
@@ -167,7 +175,7 @@ def GetWorkingImage_FromParameters(SNunter_UserParams_Loaded_int):
     return OutputImage
 
 def SN_HuntLoop(SNunter_UserParams_Loaded,InputDat):
-    
+    global ImgView_Resize#HD image doesnt fit on screen
 
     #maybe find least skewed note? Either auto or by user selecting #TODO
 
@@ -178,9 +186,9 @@ def SN_HuntLoop(SNunter_UserParams_Loaded,InputDat):
     s39Maker.outputDirectory=SNunter_UserParams_Loaded.OutputFolder +"\\"
     s39Maker.start()
     #1632*320 is full mm8 image
-    OutputImageR=Get39Image(s39Maker,'front','red',1632,320,0,0,"80080103")
-    OutputImageG=Get39Image(s39Maker,'front','green',1632,320,0,0,"80080103")
-    OutputImageB=Get39Image(s39Maker,'front','blue',1632,320,0,0,"80080103")
+    OutputImageR=Get39Image(s39Maker,'front','red',SNunter_UserParams_Loaded.MM8_fullResX,SNunter_UserParams_Loaded.MM8_fullResY,0,0,"80080103")
+    OutputImageG=Get39Image(s39Maker,'front','green',SNunter_UserParams_Loaded.MM8_fullResX,SNunter_UserParams_Loaded.MM8_fullResY,0,0,"80080103")
+    OutputImageB=Get39Image(s39Maker,'front','blue',SNunter_UserParams_Loaded.MM8_fullResX,SNunter_UserParams_Loaded.MM8_fullResY,0,0,"80080103")
     #pull out the hex mass and convert to an image
     #create dummy dictionary for cross-compatibility with other processes
     ColourImg=cv2.cvtColor(OutputImageR,cv2.COLOR_GRAY2RGB)
@@ -188,9 +196,9 @@ def SN_HuntLoop(SNunter_UserParams_Loaded,InputDat):
     ColourImg[:,:,1]=OutputImageG
     ColourImg[:,:,2]=OutputImageR
     SNunter_UserParams_Loaded.ColourBackGroundF=ColourImg
-    OutputImageR=Get39Image(s39Maker,'back','red',1632,320,0,0,"80080103")
-    OutputImageG=Get39Image(s39Maker,'back','green',1632,320,0,0,"80080103")
-    OutputImageB=Get39Image(s39Maker,'back','blue',1632,320,0,0,"80080103")
+    OutputImageR=Get39Image(s39Maker,'back','red',SNunter_UserParams_Loaded.MM8_fullResX,SNunter_UserParams_Loaded.MM8_fullResY,0,0,"80080103")
+    OutputImageG=Get39Image(s39Maker,'back','green',SNunter_UserParams_Loaded.MM8_fullResX,SNunter_UserParams_Loaded.MM8_fullResY,0,0,"80080103")
+    OutputImageB=Get39Image(s39Maker,'back','blue',SNunter_UserParams_Loaded.MM8_fullResX,SNunter_UserParams_Loaded.MM8_fullResY,0,0,"80080103")
     #pull out the hex mass and convert to an image
     ColourImg=cv2.cvtColor(OutputImageR,cv2.COLOR_GRAY2RGB)
     ColourImg[:,:,0]=OutputImageB
@@ -208,6 +216,7 @@ def SN_HuntLoop(SNunter_UserParams_Loaded,InputDat):
     # keep looping until the 'q' key is pressed
     Blur=1
     LaB=0
+    
     print("Use keys 1/2/3 to cycle through viewmodes")
     print("select area in correct wave with mouse then press C to cut out Region of Interest")
 
@@ -253,7 +262,8 @@ def SN_HuntLoop(SNunter_UserParams_Loaded,InputDat):
             LaB=0
     
         # display the image and wait for a keypress
-        cv2.imshow("image", Global_Image)
+        Global_Image_view=cv2.resize(Global_Image,(int(Global_Image.shape[1]/ImgView_Resize),int(Global_Image.shape[0]/ImgView_Resize)))
+        cv2.imshow("image", Global_Image_view)
         key = cv2.waitKey(1) & 0xFF
         # if the 'r' key is pressed, reset the cropping region
         if key == ord("r"):
@@ -266,9 +276,12 @@ def SN_HuntLoop(SNunter_UserParams_Loaded,InputDat):
         if key == ord("3"):
             SNunter_UserParams_Loaded=SetImageParams(SNunter_UserParams_Loaded,False,False,not SNunter_UserParams_Loaded.FlipHorizontal)
         elif key == ord("c"):
-            if len(refPt) == 2:
-                Global_Image=clone.copy()
-                break
+            if SNunter_UserParams_Loaded.s39_wave == 'colour':
+                print("Please choose a wave using the keyboard - colour is not compatible with S39 extraction")
+            else:
+                if len(refPt) == 2:
+                    Global_Image=clone.copy()
+                    break
        
     # if there are two reference points, then crop the region of interest
     # from the image and display it
@@ -398,40 +411,107 @@ def SN_HuntLoop(SNunter_UserParams_Loaded,InputDat):
 
     return SNunter_UserParams_Loaded
 
-
 def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
 
     #1 6 3 2 * 6 4 0 full res
     #roll through all dats in input list
-    for DatFile in InputDats_list:
+     #start timer and time metrics
+    listTimings=[]
+    listCounts=[]
+    listAvgTime=[]
+    ProcessOnly_start = time.perf_counter()
+    t1_start = None
+    for DatIndex,DatFile in enumerate(InputDats_list):
+        try:
+            if DatIndex>0:
+                listTimings.append(round(time.perf_counter()-t1_start,2))
+                #don't need linear regression as process is static - keep in case we add something funky
+                #slope, intercept, r_value, p_value, std_err = stats.linregress(range(0,len(listTimings[1:-1])),listTimings[1:-1])
+                TimePerProcess=sum(listTimings)/len(listTimings)
+                JobsLeft=len(InputDats_list)-DatIndex
+                print("Estimated time left=",str(datetime.timedelta(seconds=(TimePerProcess*JobsLeft))))
+                print("Total time for",len(InputDats_list),"jobs:",str(datetime.timedelta(seconds=(TimePerProcess*len(InputDats_list)))))
+                print("Time per Snunt=",str(datetime.timedelta(seconds=(TimePerProcess))))
+            #start timer again
+            t1_start = time.perf_counter()
+        except:
+            print("Timing code broken")
         #pull out entire mm8 image in colour
+        LoadedImg_dict={}
         s39Maker = ManyMuchS39.S39Maker()
+        s39Maker.files=[]
         s39Maker.files=[DatFile]
         s39Maker.outputDirectory=SNunter_UserParams_Loaded.OutputFolder +"\\"
         s39Maker.start()
         #1632*320 is full mm8 image
         #1632*320 is full mm8 image
-        OutputImageR=Get39Image(s39Maker,'front','red',1632,320,0,0,"80080103")
-        OutputImageG=Get39Image(s39Maker,'front','green',1632,320,0,0,"80080103")
-        OutputImageB=Get39Image(s39Maker,'front','blue',1632,320,0,0,"80080103")
+        OutputImageR=Get39Image(s39Maker,'front','red',SNunter_UserParams_Loaded.MM8_fullResX,SNunter_UserParams_Loaded.MM8_fullResY,0,0,"80080103")
+        OutputImageG=Get39Image(s39Maker,'front','green',SNunter_UserParams_Loaded.MM8_fullResX,SNunter_UserParams_Loaded.MM8_fullResY,0,0,"80080103")
+        OutputImageB=Get39Image(s39Maker,'front','blue',SNunter_UserParams_Loaded.MM8_fullResX,SNunter_UserParams_Loaded.MM8_fullResY,0,0,"80080103")
+        #persist waves into dictionary
+        LoadedImg_dict[('front','red')]=cv2.cvtColor(OutputImageR.copy(),cv2.COLOR_GRAY2RGB)
+        LoadedImg_dict[('front','green')]=cv2.cvtColor(OutputImageG.copy(),cv2.COLOR_GRAY2RGB)
+        LoadedImg_dict[('front','blue')]=cv2.cvtColor(OutputImageB.copy(),cv2.COLOR_GRAY2RGB)
+        
+
         #pull out the hex mass and convert to an image
         #create dummy dictionary for cross-compatibility with other processes
         ColourImg=cv2.cvtColor(OutputImageR,cv2.COLOR_GRAY2RGB)
         ColourImg[:,:,0]=OutputImageB
         ColourImg[:,:,1]=OutputImageG
         ColourImg[:,:,2]=OutputImageR
-        ColourBackGroundF=ColourImg
-        OutputImageR=Get39Image(s39Maker,'back','red',1632,320,0,0,"80080103")
-        OutputImageG=Get39Image(s39Maker,'back','green',1632,320,0,0,"80080103")
-        OutputImageB=Get39Image(s39Maker,'back','blue',1632,320,0,0,"80080103")
+        ColourBackGroundF=ColourImg#combine channels into colour image
+        OutputImageR=Get39Image(s39Maker,'back','red',SNunter_UserParams_Loaded.MM8_fullResX,SNunter_UserParams_Loaded.MM8_fullResY,0,0,"80080103")
+        OutputImageG=Get39Image(s39Maker,'back','green',SNunter_UserParams_Loaded.MM8_fullResX,SNunter_UserParams_Loaded.MM8_fullResY,0,0,"80080103")
+        OutputImageB=Get39Image(s39Maker,'back','blue',SNunter_UserParams_Loaded.MM8_fullResX,SNunter_UserParams_Loaded.MM8_fullResY,0,0,"80080103")
+        #persist waves into dictionary
+        LoadedImg_dict[('back','red')]=cv2.cvtColor(OutputImageR.copy(),cv2.COLOR_GRAY2RGB)
+        LoadedImg_dict[('back','green')]=cv2.cvtColor(OutputImageG.copy(),cv2.COLOR_GRAY2RGB)
+        LoadedImg_dict[('back','blue')]=cv2.cvtColor(OutputImageB.copy(),cv2.COLOR_GRAY2RGB)
         #pull out the hex mass and convert to an image
         ColourImg=cv2.cvtColor(OutputImageR,cv2.COLOR_GRAY2RGB)
         ColourImg[:,:,0]=OutputImageB
         ColourImg[:,:,1]=OutputImageG
         ColourImg[:,:,2]=OutputImageR
-        ColourBackGroundB=ColourImg
+        ColourBackGroundB=ColourImg#combine channels into colour image
+
+        #stack all images - we need to do this due to some template matching methods compatible with masking
+        #give us results more difficult to decipher if analysing each note orientation independantly
+        #multiply Y by 4 (# of orientations)
+        StackOrientations=np.zeros((ColourBackGroundB.shape[0],ColourBackGroundB.shape[1]*4,ColourBackGroundB.shape[2]),dtype='uint8')
+        StackOrientations_UserWave=np.zeros((ColourBackGroundB.shape[0],ColourBackGroundB.shape[1]*4,ColourBackGroundB.shape[2]),dtype='uint8')
+        
+        
+        Offset=0
+        
+        #add front (A)
+        StackOrientations[0:ColourBackGroundF.shape[0],0+Offset:ColourBackGroundF.shape[1]+Offset,:]=ColourBackGroundF
+        StackOrientations_UserWave[0:ColourBackGroundF.shape[0],0+Offset:ColourBackGroundF.shape[1]+Offset,:]=LoadedImg_dict[('front',SNunter_UserParams_Loaded.s39_wave)]
+
+        #add front rotate(B)
+        Offset=Offset+ColourBackGroundF.shape[1]
+        StackOrientations[0:ColourBackGroundF.shape[0],0+Offset:ColourBackGroundF.shape[1]+Offset,:]=RotateImage(ColourBackGroundF,180)
+        StackOrientations_UserWave[0:ColourBackGroundF.shape[0],0+Offset:ColourBackGroundF.shape[1]+Offset,:]=RotateImage(LoadedImg_dict[('front',SNunter_UserParams_Loaded.s39_wave)],180)
+        
+         #add back rotate(C)
+        Offset=Offset+ColourBackGroundF.shape[1]
+        StackOrientations[0:ColourBackGroundF.shape[0],0+Offset:ColourBackGroundF.shape[1]+Offset,:]=RotateImage(ColourBackGroundB,180)
+        StackOrientations_UserWave[0:ColourBackGroundF.shape[0],0+Offset:ColourBackGroundF.shape[1]+Offset,:]=RotateImage(LoadedImg_dict[('back',SNunter_UserParams_Loaded.s39_wave)],180)
+       
+        #add back (D)
+        Offset=Offset+ColourBackGroundF.shape[1]
+        StackOrientations[0:ColourBackGroundF.shape[0],0+Offset:ColourBackGroundF.shape[1]+Offset,:]=ColourBackGroundB
+        StackOrientations_UserWave[0:ColourBackGroundF.shape[0],0+Offset:ColourBackGroundF.shape[1]+Offset,:]=LoadedImg_dict[('back',SNunter_UserParams_Loaded.s39_wave)]
+
+        #StackOrientations=ColourBackGroundF
+        StackOrientations=cv2.resize(StackOrientations,(int(StackOrientations.shape[1]/SNunter_UserParams_Loaded.PatternSearchDivideImg),int(StackOrientations.shape[0]/SNunter_UserParams_Loaded.PatternSearchDivideImg)))
+        #blurring might help template matching
+        KernelSize=9
+        kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing - maybe make smoother as such small images
+        StackOrientations = cv2.filter2D(StackOrientations,-1,kernel)
         #cv2.imshow("imageclip", ColourBackGroundB)
-        #cv2.imshow("imageclip", ColourBackGroundF)
+        #StackOrientations=cv2.resize(ColourBackGroundF,(int(ColourBackGroundF.shape[0]/4),int(ColourBackGroundF.shape[1]/4)))
+        cv2.imshow("imageclip",cv2.resize(StackOrientations,(700,700)))
         #cv2.waitKey(0)
 
         # Apply template Matching
@@ -439,10 +519,17 @@ def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
         #https://opencv24-python-tutorials.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_template_matching/py_template_matching.html
         Latch_MaxValue=None
         Latch_MaxValueIndex=None
+        Latch_MaxValueTopLeft=None
+        Latch_MaxValueTopRight=None
+        Latch_SavedPatternMatch=None
+        Latch_SavedBestPattern=None
+        Orientation="EMPTY"
         for RotateIndex, RotationStage in enumerate(SNunter_UserParams_Loaded.RotateSeries_SquareLocalArea):
-            ImgToProcess=ColourBackGroundF.copy()
+            ImgToProcess=StackOrientations.copy()
             RotatedTemplate=SNunter_UserParams_Loaded.RotateSeries_SquareLocalArea[RotateIndex]
             RotatedMask=SNunter_UserParams_Loaded.RotateSeries_MaskOfSN[RotateIndex]
+            RotatedTemplate=cv2.resize(RotatedTemplate,(int(RotatedTemplate.shape[1]/SNunter_UserParams_Loaded.PatternSearchDivideImg),int(RotatedTemplate.shape[0]/SNunter_UserParams_Loaded.PatternSearchDivideImg)))
+            RotatedMask=cv2.resize(RotatedMask,(int(RotatedMask.shape[1]/SNunter_UserParams_Loaded.PatternSearchDivideImg),int(RotatedMask.shape[0]/SNunter_UserParams_Loaded.PatternSearchDivideImg)))
             cv2.imshow("imageclipTemplate", RotatedTemplate)
             #cv2.waitKey(0)
             #cv2.imshow("imageclip", RotatedMask)
@@ -450,31 +537,74 @@ def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
             ch, h,w = RotatedTemplate.shape[::-1]
             #only two methods accept masks
             #(cv.TM_SQDIFF == match_method or match_method == cv.TM_CCORR_NORMED)
-            res = cv2.matchTemplate(ColourBackGroundF,RotatedTemplate,cv2.TM_CCORR_NORMED,None,RotatedMask)#warning: only two methods work with mask
+            #normalising methods make it harder to find a true match - for instance if looking at wrong side of note 
+            res = cv2.matchTemplate(StackOrientations,RotatedTemplate,cv2.TM_CCORR_NORMED,None,None)#warning: only two methods work with mask
             
             #cv2.normalize( res, res, 0, 1, cv2.NORM_MINMAX, -1 )#so we can visualise result - don't normalise the result
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
             InputVal=max_val#max or min result depends on method used in match template
-            print("max value",InputVal)
+            #print("max value",InputVal)
             #latch max/min values
-            if RotateIndex==0:
+            if RotateIndex==0 or InputVal>Latch_MaxValue:
                 Latch_MaxValue=InputVal
                 Latch_MaxValueIndex=RotateIndex
-            else:
-                if InputVal>Latch_MaxValue:
-                    Latch_MaxValue=InputVal
-                    Latch_MaxValueIndex=RotateIndex
-            #be careful - if we change method of template match this will have to be reversed
-            top_left = max_loc
-            bottom_right = (top_left[0] + w, top_left[1] + h)
-            cv2.rectangle(ImgToProcess,top_left, bottom_right, 255, 2)
+
+                #draw initial rectangle
+                top_left = max_loc
+                bottom_right = (top_left[0] + w, top_left[1] + h)
+                cv2.rectangle(ImgToProcess,top_left, bottom_right, 90, 1)
+                Latch_MaxValueTopLeft=top_left
+                Latch_MaxValueTopRight=bottom_right
+                #latch image to save out
+                Latch_SavedPatternMatch=ImgToProcess
+                #Latch_SavedBestPattern=RotatedTemplate
+                Div=SNunter_UserParams_Loaded.PatternSearchDivideImg
+                Latch_SavedBestPattern=StackOrientations_UserWave[top_left[1]*Div:bottom_right[1]*Div,top_left[0]*Div:bottom_right[0]*Div,:]
+
+                #get what orientation search pattern was found - current method relies on orientations A B C D being stacked horizontally
+                StackWidth=StackOrientations_UserWave.shape[1]/4
+                #get position - need to multiply by user parameter for shrinking search stack image
+                PatternPos=Latch_MaxValueTopLeft[0]*SNunter_UserParams_Loaded.PatternSearchDivideImg
+                #get index of orientation (1=a,2=b etc)
+                OrientationIndex=np.floor(PatternPos/StackWidth)+1
+                Orientation="ERROR"
+                if OrientationIndex==1:Orientation="A"
+                if OrientationIndex==2:Orientation="B"
+                if OrientationIndex==3:Orientation="C"
+                if OrientationIndex==4:Orientation="D"
+
+            
+            cv2.rectangle(ImgToProcess,Latch_MaxValueTopLeft, Latch_MaxValueTopRight, 255, 2)
+            
             #cv2.imshow("imageclip", res)
             #cv2.waitKey(0)
-            cv2.imshow("imageclip", ImgToProcess)
-            cv2.waitKey(0)
+            cv2.imshow("imageclip",cv2.resize(ImgToProcess,(800,800)))
+            #cv2.waitKey(0)
+
+        
+        #save search info out to folder
+        BestMatchImg_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_BestMatch.jpg"
+        SearchPattern_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_SearchPattern.jpg"
+        UserWave_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_UserWave.jpg"
+        
+        cv2.imwrite(BestMatchImg_filename,Latch_SavedPatternMatch)
+        cv2.imwrite(SearchPattern_filename,Latch_SavedBestPattern)
+        #cv2.imwrite(UserWave_filename,StackOrientations_UserWave)
+
 
 #instantiate user params class which we will load during user interactivity
 SNunter_UserParams_toLoad=SNunter_UserParams()
+
+#load in user folders
+SNunter_UserParams_toLoad.InputFolder=r"C:\Working\FindIMage_In_Dat\TestMedia\PatternMatch_mm8_denom2"
+#set output folder
+SNunter_UserParams_toLoad.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputFindPattern"
+print("Please check output folders can be deleted:",SNunter_UserParams_toLoad.OutputFolder)
+Response=_3DVisLabLib.yesno("Continue?")
+if Response==True:
+    #delete output folder
+    _3DVisLabLib.DeleteFiles_RecreateFolder(SNunter_UserParams_toLoad.OutputFolder)
+
 
 #get all files in folders recursively
 print("Looking in",SNunter_UserParams_toLoad.InputFolder,"for .dat files")
@@ -482,6 +612,18 @@ List_all_Files=GetAllFilesInFolder_Recursive(SNunter_UserParams_toLoad.InputFold
 #filter out non .dats
 List_all_Dats=GetList_Of_ImagesInList(List_all_Files,".dat")
 print(len(List_all_Dats),".dat files found")
+#randomise dat files
+#load images in random order for testing
+print("Randomising input order, using max subset of",SNunter_UserParams_toLoad.SubSetOfData,"MM8 files")
+randomdict=dict()
+for Index, ImagePath in enumerate(List_all_Dats):
+    randomdict[ImagePath]=Index
+#user may have specified a subset of data
+List_all_Dats=[]
+while (len(List_all_Dats)<SNunter_UserParams_toLoad.SubSetOfData) and (len(randomdict)>0):
+    randomchoice_img=random.choice(list(randomdict.keys()))
+    List_all_Dats.append(randomchoice_img)
+    del randomdict[randomchoice_img]
 
 #UI to select part of note, then create details necessary to find SN in other notes 
 SNunter_UserParams_Loaded=SN_HuntLoop(SNunter_UserParams_toLoad,List_all_Dats[0])#use first .dat file - even better if we can find least skewed one
