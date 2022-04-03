@@ -471,7 +471,7 @@ class S39Maker:
 
     def start(self):
         if self.shouldPrintProgress:
-            print('Extracting S39 from all MM8 in same directory or lower')
+            #print('Extracting S39 from all MM8 in same directory or lower')
             if not (self.directory == '.\\'):
                 print('Using directory: ' + self.directory)
         if len(self.files) == 0:
