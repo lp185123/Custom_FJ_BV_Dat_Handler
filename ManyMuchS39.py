@@ -1,5 +1,7 @@
 import sys, os, shutil, binascii, math
 from datetime import datetime
+import time
+LookUpTable=dict()
 
 class ImageExtractor:
     HEIGHT_OFFSET = 4
@@ -503,6 +505,7 @@ class S39Maker:
         return hexNumber
 
     def extractS39(self):
+        global LookUpTable
         for mm8 in self.mm8:
             imageExtractor = mm8.imageExtractor
             file = mm8.file
@@ -538,18 +541,32 @@ class S39Maker:
             point += self.x * 4
             #print(len(s39))
             image = ''
+            image_list=[]
+            t1_start = time.perf_counter()
             for y in range(0, self.height):
                 if self.y + y < 640:
                     for x in range(0, self.width):
                         if self.x + x < 1632:
-                            grayscale16 = int(ImageExtractor.littleEndianHexToInt(snr[1].data[point + (x * 4):point + (x * 4) + 4]) / 16)
-                            correctedPixel = hex(grayscale16)[2:]
-                            correctedPixel = correctedPixel[-2:]
-                            while len(correctedPixel) < 2:
-                                correctedPixel = '0' + correctedPixel
-                            image += correctedPixel
-                    point += 1632 * 4
 
+                            HexChunk=snr[1].data[point + (x * 4):point + (x * 4) + 4]
+
+                            try:#Try structure essentially "free" (unless capturing an error)
+                                correctedPixel=LookUpTable[HexChunk]
+                            except:
+                                grayscale16 = int(ImageExtractor.littleEndianHexToInt(HexChunk )/ 16)
+                                correctedPixel = hex(grayscale16)[2:]
+                                correctedPixel = correctedPixel[-2:]
+                                while len(correctedPixel) < 2:
+                                    correctedPixel = '0' + correctedPixel
+
+                                LookUpTable[HexChunk]=correctedPixel
+                            
+                            
+                            #image += correctedPixel
+                            image_list.append(correctedPixel)
+                    point += 1632 * 4
+            
+            image=''.join(image_list)
             self.images.append(image)
             s39 += image
             remaining = 66320 - len(s39)
@@ -569,6 +586,13 @@ class S39Maker:
             s39 += thirdBlock[1].data[48:4834]
             s39 += waveDesignation
             s39 += thirdBlock[1].data[4836:]
+
+            T1_finish=round(time.perf_counter()-t1_start,3)
+            print("Time per Snunt=",T1_finish)
+            print(len(LookUpTable))
+
+
+
             directories = file.split('\\')
             self.ensureDirectory(self.outputDirectory);
             with open(self.outputDirectory + directories[len(directories) - 1][:-4] + '.s39', "bw+") as output:

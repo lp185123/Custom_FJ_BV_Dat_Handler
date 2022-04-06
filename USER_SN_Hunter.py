@@ -18,7 +18,43 @@ GlobalMousePos=None#need to be global to handle capturing mouse on opencv UI
 ImgView_Resize=1.3#HD image doesnt fit on screen
 
 
-
+class SNunter_UserParams():
+    def __init__(self) -> None:
+        self.InputFolder=r"C:\Working\FindIMage_In_Dat\Input"
+        self.OutputFolder=r"C:\Working\FindIMage_In_Dat\Output"
+        self.s39_shouldPrintProgress = False
+        self.s39_directory = '.\\'#repopulated later
+        self.s39_outputDirectory = '.\\s39\\'#repopulated later
+        self.s39_wave = 'colour' # or green or blue
+        self.s39_side = 'front' # or back
+        self.s39_validation = '80080103'
+        self.s39_width = 336
+        self.s39_height = 88
+        self.s39_x = 681+358#519+336+40+40+40#add these together
+        self.s39_y = 101#keep scroll point at 320 (weird coordinate systems)
+        self.ColourBackGroundF=None
+        self.ColourBackGroundB=None
+        self.ColourBackGroundF_flood=None
+        self.ColourBackGroundB_flood=None
+        self.WorkingImage=None
+        self.FlipHorizontal=False
+        self.SearchTemplate_col=None
+        self.SearchTemplate_bw=None
+        self.SearchTemplate_localArea_bw=None
+        self.CircularAoI_WithNoise=None
+        self.CircularAoI_Mask_WhiteCircle=None
+        self.CircularAoI_Mask_BlackCircle=None
+        self.RotateSeries_SquareLocalArea=[]
+        self.RotateSeries_MaskOfSN=[]
+        self.LocalAreaBuffer=50#add to area once user has selected serial number
+        self.RotationRange_deg=45#rotation range - bear in mind first note may be badly skewed already
+        self.RotationStepSize=1#how many steps to cover range of rotation
+        self.MM8_fullResX=1632#1632
+        self.MM8_fullResY=640#640
+        self.PatternSearchDivideImg=3#resize image - might help search as template matching seems to die if we make image too big
+        self.PatternSearchBlur=5#a little blur can help matching
+        self.SubSetOfData=9999
+        self.GetFloodFillImg=False
 
 def FloodFill(Inputimage):
     SeedPoint=(50,20)
@@ -40,9 +76,21 @@ def FloodFill(Inputimage):
 
     #blur = cv2.bilateralFilter(image,9,75,75)
     #https://stackoverflow.com/questions/60197665/opencv-how-to-use-floodfill-with-rgb-image
-    cv2.floodFill(image, None, seedPoint=SeedPoint, newVal=(0, 255, 0), loDiff=(10, 10, 10, 10), upDiff=(8, 8,8, 8))
-    cv2.circle(image, SeedPoint, 10, (0, 0, 255), cv2.FILLED, cv2.LINE_AA)
-    return image
+    # 0 1 2 here is essentially a "magic number" - at moment as array is uint8 cant put in a special number like -1
+    #so have to just use an unlikely colour to appear
+    cv2.floodFill(image, None, seedPoint=SeedPoint, newVal=(1, 2, 3), loDiff=(10, 10, 10, 10), upDiff=(8, 8,8, 8))
+
+    #we want to keep the flooded area but not keep the gradient image parts - so use as a pseudo mask
+    for _X in range (0,image.shape[0]):
+        for _Y in range (0,image.shape[1]):
+            #must be a better way of doing this
+            #matching code from floodfill line above
+                if image[_X,_Y,0]==1 and image[_X,_Y,1]==2 and image[_X,_Y,2]==3 :
+                    Inputimage[_X,_Y,:]=[0,255,0]
+
+    #circle for us to check that the seed is in correct location
+    cv2.circle(Inputimage, SeedPoint, 10, (0, 0, 255), cv2.FILLED, cv2.LINE_AA)
+    return Inputimage
 
 def kmeans_color_quantization(image, clusters=8, rounds=1):#
     #https://stackoverflow.com/questions/60197665/opencv-how-to-use-floodfill-with-rgb-image
@@ -115,7 +163,8 @@ def RotateImage(InputImage,RotationDeg):
     return rotated
 
 def click_and_crop(event, x, y, flags, param):
-    
+    #this is specifically for the s39 area selection and will need to be modified
+    #for other applications
     #https://pyimagesearch.com/2015/03/09/capturing-mouse-click-events-with-python-and-opencv/#:~:text=Anytime%20a%20mouse%20event%20happens,details%20to%20our%20click_and_crop%20function.
 	# grab references to the global variables
     global refPt, cropping,GlobalMousePos,ImgView_Resize
@@ -123,55 +172,35 @@ def click_and_crop(event, x, y, flags, param):
 	# if the left mouse button was clicked, record the starting
 	# (x, y) coordinates and indicate that cropping is being
 	# performed
-    GlobalMousePos=(int(x*ImgView_Resize), int(y*ImgView_Resize))
     
+    #UI has to be shrunk to fit in window - working images are true size
+    x=x*ImgView_Resize
+    y=y*ImgView_Resize
+    #if user is cropping - comply with s39 restriction for height & width being divisibly by 8
+    if cropping==True:
+        #get difference between start of area select and current position, then correct to be divisible by 8
+        StartX=refPt[0][0]
+        StartY=refPt[0][1]
+        DiffX=x-StartX
+        DiffY=y-StartY
+        ErrorX=DiffX%8
+        ErrorY=DiffY%8
+        x=x-ErrorX
+        y=y-ErrorY
+    #set global variable
+    GlobalMousePos=(int(x), int(y))
+
+
     if event == cv2.EVENT_LBUTTONDOWN:
-        refPt = [(int(x*ImgView_Resize), int(y*ImgView_Resize))]
+        refPt = [(int(x), int(y))]
         cropping = True
 	# check to see if the left mouse button was released
     elif event == cv2.EVENT_LBUTTONUP:
         # record the ending (x, y) coordinates and indicate that
         # the cropping operation is finished
-        refPt.append((int(x*ImgView_Resize), int(y*ImgView_Resize)))
+        refPt.append((int(x), int(y)))
         cropping = False
 
-class SNunter_UserParams():
-    def __init__(self) -> None:
-        self.InputFolder=r"C:\Working\FindIMage_In_Dat\Input"
-        self.OutputFolder=r"C:\Working\FindIMage_In_Dat\Output"
-        self.s39_shouldPrintProgress = False
-        self.s39_directory = '.\\'#repopulated later
-        self.s39_outputDirectory = '.\\s39\\'#repopulated later
-        self.s39_wave = 'colour' # or green or blue
-        self.s39_side = 'front' # or back
-        self.s39_validation = '80080103'
-        self.s39_width = 336
-        self.s39_height = 88
-        self.s39_x = 681+358#519+336+40+40+40#add these together
-        self.s39_y = 101#keep scroll point at 320 (weird coordinate systems)
-        self.ColourBackGroundF=None
-        self.ColourBackGroundB=None
-        self.ColourBackGroundF_flood=None
-        self.ColourBackGroundB_flood=None
-        self.WorkingImage=None
-        self.FlipHorizontal=False
-        self.SearchTemplate_col=None
-        self.SearchTemplate_bw=None
-        self.SearchTemplate_localArea_bw=None
-        self.CircularAoI_WithNoise=None
-        self.CircularAoI_Mask_WhiteCircle=None
-        self.CircularAoI_Mask_BlackCircle=None
-        self.RotateSeries_SquareLocalArea=[]
-        self.RotateSeries_MaskOfSN=[]
-        self.LocalAreaBuffer=50#add to area once user has selected serial number
-        self.RotationRange_deg=45#rotation range - bear in mind first note may be badly skewed already
-        self.RotationStepSize=2#how many steps to cover range of rotation
-        self.MM8_fullResX=1632#1632
-        self.MM8_fullResY=640#640
-        self.PatternSearchDivideImg=3#resize image - might help search as template matching seems to die if we make image too big
-        self.PatternSearchBlur=5#a little blur can help matching
-        self.SubSetOfData=9999
-        self.GetFloodFillImg=False
 
 def SetImageParams(SNunter_UserParamsSide_int,FlipSide,FlipWave,FlipHoriz):
     #this can probably be done more easily using enums
@@ -528,15 +557,29 @@ def SN_HuntLoop(SNunter_UserParams_Loaded,InputDat):
     for RotateDeg in range (-SNunter_UserParams_Loaded.RotationRange_deg,SNunter_UserParams_Loaded.RotationRange_deg,SNunter_UserParams_Loaded.RotationStepSize):
         #RotatedImage=RotateImage(SNunter_UserParams_Loaded.SquareCutRegion,RotateDeg)
         #SubtractImg=cv2.subtract(RotatedImage,SNunter_UserParams_Loaded.CircularAoI_Mask_BlackCircle)
-        RotatedImage=RotateImage(SquareCutRegion,RotateDeg)
+        #RotatedImage=RotateImage(SquareCutRegion,RotateDeg)
         RotatedImage_mask=RotateImage(SNunter_UserParams_Loaded.CircularAoI_Mask_WhiteCircle,RotateDeg)
         #RotatedImg_andMask=cv2.add(MaskedNoise,SubtractImg)
-        SNunter_UserParams_Loaded.RotateSeries_SquareLocalArea.append(RotatedImage)
+        #SNunter_UserParams_Loaded.RotateSeries_SquareLocalArea.append(RotatedImage)
         SNunter_UserParams_Loaded.RotateSeries_MaskOfSN.append(RotatedImage_mask)
         #cv2.imshow("imageclip", RotatedImage)
         #cv2.waitKey(0)
         #cv2.imshow("imageclip", RotatedImage_mask)
         #cv2.waitKey(0)
+
+        #second rotation technique
+        #rotate the main image and crop a square from the center of selection region
+        M = cv2.getRotationMatrix2D((MidPointX,MidPointY), RotateDeg, 1.0)
+        rotated = cv2.warpAffine(Global_Image, M, (Global_Image.shape[1], Global_Image.shape[0]))
+        SquareCutRegion_rot=rotated[Y_up:Y_up+Length,X_left:X_left+Length,:]
+        SNunter_UserParams_Loaded.RotateSeries_SquareLocalArea.append(SquareCutRegion_rot)
+        #cv2.imshow("imageclip", SquareCutRegion_rot)
+        #cv2.waitKey(0)
+
+        #save out rotation sequence for debugging
+        RotateMatchPAttern_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(RotateDeg) + "_RotateMatchPattern.jpg"
+        cv2.imwrite(RotateMatchPAttern_filename,SquareCutRegion_rot)
+
 
     return SNunter_UserParams_Loaded
 
@@ -674,8 +717,8 @@ def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
             #(cv.TM_SQDIFF == match_method or match_method == cv.TM_CCORR_NORMED)
             #normalising methods make it harder to find a true match - for instance if looking at wrong side of note 
             res = cv2.matchTemplate(StackOrientations,RotatedTemplate,cv2.TM_CCORR_NORMED,None,None)#warning: only two methods work with mask
-            
-            #cv2.normalize( res, res, 0, 1, cv2.NORM_MINMAX, -1 )#so we can visualise result - don't normalise the result
+            #so we can visualise result - don't normalise the result
+
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
             InputVal=max_val#max or min result depends on method used in match template
             #print("max value",InputVal)
@@ -692,14 +735,14 @@ def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
                 Latch_MaxValueTopRight=bottom_right
                 #latch image to save out
                 Latch_SavedPatternMatch=ImgToProcess
-                #Latch_SavedBestPattern=RotatedTemplate
+                Latch_SavedBestRotationPattern=SNunter_UserParams_Loaded.RotateSeries_SquareLocalArea[RotateIndex].copy()
                 Div=SNunter_UserParams_Loaded.PatternSearchDivideImg
-                Latch_SavedBestPattern=StackOrientations_UserWave[top_left[1]*Div:bottom_right[1]*Div,top_left[0]*Div:bottom_right[0]*Div,:]
+                Latch_SavedBestPattern=StackOrientations_UserWave[int(top_left[1]*Div):int(bottom_right[1]*Div),int(top_left[0]*Div):int(bottom_right[0]*Div),:]
 
                 #get what orientation search pattern was found - current method relies on orientations A B C D being stacked horizontally
                 StackWidth=StackOrientations_UserWave.shape[1]/4
                 #get position - need to multiply by user parameter for shrinking search stack image
-                PatternPos=Latch_MaxValueTopLeft[0]*SNunter_UserParams_Loaded.PatternSearchDivideImg
+                PatternPos=int(Latch_MaxValueTopLeft[0]*SNunter_UserParams_Loaded.PatternSearchDivideImg)
                 #get index of orientation (1=a,2=b etc)
                 OrientationIndex=np.floor(PatternPos/StackWidth)+1
                 Orientation="ERROR"
@@ -707,7 +750,8 @@ def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
                 if OrientationIndex==2:Orientation="B"
                 if OrientationIndex==3:Orientation="C"
                 if OrientationIndex==4:Orientation="D"
-
+                res_output=res.copy()
+                cv2.normalize(res_output, res_output, 0, 255, cv2.NORM_MINMAX, -1 )
             
             cv2.rectangle(ImgToProcess,Latch_MaxValueTopLeft, Latch_MaxValueTopRight, 255, 2)
             
@@ -720,19 +764,21 @@ def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
         #save search info out to folder
         BestMatchImg_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_BestMatch.jpg"
         SearchPattern_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_SearchPattern.jpg"
-        UserWave_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_UserWave.jpg"
-        
+        PatternMatch_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_PatternMatch.jpg"
+        res_output_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_ResMap.jpg"
         cv2.imwrite(BestMatchImg_filename,Latch_SavedPatternMatch)
         cv2.imwrite(SearchPattern_filename,Latch_SavedBestPattern)
-        #cv2.imwrite(UserWave_filename,StackOrientations_UserWave)
+        cv2.imwrite(PatternMatch_filename,Latch_SavedBestRotationPattern)
+        cv2.imwrite(res_output_filename,res_output)
+        
 
 
 #instantiate user params class which we will load during user interactivity
 SNunter_UserParams_toLoad=SNunter_UserParams()
 
 #load in user folders
-#SNunter_UserParams_toLoad.InputFolder=r"C:\Working\FindIMage_In_Dat\TestMedia\PatternMatch_mm8_denom2"
-SNunter_UserParams_toLoad.InputFolder=r"E:\NCR\Currencies\Bangladesh_SR2800\Bangladesh\SR DC\MM8\1000\2008"
+SNunter_UserParams_toLoad.InputFolder=r"E:\NCR\Currencies\01_MM8_DC\SR_MALAYSIA_MM8_DC\KP00010010\MM8\50 MYR B"
+#SNunter_UserParams_toLoad.InputFolder=r"E:\NCR\Currencies\Bangladesh_SR2800\Bangladesh\SR DC\MM8\1000\2008"
 #set output folder
 SNunter_UserParams_toLoad.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputFindPattern"
 print("Please check output folders can be deleted:",SNunter_UserParams_toLoad.OutputFolder)
