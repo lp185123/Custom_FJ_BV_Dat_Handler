@@ -76,6 +76,7 @@ class UserInputParameters():
         self.GetSNR=False
         self.GetRGBImage=""#""True""
         self.FolderPerDat=False
+        self.GetBothSides=True
 
 
         self.s39_shouldPrintProgress = True
@@ -218,8 +219,6 @@ class DummyImageClass():
 
 def AutomaticExtraction(UserParameters):
     
-
-
     if UserParameters.GenerateS39orImageFromS39==True:
         #if s39 - we can cheat and rename the s.39 as .dats to keep everything in order
         #TODO improve this if we can get time earmarked for development
@@ -331,6 +330,7 @@ def AutomaticExtraction(UserParameters):
         SkippedFiles=dict()
 
         for FileIndex, DatFile in enumerate(InputFiles_cleaned):
+            
             print(FileIndex,"/",len(InputFiles_cleaned))
             #get all images from first .dat file in input folder(s) (nested)
             #create subfolder from name of dat file
@@ -373,6 +373,14 @@ def AutomaticExtraction(UserParameters):
                         continue
                         #raise Exception(DatFile,"Automatic image extraction RGB channels: extracted channel sizes do not match!")
 
+
+                #user might want both images
+                if UserParameters.GetBothSides==True:
+                    filteredImages_Back = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.UnderFeed_RGBwaves[0])
+                    filteredImagesR_Back = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.UnderFeed_RGBwaves[2])
+                    filteredImagesB_Back = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.UnderFeed_RGBwaves[1])
+
+
                 #load in dat file as hex
                 data_hex=Load_Hex_File(DatFile)
                 #check if MM8 image wanted
@@ -382,7 +390,15 @@ def AutomaticExtraction(UserParameters):
                 #roll through filtered images and extract from datamass
                 NoteCount=0
                 for Index,Notefound in enumerate(filteredImages):
+                    OutputImage_back=None#use option to extract both sides of capture
+                    #front facing image
                     (OutputImage,dummy)=Image_from_Automatic_mode(filteredImages,Notefound,data_hex,IsMM8_Image)
+
+                    #optional back face
+                    if UserParameters.GetBothSides==True:
+                        (OutputImage_back,dummy)=Image_from_Automatic_mode(filteredImages_Back,Notefound,data_hex,IsMM8_Image)
+
+
                     SNR_ReadResult=""
                     #if request for all colour channels is true - combine images
                     #this will have been checked earlier for alignment
@@ -401,6 +417,29 @@ def AutomaticExtraction(UserParameters):
                         #should have an RGB image now 
                         OutputImage=RGB_Image
 
+
+                    if UserParameters.GetBothSides==True:
+                        print("Debug - getting back image ")
+                        (red_image,dummy)=Image_from_Automatic_mode(filteredImagesR_Back,Notefound,data_hex,IsMM8_Image)
+                        (blue_image,dummy)=Image_from_Automatic_mode(filteredImagesB_Back,Notefound,data_hex,IsMM8_Image)
+                        #create empty 3 channel (RGB) image
+                        #all images should be same dimensions so arbitary which one we take dims from
+                        RGB_Image = np.zeros((int(filteredImages[Notefound].height),int(filteredImages[Notefound].width),3), np.uint8)
+                        #use slicing to load image
+                        #WARNING these colour channels will not correspond to RGB!!! Done ad hoc 
+                        #For OpenCV, 0=blue, 1=Green, 2=red
+                        RGB_Image[:,:,0]=blue_image
+                        RGB_Image[:,:,1]=OutputImage_back
+                        RGB_Image[:,:,2]=red_image
+                        #should have an RGB image now 
+                        OutputImage_back=RGB_Image
+                        #stack images
+                        StackCanvas = np.zeros((int(filteredImages[Notefound].height*2),int(filteredImages[Notefound].width),3), np.uint8)
+                        StackCanvas[0:filteredImages[Notefound].height,0:filteredImages[Notefound].width,:]=OutputImage
+                        StackCanvas[filteredImages[Notefound].height:,0:filteredImages[Notefound].width,:]=OutputImage_back
+                        OutputImage=StackCanvas
+
+
                     #display image
                     #_3DVisLabLib.ImageViewer_Quickv2(OutputImage,0,False,False)
 
@@ -418,6 +457,10 @@ def AutomaticExtraction(UserParameters):
                         Savestring=DatFile.lower().replace(".dat",".jpg")
                         print("saving image to ", Savestring)
                         cv2.imwrite(Savestring,OutputImage)
+
+                        #if UserParameters.GetBothSides==True:#user option to extract back of capture
+                        #    Savestring2=Savestring.replace(".jpg","_BACK.jpg")
+                        #    cv2.imwrite(Savestring2,OutputImage_back)
                         break
                     else:
                         DelimitedDat=DatFile.split("\\")
@@ -435,6 +478,12 @@ def AutomaticExtraction(UserParameters):
                         cv2.imwrite(Savestring,OutputImage)
                         #CreateImageVDatfileRecord provenance tracker
                         #ImageHash=_3DVisLabLib. pHash(OutputImage)
+
+                        #if UserParameters.GetBothSides==True:#user option to extract back of capture
+                        #    Savestring2=Savestring.replace(".jpg","_BACK.jpg")
+                        #    cv2.imwrite(Savestring2,OutputImage_back)
+                        
+
                         ImgVDatFile_andRecord[Savestring]=(DatFile,Index+1,SNR_ReadResult)
                 print(DatFile,NoteCount)
             except:
