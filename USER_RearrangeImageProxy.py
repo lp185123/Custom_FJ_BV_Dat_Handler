@@ -11,7 +11,7 @@ OutputFolder=r"C:\Working\FindIMage_In_Dat\Output"
 MergedRecordSize=300
 
 #what folder has user placed in images (dat records) to merge
-TestMergingFolder=r"C:\Working\FindIMage_In_Dat\Output\ReorganiseOrMerge"
+TestMergingFolder=r"C:\Working\FindIMage_In_Dat\Output\Merge_D6_BigStains\Internal_CD"
 
 #load json file which links image proxies back to their dat files and record
 RecordOffset=-1#fudge factor
@@ -39,7 +39,7 @@ for ImgProxy in ListAllJpg_files:
 #File13_Image_48_2a_aa_190116_120731 - Copy - Copy.jpg
 #File13_Image_47_2a_aa_190116_120731 (2).jpg<----------this one harder to detect
 
-List_WindowsCopy_Suffix=[" - Copy", " ("]
+List_WindowsCopy_Suffix=[]#disable this - some dats can have such extensions[" - Copy", " ("]
 #list of duplicate list filenames we can add to safelist
 Duplicates_list=[]
 for ImgProxy in ListAllJpg_files:

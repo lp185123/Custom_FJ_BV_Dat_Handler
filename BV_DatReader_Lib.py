@@ -419,7 +419,7 @@ def AutomaticExtraction(UserParameters):
 
 
                     if UserParameters.GetBothSides==True:
-                        print("Debug - getting back image ")
+                        print("Debug - combining front and back image: UserParameters.GetBothSides ")
                         (red_image,dummy)=Image_from_Automatic_mode(filteredImagesR_Back,Notefound,data_hex,IsMM8_Image)
                         (blue_image,dummy)=Image_from_Automatic_mode(filteredImagesB_Back,Notefound,data_hex,IsMM8_Image)
                         #create empty 3 channel (RGB) image

@@ -487,6 +487,7 @@ class S39Maker:
         self.validation = '80080103'
         self.width = 336
         self.height = 88
+        self.Rotate180=False
         self.x = 0
         self.y = 0
         self.images = []
@@ -568,10 +569,10 @@ class S39Maker:
                 if self.y + y < 640:
                     for x in range(0, self.width):
                         if self.x + x < 1632:
-
+                            point=int(point)#liell update - not sure why point became floating
                             HexChunk=snr[1].data[point + (x * 4):point + (x * 4) + 4]
 
-                            try:#Try structure essentially "free" (unless capturing an error)
+                            try:#liell update - try to create lookup table to speed up process
                                 correctedPixel=LookUpTable[HexChunk]
                             except:
                                 grayscale16 = int(ImageExtractor.littleEndianHexToInt(HexChunk )/ 16)
@@ -586,7 +587,12 @@ class S39Maker:
                             image_list.append(correctedPixel)
                     point += 1632 * 4
             
-            image=''.join(image_list)
+            print("Rotate180",self.Rotate180)
+            if self.Rotate180==True:
+                image=''.join(list(reversed(image_list)))#liell update - if we want to use B or C orientaton
+            else:
+                image=''.join(image_list)
+
             self.images.append(image)
             s39 += image
             remaining = 66320 - len(s39)
@@ -892,7 +898,6 @@ def click_and_crop(event, x, y, flags, param):
         refPt.append((int(x), int(y)))
         cropping = False
 
-
 def SetImageParams(SNunter_UserParamsSide_int,FlipSide,FlipWave,FlipHoriz):
     #this can probably be done more easily using enums
     if FlipSide==True:
@@ -938,7 +943,7 @@ def GetList_Of_ImagesInList(ListOfFiles, ImageTypes=(".jPg", ".Png",".gif")):
     
     return Image_FileNames
 
-def Get39Image(S39MakerObject,Side,wave,Width,Height,Xoffset,Yoffset,Validation,FixMM8_AspectRatio=False):
+def Get39Image(S39MakerObject,Side,wave,Width,Height,Xoffset,Yoffset,Validation,Rotate180_=False,FixMM8_AspectRatio=False):
     S39MakerObject.images=[]#clean out images list
     S39MakerObject.wave =wave
     S39MakerObject.side=Side
@@ -947,7 +952,10 @@ def Get39Image(S39MakerObject,Side,wave,Width,Height,Xoffset,Yoffset,Validation,
     S39MakerObject.y=Yoffset
     S39MakerObject.width=Width
     S39MakerObject.height=Height
+    S39MakerObject.Rotate180=Rotate180_
+    #fire off the s39 maker
     S39MakerObject.extractS39()
+    
     #need a dummy class for cross compatibility with other libraries
     FakedClass=BV_DatReader_Lib. DummyImageClass()
     FakedClass.offsetStart=0
@@ -1272,10 +1280,11 @@ def SN_HuntLoop(SNunter_UserParams_Loaded,InputDat):
 
         #save out rotation sequence for debugging
         RotateMatchPAttern_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(RotateDeg) + "_RotateMatchPattern.jpg"
-        cv2.imwrite(RotateMatchPAttern_filename,SquareCutRegion_rot)
+        #cv2.imwrite(RotateMatchPAttern_filename,SquareCutRegion_rot)
 
 
     return SNunter_UserParams_Loaded
+
 
 def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
 
@@ -1450,7 +1459,7 @@ def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
                 #get index of orientation (1=a,2=b etc)
                 OrientationIndex=np.floor(PatternPos/StackWidth)+1
                 #get x & y offset for non stacked image
-                Latch_ForS39MakePatternOffsetX=PatternPos-(StackWidth*(OrientationIndex-1))
+                Latch_ForS39MakerPatternOffsetX=PatternPos-(StackWidth*(OrientationIndex-1))
                 
                 Orientation="ERROR"
                 if OrientationIndex==1:Orientation="A"
@@ -1485,10 +1494,10 @@ def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
                 Latch_SavedBestPattern_userROI=StackOrientations_UserWave[int(TopLeft_ScaledUserROI[1]*Div):int(BottomRight_ScaledUserROI[1]*Div),int(TopLeft_ScaledUserROI[0]*Div):int(BottomRight_ScaledUserROI[0]*Div),:]
                 
                 #have s39 details in one place
-                Latch_ForS39MakerPatternOffsetY=int(TopLeft_ScaledUserROI[1]*Div)
-                Latch_ForS39MakePatternOffsetX=Latch_ForS39MakePatternOffsetX
-                Latch_ForS39MakerPatternWidth=Width*Div#this is pretty daft = apologies for whoever is looking at this code (probably me)
-                Latch_ForS39MakerPatternHeight=Height*Div
+                Latch_ForS39MakerPatternOffsetY=int(TopLeft_ScaledUserROI[1]*Div/2)
+                Latch_ForS39MakerPatternOffsetX=Latch_ForS39MakerPatternOffsetX
+                Latch_ForS39MakerPatternWidth=Width#this is pretty daft = apologies for whoever is looking at this code (probably me)
+                Latch_ForS39MakerPatternHeight=Height
 
 
                 #now have to 
@@ -1520,20 +1529,69 @@ def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
             #cv2.waitKey(0)
 
         
-        #save search info out to folder
+        #save debug images out to folder
         BestMatchImg_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_BestMatch.jpg"
         SearchPattern_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_SearchPattern.jpg"
         PatternMatch_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_PatternMatch.jpg"
         Latch_SavedBestPattern_userROI_Filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_UserROI_PatternMatch.jpg"
         res_output_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_ResMap.jpg"
+        StackOrientations_UserWave_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_userWave.jpg"
+        
+
+        cv2.imwrite(StackOrientations_UserWave_filename,StackOrientations_UserWave)
         cv2.imwrite(BestMatchImg_filename,Latch_SavedPatternMatch)
         cv2.imwrite(SearchPattern_filename,Latch_SavedBestPattern)
         cv2.imwrite(Latch_SavedBestPattern_userROI_Filename,Latch_SavedBestPattern_userROI)
         cv2.imwrite(PatternMatch_filename,Latch_SavedBestRotationPattern)
         cv2.imwrite(res_output_filename,res_output)
+
+        #save out s39 for A and D - we will need special rules for B and C
+        s39Maker = S39Maker()#new instance of s39 extractor
+        s39Maker.files=[DatFile]
+        s39Maker.outputDirectory=SNunter_UserParams_Loaded.OutputFolder +"\\"
+        s39Maker.start()
+        #populate s39 area - need different logic if note is in flipped orientation (B/C)
+        RealS39_Image=None
+
+        #explaination of inputs for get39image
+        #input s39 maker object - we might use different versions
+        #input wave - this is the wave the user selected at the region selection (r/g/b)
+        #pattern width - this is the width of the user rectangle drawing initially. The image the user has drawn on
+        #has had aspect ratio changed and is scaled to fit on screen - so has to be fiddled with
+        #Similarly for height  - this is why we are dividing by 2 to undo aspect ratio fix
+        #and same goes for x/y offset - this is area found by the search pattern - but the search pattern is larger generally than the
+        #area we want - so need to calculate this offset then fix any scaling, and any aspect ratio
+        
+        if Orientation=="A":
+            RealS39_Image=Get39Image(s39Maker,"front",SNunter_UserParams_Loaded.s39_wave,Latch_ForS39MakerPatternWidth,int(Latch_ForS39MakerPatternHeight/2),Latch_ForS39MakerPatternOffsetX,Latch_ForS39MakerPatternOffsetY,SNunter_UserParams_Loaded.s39_validation,FixMM8_AspectRatio=False)
+            pass
+        #_3DVisLabLib.ImageViewer_Quickv2(Get39Image(s39Maker,"back",SNunter_UserParams_Loaded.s39_wave,Latch_ForS39MakerPatternWidth,int(Latch_ForS39MakerPatternHeight/2),Latch_ForS39MakerPatternOffsetX,int(refPt[0][1]/2),SNunter_UserParams_Loaded.s39_validation,FixMM8_AspectRatio=False),0,True,True)
+        if Orientation=="D":
+            RealS39_Image=Get39Image(s39Maker,"back",SNunter_UserParams_Loaded.s39_wave,Latch_ForS39MakerPatternWidth,int(Latch_ForS39MakerPatternHeight/2),Latch_ForS39MakerPatternOffsetX,Latch_ForS39MakerPatternOffsetY,SNunter_UserParams_Loaded.s39_validation,FixMM8_AspectRatio=False)
+            pass
+
+        #orientations B and C require a rotation of 180 to match A and D orientation
+        if Orientation=="B" or Orientation=="C":
+            
+            Latch_ForS39MakerPatternOffsetY=SNunter_UserParams_Loaded.MM8_fullResY-Latch_ForS39MakerPatternOffsetY-int(Latch_ForS39MakerPatternHeight/2)
+            Latch_ForS39MakerPatternOffsetX=SNunter_UserParams_Loaded.MM8_fullResX-Latch_ForS39MakerPatternOffsetX-Latch_ForS39MakerPatternWidth
+            #make rotation matrix
+            #M = cv2.getRotationMatrix2D((int(SNunter_UserParams_Loaded.MM8_fullResX/2), int(SNunter_UserParams_Loaded.MM8_fullResY/2)), 180, 1.0)
+            #make vector 
+            #TopLeftVector=np.array()
+            if Orientation=="B":
+                RealS39_Image=Get39Image(s39Maker,"front",SNunter_UserParams_Loaded.s39_wave,Latch_ForS39MakerPatternWidth,int(Latch_ForS39MakerPatternHeight/2),Latch_ForS39MakerPatternOffsetX,Latch_ForS39MakerPatternOffsetY,SNunter_UserParams_Loaded.s39_validation,Rotate180_=True,FixMM8_AspectRatio=False)
+            if Orientation=="C":
+                RealS39_Image=Get39Image(s39Maker,"back",SNunter_UserParams_Loaded.s39_wave,Latch_ForS39MakerPatternWidth,int(Latch_ForS39MakerPatternHeight/2),Latch_ForS39MakerPatternOffsetX,Latch_ForS39MakerPatternOffsetY,SNunter_UserParams_Loaded.s39_validation,Rotate180_=True,FixMM8_AspectRatio=False)
+                pass
+            
+        if RealS39_Image is not None:
+            RealS39_Image_filename=SNunter_UserParams_Loaded.OutputFolder +"\\00" + str(DatIndex) + "_" + Orientation + "_S39ExtractionImg.jpg"
+            cv2.imwrite(RealS39_Image_filename,RealS39_Image)
+
         
 
-
+        
 #instantiate user params class which we will load during user interactivity
 SNunter_UserParams_toLoad=SNunter_UserParams()
 
