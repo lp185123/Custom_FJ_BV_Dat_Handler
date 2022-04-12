@@ -12,7 +12,8 @@ import datetime
 import sys, os, shutil, binascii, math
 import datetime
 import time
-
+import psutil
+import multiprocessing
 
 # initialize the list of reference points and boolean indicating
 # whether cropping is being performed or not
@@ -753,6 +754,11 @@ class SNunter_UserParams():
         self.GetFloodFillImg=False
         self.MidPoint_user_SN_XY=None
         self.FloodFillUpdiff=(5, 5,5, 5)#strength of flood fill tolerance, 3 colour channels and unknown channel
+        #multiprocess params
+        self.FreeMemoryBuffer_pc = 30  # how much ~memory % should be reserved while multiprocessing
+        # set this to "1" to force inline processing, otherwise to limit cores set to the cores you wish to use then add one (as system will remove one for safety regardless)
+        self.MemoryError_ReduceLoad = (True,11)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
+
 
 def FloodFill(Inputimage,SNunter_UserParams_Loaded_int):
     SeedPoint=(50,20)
@@ -1285,8 +1291,61 @@ def SN_HuntLoop(SNunter_UserParams_Loaded,InputDat):
 
     return SNunter_UserParams_Loaded
 
+def PrepareMultiProcessing(SNunter_UserParams_Loaded,InputDats_list):
+    #set up multiprocessing
+    #PhysicalCores=psutil.cpu_count(logical=False)#number of physical cores
+    Cores_Available = int(os.environ['NUMBER_OF_PROCESSORS'])#hyperthreaded cores - not compatible with some processes
+    #final core count available
+    CoresTouse=1
+    #user may have restricted performance to overcome memory errors or to leave system capacity for other tasks
+    if SNunter_UserParams_Loaded.MemoryError_ReduceLoad[0]==True and Cores_Available>1:
+        CoresTouse=min(Cores_Available,SNunter_UserParams_Loaded.MemoryError_ReduceLoad[1])#if user has over-specified cores restrict to cores available
+        print("THROTTLING BY USER - Memory protection: restricting cores to", CoresTouse, "or less, user option MemoryError_ReduceLoad")
+    else:
+        CoresTouse=Cores_Available
+    #if no restriction by user , leave a core anyway
+    processes=max(CoresTouse-1,1)#rule is thumb is to use number of logical cores minus 1, but always make sure this number >0. Its not a good idea to blast CPU at 100% as this can reduce performance as OS tries to balance the load
+    #find how much memory single process uses (windows)
+    Currentprocess = psutil.Process(os.getpid())
+    SingleProcess_Memory=Currentprocess.memory_percent()
+    SystemMemoryUsed=psutil.virtual_memory().percent
+    FreeMemoryBuffer_pc=SNunter_UserParams_Loaded.FreeMemoryBuffer_pc#arbitrary free memory to leave
+    MaxPossibleProcesses=max(math.floor((100-FreeMemoryBuffer_pc-SystemMemoryUsed)/SingleProcess_Memory),0)#can't be lower than zero
+    print(MaxPossibleProcesses,"parallel processes possible at system capacity (leaving",FreeMemoryBuffer_pc,"% memory free)")
+    print("Each process will use ~ ",round(psutil.virtual_memory().total*SingleProcess_Memory/100000000000,1),"gb")#convert bytes to gb
+    #cannot proceed if we can't use even one core
+    if processes<1 or MaxPossibleProcesses<1:
+        print(("Multiprocess Configuration error! Less than 1 process possible - memory or logic error"))
+        processes=1
+        MaxPossibleProcesses=1
+        print("Forcing processors =1, may cause memory error")
+        #raise Exception("Multiprocess Configuration error! Less than 1 process possible - memory or logic error")
+    #check system has enough memory - if not restrict cores used
+    if processes>MaxPossibleProcesses:
+        print("WARNING!! possible memory overflow - restricting number of processes from",processes,"to",MaxPossibleProcesses)
+        processes=MaxPossibleProcesses
+
+    ThreadsNeeded=len(InputDats_list)
+    #calculate how many processes each CPU will get per cycle
+    chunksize=processes*3#arbitrary setting to be able to get time feedback and not clog up system - but each reset of tasks can have memory overhead
+    #how many jobs do we build up to pass off to the multiprocess pool, in this case in theory each core gets 3 stacked tasks
+    ProcessesPerCycle=processes*chunksize#this might be bigger than amount of multiprocesses needed
+    #randomise tasks - application specific and not required in this situation
+    #SacrificialDictionary=copy.deepcopy(MatchImages.ImagesInMem_Pairing)
+    #ImagesInMem_Pairing_ForThreading=dict()
+    #while len(SacrificialDictionary)>0:
+    #    RandomItem=random.choice(list(SacrificialDictionary.keys()))
+    #    ImagesInMem_Pairing_ForThreading[RandomItem]=MatchImages.ImagesInMem_Pairing[RandomItem]
+    #    del SacrificialDictionary[RandomItem]
+
+    print("[Multiprocess start]","Taskstack per core:",chunksize,"  Taskpool size:",ProcessesPerCycle,"  Physical cores used:",processes,"   Image Threads:",ThreadsNeeded)
+
 
 def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
+
+
+
+    
 
     #1 6 3 2 * 6 4 0 full res
     #roll through all dats in input list
@@ -1304,9 +1363,9 @@ def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
                 #slope, intercept, r_value, p_value, std_err = stats.linregress(range(0,len(listTimings[1:-1])),listTimings[1:-1])
                 TimePerProcess=sum(listTimings)/len(listTimings)
                 JobsLeft=len(InputDats_list)-DatIndex
-                print("Estimated time left=",str(datetime.timedelta(seconds=(TimePerProcess*JobsLeft))))
+                print("Estimated time left for" + str(len(InputDats_list)-DatIndex)+"jobs:",str(datetime.timedelta(seconds=(TimePerProcess*JobsLeft))))
                 print("Total time for",len(InputDats_list),"jobs:",str(datetime.timedelta(seconds=(TimePerProcess*len(InputDats_list)))))
-                print("Time per Snunt=",str(datetime.timedelta(seconds=(TimePerProcess))))
+                print("Time per Snunt:",str(datetime.timedelta(seconds=(TimePerProcess))))
             #start timer again
             t1_start = time.perf_counter()
         except:
@@ -1481,7 +1540,7 @@ def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
 
                 UserROI_ScaledX=int(MidPointX-(Width_scaled/2))
                 UserROI_ScaledY=int(MidPointY-(Height_scaled/2))
-                TopLeft_ScaledUserROI=(UserROI_ScaledX,UserROI_ScaledY)
+                TopLeft_ScaledUserROI=(UserROI_ScaledX,UserROI_ScaledY)#NB use this for s39 output
                 UserROI_ScaledX=int(MidPointX+(Width_scaled/2))
                 UserROI_ScaledY=int(MidPointY+(Height_scaled/2))
                 BottomRight_ScaledUserROI=(UserROI_ScaledX,UserROI_ScaledY)
@@ -1495,7 +1554,9 @@ def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
                 
                 #have s39 details in one place
                 Latch_ForS39MakerPatternOffsetY=int(TopLeft_ScaledUserROI[1]*Div/2)
-                Latch_ForS39MakerPatternOffsetX=Latch_ForS39MakerPatternOffsetX
+                #to get X offset - we have far left of pattern search - this can be larger than user ROI so need to calculate offset from the far left of local search to far left of user search
+                #we have that elsewhere - this is not the best way to do things and needs tidied up #TODO
+                Latch_ForS39MakerPatternOffsetX=int(Latch_ForS39MakerPatternOffsetX+(w*SNunter_UserParams_Loaded.PatternSearchDivideImg/2)-(Width/2))
                 Latch_ForS39MakerPatternWidth=Width#this is pretty daft = apologies for whoever is looking at this code (probably me)
                 Latch_ForS39MakerPatternHeight=Height
 
@@ -1596,7 +1657,7 @@ def SearchMM8_forSN_Location(SNunter_UserParams_Loaded,InputDats_list):
 SNunter_UserParams_toLoad=SNunter_UserParams()
 
 #load in user folders
-SNunter_UserParams_toLoad.InputFolder=r"E:\NCR\Currencies\01_MM8_DC\SR_MALAYSIA_MM8_DC\KP00010010\MM8\50 MYR B"
+SNunter_UserParams_toLoad.InputFolder=r"D:\Bax\NCR_2022_03_29\NCR\Currencies\01_MM8_DC\SR_MALAYSIA_MM8_DC\KP00010010\MM8\5 MYR B"
 #SNunter_UserParams_toLoad.InputFolder=r"E:\NCR\Currencies\Bangladesh_SR2800\Bangladesh\SR DC\MM8\1000\2008"
 #set output folder
 SNunter_UserParams_toLoad.OutputFolder=r"C:\Working\FindIMage_In_Dat\OutputFindPattern"
@@ -1626,6 +1687,8 @@ while (len(List_all_Dats)<SNunter_UserParams_toLoad.SubSetOfData) and (len(rando
     List_all_Dats.append(randomchoice_img)
     del randomdict[randomchoice_img]
 
+PrepareMultiProcessing(SNunter_UserParams_toLoad,List_all_Dats)
+ssss
 #UI to select part of note, then create details necessary to find SN in other notes 
 SNunter_UserParams_Loaded=SN_HuntLoop(SNunter_UserParams_toLoad,List_all_Dats[0])#use first .dat file - even better if we can find least skewed one
 
