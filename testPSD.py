@@ -1,3 +1,4 @@
+from re import L, M
 import matplotlib.image as mpimg
 import numpy as np
 import scipy.stats as stats
@@ -35,4 +36,126 @@ def GetPwrSpcDensity(image):
     pl.tight_layout()
     pl.savefig(r"E:\NCR\TestImages\cloud_power_spectrum2.png", dpi = 300, bbox_inches = "tight")
 
-GetPwrSpcDensity(image)
+#GetPwrSpcDensity(image)
+
+
+
+
+if True is False:
+        #notes for normalising vectors/make as unit vectors - to get dot product without magnitude
+    #create two random integer vectors
+    n=4
+    v1=np.round(20*np.random.randn(4))
+    v2=np.round(20*np.random.randn(4))
+    #compute the lengths of the individual vectors, and magnitude of their dot products
+    #compute magnitude
+    v1m=np.sqrt(np.dot(v1,v1))
+    v2m=np.sqrt(np.dot(v1,v1))
+    dpm=np.abs(np.dot(v1,v2))
+    #normalise the vectors - creating unit vectors
+    #normalise dot product
+    v1u=v1/v1m
+    v2u=v2/v2m
+    #compute magnitude of dot product of unit length vectors
+    dpm=np.abs(np.dot(v1u,v2u))
+
+
+    import matplotlib.pyplot as plt
+    #2d input vector
+    v=np.array([3,-2])
+    #2*2 transformation matrix
+    A=np.array([[1,-1],[2,1]])
+    #output vector is Av (convert v to column)
+    w=A@np.matrix.transpose(v)
+    #plot vector
+    plt.plot([0,v[0]],[0,v[1]],label='v')
+    plt.plot([0,w[0]],[0,w[1]],label='Av')
+    plt.grid()      
+    plt.axis((-6,6,-6,6))
+    plt.legend()
+    plt.title("Rotation & stretching")
+    plt.show()
+
+
+
+    import matplotlib.pyplot as plt
+    import math
+    #2d input vector
+    v=np.array([5,-2])
+    #2*2 transformation matrix
+    #rotation matrix
+    theta = np.radians(45)
+
+    #A= np.array(( (np.cos(theta), -np.sin(theta)),
+    #               (np.sin(theta),  np.cos(theta)) ))
+    A=np.array([[math.cos(theta),-math.sin(theta)],[math.sin(theta),math.cos(theta)]])
+
+    #output vector is Av (convert v to column)
+    w=A@np.matrix.transpose(v)
+    #plot vector
+    plt.plot([0,v[0]],[0,v[1]],label='v')
+    plt.plot([0,w[0]],[0,w[1]],label='Av')
+    plt.grid()
+    plt.axis((-6,6,-6,6))
+    plt.legend()
+    plt.title("Rotation & stretching")
+    plt.show()
+
+
+
+
+    numbers=np.linspace(1,10,10)
+    def square(m):
+        return m*m 
+
+    def even(n):
+        return n%2==0
+
+    #map maps the function to an input
+    squares=list(map(square,numbers))
+    #filter only maps if reutrn is true
+    squares=list(filter(even,numbers))
+    squares
+
+    #lambda function
+    squares=list(map(lambda x: x*x ,numbers))
+    squares
+
+    class teststatic():
+        def __init__(self) -> None:
+            pass
+
+        #@staticmethod
+        #def test(in):
+        #    pass
+        #    print(in)
+        
+        @classmethod
+        def from_json(cls,filename):
+            c=cls()
+            return c
+        
+    #*ark **kwargs
+
+    def My_func(*args,**kwargs):
+        print("hello world",args,kwargs)
+
+    My_func("abc","plop",1,2,3,key=123,plopplop="hehe")
+
+
+import matplotlib.pyplot as plt
+#generate xy coordsinates for a circle
+x= np.linspace(-np.pi,np.pi,10)
+xy=np.vstack((np.cos(x),np.sin(x))).T
+print(np.shape(xy))
+plt.ylim=(-5,5)
+plt.xlim=(-5,5)
+plt.plot(xy[:,0],xy[:,1],'o')
+#2 by 2 matrix
+T=np.array([[1,2],[2,1]])
+#multiply matrix by coords
+newxy=xy@T
+#plt.axis('square')
+plt.plot(newxy[:,0],newxy[:,1],'o')
+
+plt.show()

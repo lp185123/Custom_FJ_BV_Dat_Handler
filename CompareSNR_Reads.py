@@ -36,16 +36,20 @@ class CheckSN_Answers():
     def __init__(self,NoTemplateSNR_CloudOCR_Only=False,Language=None,FilterConfidenceInput=0.1):
         #Language gets filtered in "getexternalOCR", if for a character the language matches, the char will be filtered by the confidence and replace with "%"
         self.NoTemplateSNR_CloudOCR_Only=NoTemplateSNR_CloudOCR_Only
-        self.BaseSNR_Folder = input("Please enter images folder: Default is C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput")
-        if len(self.BaseSNR_Folder)==0:
-            self.BaseSNR_Folder = r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput"
+        self.BaseSNR_Folder = r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput"
+        #self.BaseSNR_Folder = input("Please enter images folder: Default is C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput")
+        #if len(self.BaseSNR_Folder)==0:
+        #    self.BaseSNR_Folder = r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput"
         #self.BaseSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\ToBeRead_Collimated"
         #self.BaseSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\ToBeRead_Single"
         #self.BaseSNR_Folder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\India"
         #answers from external OCR verification
-        self.AnswersFolder = input("Please enter answers folder: Default is C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR")
-        if len(self.AnswersFolder)==0:
-            self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR"
+
+        #self.AnswersFolder = input("Please enter answers folder: Default is C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR")
+        #if len(self.AnswersFolder)==0:
+        #    self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR"
+        self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR"
+
         #self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\SNR_Answers_Collimated"
         #self.AnswersFolder=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\SNR_Answers_Single"
 
@@ -196,8 +200,9 @@ class CheckSN_Answers():
         buildhtml.append("<html>")
         buildhtml.append("<body>")
         buildhtml.append("<h2> Analysis Folder: " + self.BaseSNR_Folder+  "</h2>")
+        buildhtml.append("<h4> BLUE is NCR template OCR, RED is the External OCR closest match, check RawCloudOCR for pre-modified read string  </h4>")
+        #buildhtml.append("<h4> If Cloud OCR results look odd - check RAW results  </h4>")
 
-        
         SingleResult_ColImgTrace=None#need this if we have collimated images 
         TotalPass=0
         TotalFail=0
@@ -494,7 +499,7 @@ class CheckSN_Answers():
                                     FilteredLine=''.join(FilteredLine)
                                     #FilteredLines.append(FilteredLine)
                                     FileTrackerName="[" + str(FileCounter) +"]" + str(FilteredLine)
-                                    FilteredLines.append(FileTrackerName)
+                                    FilteredLines.append(FileTrackerName)#FileTrackerName isnt a mistake - need that format for filtering stage
                                     
 
                                     #save into character analysis dictionary which holds all data needed to filter out in a subsequent stage

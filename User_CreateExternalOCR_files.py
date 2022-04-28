@@ -12,7 +12,7 @@ from GeneticAlg_SNR import Individual
 
 #at time of writing point this to folder of S39 images with savedstate obj file (preprocessing)
 #can disable preprocessing but need this file until fixed
-Input_S39_ExtractionImages=r"C:\Working\FindIMage_In_Dat\Output"
+Input_S39_ExtractionImages=r"C:\Working\FindIMage_In_Dat\Output\1000 C"
 #output folder for single processed files with snr answer as filename
 OutputFolderSingleImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\ProcessSingles"
 #output folder tiled images
@@ -20,11 +20,11 @@ OutputFolderTiledImages=r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOu
 #column size of tiled images - if a ML saved state is available this will be overridden
 ColumnSize=20#column size of 1 will be treated differently - with no delimiter image
 #Preprocessing on/off - if ML optimisation has been used - will look in same folder as media
-PreProcessing=True
+PreProcessing=False
 #can force mirroring or it can be found in genparameters
 MirrorImage=True # turn this on if preprocessing is false
 #force stretching image in Y if its MM8 data (usually at squashed aspect ratio) - if preprocessing is on this will be overridden by preprocess parameters
-ForceYStretch=None#set to None if not used
+ForceYStretch=2#set to None if not used#put in a figure - 2 will multiply Y by 2
 
 
 
@@ -43,10 +43,10 @@ ForceYStretch=None#set to None if not used
 
 
 
-
+Response=True
 #prompt user to check filepaths are OK for deletion
-print("Please check output folders can be deleted:\n",OutputFolderSingleImages,"\n",OutputFolderTiledImages)
-Response=_3DVisLabLib.yesno("Continue?")
+#print("Please check output folders can be deleted:\n",OutputFolderSingleImages,"\n",OutputFolderTiledImages)
+#Response=_3DVisLabLib.yesno("Continue?")
 if Response==False:
     raise Exception("User declined to delete folders - process terminated")
 #delete output folder

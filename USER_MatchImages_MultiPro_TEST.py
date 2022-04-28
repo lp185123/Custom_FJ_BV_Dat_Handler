@@ -51,12 +51,12 @@ class MatchImagesObject():
         #self.InputFolder=r"C:\Working\TempImages\Flowers"
         #self.InputFolder = r"E:\NCR\TestImages\Furniture"
         #self.InputFolder=r"C:\Working\TempImages\TestMatches"
-        #self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
+        self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
         #self.InputFolder=r"E:\NCR\TestImages\UK_1000"
         #self.InputFolder=r"C:\Working\TempImages"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
-        self.InputFolder=r"C:\Working\TempImages\Artwork"
+        #self.InputFolder=r"C:\Working\TempImages\Artwork"
         #self.InputFolder=r"C:\Working\TempImages\butterflys"
         #self.InputFolder=r"X:\Output"
         #self.InputFolder=r"C:\Working\TempImages\Food\images"
@@ -64,7 +64,7 @@ class MatchImagesObject():
         ##set subset of data - will select random images
         ##if cross checking for similarity will be in O^ (n/2) time complexity
         ##################################################
-        self.SubSetOfData = int(90000)  # subset of data
+        self.SubSetOfData = int(100)  # subset of data
         ################################################################
         ##select what function will be used, which will load image,crop,resize
         ##etc for all analytical procesess
@@ -80,8 +80,8 @@ class MatchImagesObject():
         # what metrics to use
         self.Use_MODE_Centralis=False# to be developed - use centralis mode on everyhting - input image will be masked with circular noise
         self.Use__FeatureMatch = False  # match detailed areas of image - quite slow
-        self.Use__histogram = False  # match how close the image colour distribution is - structure does not matter
-        self.Use__FourierDifference = False  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
+        self.Use__histogram = True  # match how close the image colour distribution is - structure does not matter
+        self.Use__FourierDifference = True  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
         self.Use__PhaseCorrelation = True  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
         #in theory can convert for instance fourier magnitude image, polar unwrap it and check using phase correlation - but has to be proven
         self.Use__HOG_featureMatch = True  # dense feature match - good for small images - very effective for mm side
@@ -99,7 +99,7 @@ class MatchImagesObject():
         ##set multi process behaviour - can force no threading if memory issues are encountered (imgs > 3000)
         #######################################################
         # set this to "1" to force inline processing, otherwise to limit cores set to the cores you wish to use then add one (as system will remove one for safety regardless)
-        self.MemoryError_ReduceLoad = (True,11)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
+        self.MemoryError_ReduceLoad = (True,1)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
         #sometimes establishing a new worker fork can spike memory usage 200+% which can cause unexpected memory errors
 
         self.BeastMode = False  # Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
@@ -125,7 +125,7 @@ class MatchImagesObject():
         #self.MatchFindFolder = r"C:\Working\TempImages\Faces\MatcherFolder"
         #self.MatchFindFolder = r"E:\NCR\TestImages\UK_Side_Small_15sets10_findmatch"
         self.MatchFindFolder = r"C:\Working\TempImages\Faces\Match2Art"
-        self.MatchInputSet = True  # if a list of input images are provided the system will find similarities only with them, rather than
+        self.MatchInputSet = False  # if a list of input images are provided the system will find similarities only with them, rather than
         # attempt to match every image sequentially.
 
 

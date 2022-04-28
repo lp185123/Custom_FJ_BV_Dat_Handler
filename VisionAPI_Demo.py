@@ -6,15 +6,80 @@ import re
 import os
 print(google.api_core.__version__)
 print(google.auth.credentials.__file__)
+
+#langauge input hints for google OCR - helps with filtering rather than cloud OCR stage
+# Language	Language (English name)	languageHints code	Script / notes
+# Afrikaans	Afrikaans	af	Latn
+# shqip	Albanian	sq	Latn
+# العربية	Arabic	ar	Arab; Modern Standard
+# Հայ	Armenian	hy	Armn
+# беларуская	Belarusian	be	Cyrl
+# বাংলা	Bengali	bn	Beng
+# български	Bulgarian	bg	Cyrl
+# Català	Catalan	ca	Latn
+# 普通话	Chinese	zh	Hans/Hant
+# Hrvatski	Croatian	hr	Latn
+# Čeština	Czech	cs	Latn
+# Dansk	Danish	da	Latn
+# Nederlands	Dutch	nl	Latn
+# English	English	en	Latn; American
+# Eesti keel	Estonian	et	Latn
+# Filipino	Filipino	fil (or tl)	Latn
+# Suomi	Finnish	fi	Latn
+# Français	French	fr	Latn; European
+# Deutsch	German	de	Latn
+# Ελληνικά	Greek	el	Grek
+# ગુજરાતી	Gujarati	gu	Gujr
+# עברית	Hebrew	iw	Hebr
+# हिन्दी	Hindi	hi	Deva
+# Magyar	Hungarian	hu	Latn
+# Íslenska	Icelandic	is	Latn
+# Bahasa Indonesia	Indonesian	id	Latn
+# Italiano	Italian	it	Latn
+# 日本語	Japanese	ja	Jpan
+# ಕನ್ನಡ	Kannada	kn	Knda
+# ភាសាខ្មែរ	Khmer	km	Khmr
+# 한국어	Korean	ko	Kore
+# ລາວ	Lao	lo	Laoo
+# Latviešu	Latvian	lv	Latn
+# Lietuvių	Lithuanian	lt	Latn
+# Македонски	Macedonian	mk	Cyrl
+# Bahasa Melayu	Malay	ms	Latn
+# മലയാളം	Malayalam	ml	Mlym
+# मराठी	Marathi	mr	Deva
+# नेपाली	Nepali	ne	Deva
+# Norsk	Norwegian	no	Latn; Bokmål
+# فارسی	Persian	fa	Arab
+# Polski	Polish	pl	Latn
+# Português	Portuguese	pt	Latn; Brazilian
+# ਪੰਜਾਬੀ	Punjabi	pa	Guru; Gurmukhi
+# Română	Romanian	ro	Latn
+# Русский	Russian	ru	Cyrl
+# Русский (старая орфография)	Russian	ru-PETR1708	Cyrl; Old Orthography
+# Српски	Serbian	sr	Cyrl & Latn
+# Српски (латиница)	Serbian	sr-Latn	Latn
+# Slovenčina	Slovak	sk	Latn
+# Slovenščina	Slovenian	sl	Latn
+# Español	Spanish	es	Latn; European
+# Svenska	Swedish	sv	Latn
+# தமிழ்	Tamil	ta	Taml
+# తెలుగు	Telugu	te	Telu
+# ไทย	Thai	th	Thai
+# Türkçe	Turkish	tr	Latn
+# Українська	Ukrainian	uk	Cyrl
+# Tiếng Việt	Vietnamese	vi	Latn
+# Yiddish	Yiddish	yi	Hebr
+
+
 class CloudOCR():
     """Class to authenticate cloud service and perform OCR services."""
     def __init__(self):
         #Authenticate user - see notes 
         #https://www.youtube.com/watch?v=_24h-FQODqo good guidance - have to PIP install the google thing very specifically
         #os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = r"C:\Working\FindIMage_In_Dat\VisionAPIDemo\ocrtrial-338212-a4732d2e2a9c.json"
-        #os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = r"C:\Working\FindIMage_In_Dat\VisionAPIDemo\ServiceAccountToken.json"
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = r"C:\Working\GIT\BV_DatHandler\titanium-cacao-345715-a5031caf2100.json"
         self.client = vision.ImageAnnotatorClient()
-        #set GOOGLE_APPLICATION_CREDENTIALS="C:\Working\FindIMage_In_Dat\VisionAPIDemo\ServiceAccountToken.json
+        #set GOOGLE_APPLICATION_CREDENTIALS="C:\Working\GIT\BV_DatHandler\titanium-cacao-345715-a5031caf2100.json"
         #pip install --upgrade google-analytics-data
         #pip install --upgrade google-auth
         print("Google Vision API initialised")# - this costs approx 3$ an hour (1$ per 1000 images) - same approx price as 125cc motorbike fuel (@60mph)")
@@ -50,8 +115,8 @@ class CloudOCR():
 
         #response = self.client.text_detection(image=image,image_context={"language_hints": ["bn","en"]})
         #image_context={"language_hints": ["bn"]} #https://cloud.google.com/vision/docs/languages more langauge hints
-        response = self.client.document_text_detection(image=image)#,image_context={"language_hints": ["bn"]})
-        #response = self.client.text_detection(image=image,image_context={"language_hints": ["bn"]})
+        #response = self.client.document_text_detection(image=image)#,image_context={"language_hints": ["bn"]})
+        response = self.client.text_detection(image=image)
         #print("Google VIsion API using [document_text_detection], can swap mode to [text_detection] to improve results")
         UnicodeListSymbols=[]
         UnicodeCharVConfidence=dict()

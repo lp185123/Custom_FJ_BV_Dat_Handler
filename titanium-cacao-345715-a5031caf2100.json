@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "titanium-cacao-345715",
+  "private_key_id": "a5031caf210007e9fdd0976d82d450927c231ac5",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC4H8h4AilXMups\n9Jxm0FsHl6EvjUOZKXBDDwIo0IJDYC+lhU6fb1IjnZkzIO1CweW7fYkWC2OkMr0w\nDOwYprX2WkeAUoS02n7iIOrmVqZ+JRFmWom0c1ukVN/n6EPudFSXNOVyH6krvg7b\nfMdFDdnLW/lXjaAqriBq7J+Lj5h20sCb6mXLkQ7vvvqxMQ7LJ2NMRGGo9AAPrjhl\nDDoAvYJh84faBAQ8b7Ibe6D9Tc738pxw+F0WPKjGS0K/cVNA6RVGu7pxpF4u41RW\nTGAytGj8Kg524E7UBZlSVDK+d4xQLawIOlRTCRL6kDQVSkIvahPCwtf22lfpX4Gb\nYLrZkYmhAgMBAAECggEAE171pWmNzaCb0PNxrm/qecuiL7loFJmrV8TBFIfuQnYg\nwSRbm5K3xKs4kkxbJdA2MhHgnab8WEqlxIPBhYzpfSXtmpKj506K9ZGiwPG6EbCm\n6lqpXOibijgLN+/j0LcgrKlKH+X0k3drAvy3TryorphKLOPHp2HbI4CqPuGwN8Th\no8ABbw88QdvUkDqm8I52pzEYatbum336aZh7QoRA8rUE6F88Vv8gy55c4naB18tP\nwxTb6xIs3zO19taM5dT+g19hkpXzGf+dMX+RJ2uhaC6YSGuYijO1OHxd/wGol80f\nQyy2G1vm3DzwBaM1srDtqtSmr5iOJuZtzwUCM7DwKQKBgQD2v+2aoY+Pa2/61ajl\njtH06+Q9fPdeRZXOmuVq+EL2ueAc4LMDFJvB57EKV/5mWE4faoSxHzXMf+YF4uck\nJ+1VWvEp82SQi7Qd6QEs6Qj21JN5DRCnEweUroosUlhM8L0ifnimOmjmIh4IRl/L\nb+kLzPnL32KJDwNDe38BkBce6QKBgQC/BtVoJKhafbXV+BqcOc7SRV+fQJgq3jPD\nJt8RH3Onnuy9NG4G41XWV5GO4zoTc80kf+kKjvIuhARtSjMncIAiZGZJHSRfNCa+\npP8GRPBqM7q2JFoVQ6BNfTHmGzGP+N4IdRJwbUnwg9FfzM85/qay+K76NtLj5vLe\nDOpjy28R+QKBgCjoPssA99zuEd2C6IJOQC6boPY0ron5fVGISnqGeAuRWz9OXT8o\nfn4SHD67wdhT0XfR3/fBVdj2ZzsYl/tdhzI8Znju+gAguRawV1qLs8nACkbqTJV2\nSS50FUIt0KfIzYJXd0cPre5hP5tdl2oRvpAPRmZvPVW9oGvioHaw3bRpAoGALeby\neOf2HGiAvT21Bz1M2XIaHCZlakeioI5Co9au7+RcdsqWdclC4xJ/w5oOZoY5EUA7\nO3JF9695cNmXmS6LW7hMa9041Dev57e2IEeIjbyIbSQnEV0CtBwVVXnLWxEuKVIY\ncDOSxNyn/yEz2ne6jt77DN0HqAPi8ECiQgCsW+ECgYEAzCU46IZxtG/aHeWZOnMS\nTSTUhPdaKtYazqFDl8rvV5tdTlmNiUHqWTXJEJpBYpgilRPXOcDi3h0cYVUnDXvD\niusJ/SA7px+XB/IPoVVNLCF0wvxjjDhbusGhsFlBwI5dnIOvSOjD5KzIcY3I14xF\n5oSHAelxpGnPfcIwCDLL/kQ=\n-----END PRIVATE KEY-----\n",
+  "client_email": "liellpc@titanium-cacao-345715.iam.gserviceaccount.com",
+  "client_id": "111913582015043562630",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/liellpc%40titanium-cacao-345715.iam.gserviceaccount.com"
+}

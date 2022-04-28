@@ -9,16 +9,19 @@ Default_Input=str( r"C:\Working\FindIMage_In_Dat\OutputTestSNR\CollimatedOutput"
 Default_Output=str( r"C:\Working\FindIMage_In_Dat\OutputTestSNR\TestProcess\CloudOCR")
 #get input folder of images from extract S39 function - can be single images with embedded template answer or
 #collimated images with answer text files with same filename but different extensions
-Result_Input = input("Please enter images input folder - press enter to use default" + "   " + Default_Input)
-if len(Result_Input)<2:
-    Result_Input=Default_Input
-Result_Output = input("Please enter Cloud OCR answers output folder - press enter to use default" + "   " + Default_Output)
-if len(Result_Output)<2:
-    Result_Output=Default_Output
+Result_Input=Default_Input
+Result_Output=Default_Output
+#Result_Input = input("Please enter images input folder - press enter to use default" + "   " + Default_Input)
+#if len(Result_Input)<2:
+#    Result_Input=Default_Input
+#Result_Output = input("Please enter Cloud OCR answers output folder - press enter to use default" + "   " + Default_Output)
+#if len(Result_Output)<2:
+#    Result_Output=Default_Output
 
 #prompt user to check filepaths are OK for deletion
+Response=True
 print("Please check output folders can be deleted:\n",Result_Output)
-Response=_3DVisLabLib.yesno("Continue?")
+#Response=_3DVisLabLib.yesno("Continue?")
 if Response==False:
     raise Exception("User declined to delete folders - process terminated")
 

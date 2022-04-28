@@ -11,7 +11,7 @@ OutputFolder=r"C:\Working\FindIMage_In_Dat\Output"
 MergedRecordSize=300
 
 #what folder has user placed in images (dat records) to merge
-TestMergingFolder=r"C:\Working\FindIMage_In_Dat\Output\Merge_D6_BigStains\Internal_CD"
+TestMergingFolder=r"C:\Working\FindIMage_In_Dat\Output\StainCheck_allDenoms"
 
 #load json file which links image proxies back to their dat files and record
 RecordOffset=-1#fudge factor

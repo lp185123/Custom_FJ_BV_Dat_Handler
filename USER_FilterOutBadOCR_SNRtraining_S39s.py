@@ -8,9 +8,9 @@ import random
 
 #expect a folder with txt files containing ocr answers, and files which can trace the text files
 #back to images/s39 images and other jsons with data for each character read (confidence, language etc)
-MaxLength_of_SN=9
-MinConfidence=0.6#from 0.0 to 1.0
-LanguageFilter='[language_code: "bn"\n]'
+MaxLength_of_SN=10
+MinConfidence=0.1#from 0.0 to 1.0
+LanguageFilter='[language_code: "ar"\n]'
 RareChars_Unfiltered=5#we dont want to filter out rare characters - so save them in a seperate folder 
 InstancesOfChar=10 # maximum instances of character to create a manageable subset for training
 FirstCharsOnly=2
@@ -292,8 +292,8 @@ print("key 3: Rare characters, SN no length or confidence filter")
 
 #create training sets now for each character, and anther folder with everything by
 #rolling through the dictionary with the best examples we have 
-
-okokok
+#
+#okokok
 
 #first filter - find unicode 
 UnicodeList=[]

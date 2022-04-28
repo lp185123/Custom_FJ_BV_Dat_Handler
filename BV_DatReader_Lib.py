@@ -90,6 +90,8 @@ class UserInputParameters():
         self.s39_x = 681+358#519+336+40+40+40#add these together
         self.s39_y = 101#keep scroll point at 320 (weird coordinate systems)
 
+
+
     def UserPopulateParameters(self):
         self.UserInput_and_test()
         self.PrintAllUserInputs()
@@ -187,7 +189,10 @@ class UserInputParameters():
             
         #does user want SNR values associated with extracted data
         self.GetSNR=_3DVisLabLib.yesno("Get Serial Number if available? y/n")
-
+        
+        #nasty but rush job now
+        if self.GetSNR==True:
+            self.GetBothSides=False
 
 
 def Image_from_Automatic_mode(filteredImages,Notefound,data_hex,Is_mm8=False):
@@ -373,7 +378,7 @@ def AutomaticExtraction(UserParameters):
                         continue
                         #raise Exception(DatFile,"Automatic image extraction RGB channels: extracted channel sizes do not match!")
 
-
+                
                 #user might want both images
                 if UserParameters.GetBothSides==True:
                     filteredImages_Back = images.filter(UserParameters.BlockType_ImageFormat,UserParameters.UnderFeed_RGBwaves[0])
@@ -486,7 +491,7 @@ def AutomaticExtraction(UserParameters):
 
                         ImgVDatFile_andRecord[Savestring]=(DatFile,Index+1,SNR_ReadResult)
                 print(DatFile,NoteCount)
-            except:
+            except Exception:
                 print("error with file",DatFile)
     #save out dictionary so we can trace images back to dat files and record number
     #if it already exists - user may want to merge JSONs together as has decided not to delete output folder

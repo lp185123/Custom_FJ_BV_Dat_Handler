@@ -3,7 +3,7 @@ import Merger_newest
 import time
 import os
 import shutil
-InputPath=r"E:\NCR\SR_Generations\Bangladesh\20211130_ReleaseVer2.2.1\TemplateGenData"
+InputPath=r"E:\NCR\Currencies\Bangladesh_SR2800\Bangladesh\Big_Stains"
 
 
 #get all files in input folder
@@ -11,8 +11,14 @@ InputFiles=_3DVisLabLib.GetAllFilesInFolder_Recursive(InputPath)
 #Get pickle file - warning will just take first one
 ListAllDat_files=_3DVisLabLib.GetList_Of_ImagesInList(InputFiles,ImageTypes=[".dat"])
 
-
-
+# #give to merger tool
+# merger = Merger_newest.ImageMerger()
+# merger.files = ListAllDat_files
+# merger.outputDirectory=InputPath
+# merger.start()
+# time.sleep(5)#at the moment the merger tool uses time for filename with resoluton of 1 sec,
+# #potentially can overwrite
+# ssss
 
 lookupDenomi=dict()
 lookupDenomi["D1"]="Denomi.1"
@@ -45,25 +51,25 @@ lookupDenomi["D8"]="Denomi.8"
 #         shutil.copy(DatItem,OutputFolder)
 
 #get all folder paths for the mm1 genuine field data used to improve SR gen tool performance
-ListPaths=dict()
-for DatItem in ListAllDat_files:
+# ListPaths=dict()
+# for DatItem in ListAllDat_files:
 
-    if "Damage" == DatItem.split("\\")[-4]:
-        if "Field" == DatItem.split("\\")[-3]:
-            #fix the booboo
-            if not "20220406" in DatItem.split("\\")[-1]:
-                print("Will delete file",DatItem)
+#     if "Damage" == DatItem.split("\\")[-4]:
+#         if "Field" == DatItem.split("\\")[-3]:
+#             #fix the booboo
+#             if not "20220406" in DatItem.split("\\")[-1]:
+#                 print("Will delete file",DatItem)
 
-                os.remove(DatItem)
+#                 os.remove(DatItem)
 
-            #FolderToMerge=DatItem.replace(DatItem.split("\\")[-1],"")
-            #ListPaths[FolderToMerge]="plop"
-        #Denom=lookupDenomi[DatItem.split("\\")[-4]]
-        #Orientation="Direction" + DatItem.split("\\")[-2]
+#             #FolderToMerge=DatItem.replace(DatItem.split("\\")[-1],"")
+#             #ListPaths[FolderToMerge]="plop"
+#         #Denom=lookupDenomi[DatItem.split("\\")[-4]]
+#         #Orientation="Direction" + DatItem.split("\\")[-2]
 
 
 
-ssss
+# ssss
 #merge dats together in folder
 merger = Merger_newest.ImageMerger()
 
