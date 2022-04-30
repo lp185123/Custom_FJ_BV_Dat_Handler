@@ -633,7 +633,7 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
 
     #ImageGrayscale=Resize_toPixel_keepRatio(ImageInfo.ImageGrayscale[0], 120, 120)
 
-    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,100,100,0,False)
+    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,100,95,3,False)
     KernelSize=5
     kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing
 
@@ -720,7 +720,7 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
             #MacroStructure_img = cv2.resize(Img_colour, (25, 25))
             #_3DVisLabLib.ImageViewer_Quick_no_resize(HistogramStripulus_Centralis,0,True,True)
             HistoStripes = cv2.filter2D(Img_colour,-1,kernel)
-            HistoStripes=Histogram_Stripes(HistoStripes,9,16,HistogramStripulus_Centralis)
+            HistoStripes=Histogram_Stripes(HistoStripes,9,8,HistogramStripulus_Centralis)
             ImageInfo.Metrics_functions["HM_data_HistogramStriping"].append(HistoStripes)
 
         #POWER SPECTRAL DENSITY

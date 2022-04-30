@@ -51,7 +51,7 @@ class MatchImagesObject():
         #self.InputFolder=r"C:\Working\TempImages\Flowers"
         #self.InputFolder = r"E:\NCR\TestImages\Furniture"
         #self.InputFolder=r"C:\Working\TempImages\TestMatches"
-        self.InputFolder=r"E:\NCR\TestImages\UK_SMall"
+        self.InputFolder=r"E:\NCR\TestImages\Artwork\complete\artwork"
         #self.InputFolder=r"E:\NCR\TestImages\UK_1000"
         #self.InputFolder=r"C:\Working\TempImages"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
@@ -64,7 +64,7 @@ class MatchImagesObject():
         ##set subset of data - will select random images
         ##if cross checking for similarity will be in O^ (n/2) time complexity
         ##################################################
-        self.SubSetOfData = int(100)  # subset of data
+        self.SubSetOfData = int(5000)  # subset of data
         ################################################################
         ##select what function will be used, which will load image,crop,resize
         ##etc for all analytical procesess
@@ -80,15 +80,15 @@ class MatchImagesObject():
         # what metrics to use
         self.Use_MODE_Centralis=False# to be developed - use centralis mode on everyhting - input image will be masked with circular noise
         self.Use__FeatureMatch = False  # match detailed areas of image - quite slow
-        self.Use__histogram = True  # match how close the image colour distribution is - structure does not matter
-        self.Use__FourierDifference = True  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
-        self.Use__PhaseCorrelation = True  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
+        self.Use__histogram = False  # match how close the image colour distribution is - structure does not matter
+        self.Use__FourierDifference = False  # only useful if subjects are perfectly aligned (like MM side) - otherwise will be noise
+        self.Use__PhaseCorrelation = False  # not developed yet - can check 1d or 2d signal for X/Y movement (but not rotation).
         #in theory can convert for instance fourier magnitude image, polar unwrap it and check using phase correlation - but has to be proven
         self.Use__HOG_featureMatch = True  # dense feature match - good for small images - very effective for mm side
         self.Use__EigenVectorDotProd = False  #SQUARE IMAGE ONLY how close are principle components orientated- doesnt seem to work correctly yet - MUST BE SQUARE!
         self.Use__EigenValueDifference = False  #SQUARE IMAGE ONLY how close are principle component lengths for COLOUR - works pretty well - still needs a look at in how to package up matrix, and if using non -square do we use SVD instead?
         self.Use__FourierPowerDensity = True  # histogram of frequencies found in image - works very well
-        self.Use__MacroStructure=True#very small image to compare macrostructure - experimental
+        self.Use__MacroStructure=False#very small image to compare macrostructure - experimental
         self.Use__StructuralPCA_dotProd=False#Principle component analysis on binarised image - a geometrical PCA
         self.Use__StructuralPCA_VectorValue = False  # for STRUCTURE Principle component analysis on binarised image - a geometrical PCA
         self.Use__TemplateMatching = False # match templates by sliding one over the other - can be different sizes so bear that in mind
@@ -99,7 +99,7 @@ class MatchImagesObject():
         ##set multi process behaviour - can force no threading if memory issues are encountered (imgs > 3000)
         #######################################################
         # set this to "1" to force inline processing, otherwise to limit cores set to the cores you wish to use then add one (as system will remove one for safety regardless)
-        self.MemoryError_ReduceLoad = (True,1)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
+        self.MemoryError_ReduceLoad = (False,1)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
         #sometimes establishing a new worker fork can spike memory usage 200+% which can cause unexpected memory errors
 
         self.BeastMode = False  # Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
