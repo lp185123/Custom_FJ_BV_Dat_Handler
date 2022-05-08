@@ -1,9 +1,12 @@
 from ctypes.wintypes import HHOOK
+
+from numpy import DataSource
 import _3DVisLabLib
+#import ImageExtractorModule_testNoMM8 as Merger_newest
 import Merger_newest
 import time
 import os
-InputPath=r"E:\NCR\Currencies\Bangladesh_SR2800\Bangladesh\SR DC\MM1\TEST_SETS\D5\4A_Orientations\D"
+InputPath=r"E:\NCR\Currencies\Bangladesh_SR2800\Bangladesh\SR DC\MM8\100\04_100(2006-2010)\Brand New_100pcs Notes\MM8\D"
 
 
 #get all files in input folder
@@ -31,6 +34,7 @@ merger.start()
 
 #rename dats
 
+xxx
 
 for OldFile in FileToRename_dict:
     NewFile=FileToRename_dict[OldFile]

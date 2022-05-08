@@ -65,6 +65,20 @@ class _3D_data:
 
     self._3dPoints= TranslatedCartesian
   
+
+#how to get vector of PCA
+#   If you need a rotation matrix representing an orientation, we can choose the axis
+#    in which the volume distribution of the object is highest (normalised first eigenvector -
+#     that is the eigenvector associated with the largest eigenvalue) as the first column of the matrix.
+
+# For the 2nd column of the matrix choose the 2nd eigenvector but you have to subtract from it
+#  its projection onto the 1st eigenvector so that it is orthogonal to the first. To calculate its 
+#  projection you can use the dot product - if the eigenvectors are already normalised you can just
+#   use the dot product to calculate the length of the vector to subtract: so dot product the two vectors
+#    and multiply the 1st vector by the dot product, then subtract the resulting vector from the 1st eigenvector.
+
+# For the 3rd column there will only be one choice left - the cross product of the two calculated above.
+
   @staticmethod
   def GetPrincipleAxis(InputArray:np.array)->None:
     '''test get principle axis'''
@@ -171,6 +185,70 @@ class _3D_data:
 #rotation matrix
 #translation matrix
 
+@dataclass(order=True,repr=False)
+class CameraClass:
+  sort_index: int =field(init=False)#use this for sorting
+  name:str
+  Focallength_mm:float
+  Pixel_size_sensor_mm: float
+  Image_Height:int
+  Image_Width:int
+
+  #these are variables (usually in __init__ as "self")
+  TranslationMatrix_t=np.array([0, 0, 50])#a 3D translation vector describing the position of the camera center
+  RotationMatrix_R=np.eye(3, k=0)#orientation of the cmaera
+  IntrinsicMatrix_K=None# calibration matrix
+  ExtrinsicMatrix=None
+  _3D_worldCoordinates=None
+
+  def __post_init__(self):#need this for sorting
+    object.__setattr__(self,'sort_index',self.Focallength_mm)#if we want to freeze object
+  def CalculateIntrinsicMatrix(self):
+    '''Create instrinsic camera matrix, internal details'''
+    focalX=self.Focallength_mm/self.Pixel_size_sensor_mm
+    focalY=self.Focallength_mm/self.Pixel_size_sensor_mm
+    cx=self.Image_Width/2
+    cy=self.Image_Height/2
+
+    CameraMatrix_Intrinsic=np.eye(3)
+    CameraMatrix_Intrinsic[2,2]=1
+    CameraMatrix_Intrinsic[0,0]=focalX
+    CameraMatrix_Intrinsic[1,1]=focalY
+    CameraMatrix_Intrinsic[0,2]=cx
+    CameraMatrix_Intrinsic[1,2]=cy
+    self.IntrinsicMatrix_K=CameraMatrix_Intrinsic
+  def CalculateExtrinsicMatrix(self):
+    '''create extrinsic properties, translation & rotation [R|T]'''
+    #add column to  Rotation matrix -
+    b = np.append(self.RotationMatrix_R, [[self.TranslationMatrix_t[0]],[self.TranslationMatrix_t[1]],[self.TranslationMatrix_t[2]]], axis = 1)
+    #b = np.pad(self.RotationMatrix, ((0, 0), (0, 1)), mode='constant', constant_values=0)
+    #lame code to add extra column - definitely better ways of doing this
+    #b[0,3]=self.TranslationVector[0]
+    #b[1,3]=self.TranslationVector[1]
+    #b[2,3]=self.TranslationVector[2]
+    self.ExtrinsicMatrix=b
+
+  def GetProjectedPoints(self,InputPoint:np.array)->np.array:
+    '''Calculate projection matrix P=K [r|T]
+    this should be done in another function after proof of principle
+    Expecting input of 3D homogenous coordinates'''
+    self.CalculateIntrinsicMatrix()
+    self.CalculateExtrinsicMatrix()
+
+    #convert 3d point to homogenous coordinates (just add a 1)
+    Homogenous3DPt=np.append(InputPoint,([1]))
+    
+    scaledPixelCoords = np.matmul(np.matmul(self.IntrinsicMatrix_K,self.ExtrinsicMatrix),Homogenous3DPt)
+    #scaledPixelCoords = np.matmul(np.matmul(self.ExtrinsicMatrix,Homogenous3DPt),self.IntrinsicMatrix_K)
+    return scaledPixelCoords
+
+
+
+
+  
+
+
+
 
 Focallength_mm= 26 
 Pixel_size_sensor_mm= 0.00551 
@@ -228,7 +306,7 @@ def rotation_matrix(axis, theta):
                      [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
 
 #3d plot
-def _3D_Plotter(Input_np_array,Filepath):#3d matlab plot 3d plot
+def _3D_Plotter(Input_np_array,Filepath,Drawpaths,CrossProducts,**kwargs):#3d matlab plot 3d plot
     fig = plt.figure(figsize=(12, 12))
     ax = fig.add_subplot(projection='3d')
     sequence_containing_x_vals = list(Input_np_array[:,0])
@@ -236,13 +314,29 @@ def _3D_Plotter(Input_np_array,Filepath):#3d matlab plot 3d plot
     sequence_containing_z_vals = list(Input_np_array[:,2])
     ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals)
   
-    x_start,y_start,z_start=0,0,0
-    for Index,(x,y,z) in enumerate(zip(sequence_containing_x_vals,sequence_containing_y_vals,sequence_containing_z_vals)):
-      if Index==0:
+    if Drawpaths is True:
+      x_start,y_start,z_start=0,0,0
+      for Index,(x,y,z) in enumerate(zip(sequence_containing_x_vals,sequence_containing_y_vals,sequence_containing_z_vals)):
+        if Index==0:
+          x_start,y_start,z_start=x,y,z
+          continue
+        plt.plot([x_start,x],[y_start,y],[z_start,z],label='v')
         x_start,y_start,z_start=x,y,z
-        continue
-      plt.plot([x_start,x],[y_start,y],[z_start,z],label='v')
-      x_start,y_start,z_start=x,y,z
+   
+    if 'eigvectors' in kwargs and 'eigvalues' in kwargs:
+      #user wants to draw eigendecomp stuff into render
+      PrincipleVector=kwargs['eigvectors'][0] * 300#kwargs['eigvalues'][0]
+       #* -kwargs['eigvalues'][0]
+      plt.plot([0,PrincipleVector[0]],[0,PrincipleVector[1]],[0,PrincipleVector[2]],label='v')
+
+    if CrossProducts is True:
+      for Index,(x,y,z) in enumerate(zip(sequence_containing_x_vals,sequence_containing_y_vals,sequence_containing_z_vals)):
+        if Index==0:
+          x_start,y_start,z_start=x,y,z
+          continue
+        #get cross product of last and current vectors - remember right hand rule!
+        crossProd=np.cross([x_start,y_start,z_start],[x,y,z])
+        plt.plot([0,crossProd[0]],[0,crossProd[1]],[0,crossProd[2]],label='v')
 
     #plt.show()
     if Filepath is not None:
@@ -258,7 +352,7 @@ _3D_points.append(( 225.0, 170.0, -135.0))
 
 #create random field of 3d points with a rough shape
 _3D_points=[]
-for Index in range(0,300):
+for Index in range(0,10):
   _3D_points.append((Index*random.random(),Index*random.random(),4*Index*random.random()))
 
 #convert to numpy array for matrix operations
@@ -272,6 +366,14 @@ _3D_points_np=np.array(_3D_points)
 _5pointFace=_3D_data("5pointface",_3D_points_np)
   
 
+MyCamera=CameraClass("ForProjectionMatrix",26,0.00551,1000,500)
+
+for _3dPoint in _5pointFace._3dPoints:
+  print(_3dPoint)
+  print(MyCamera.GetProjectedPoints(_3dPoint))
+
+
+
 
 #Translate3D(_3D_points_np,x=1,y=1,z=1)
 
@@ -280,18 +382,18 @@ while True:
 
   _5pointFace.Translate3D_classmethod(x=0,y=0,z=0)
   _5pointFace.rotate_ClassMethod(math.radians(5),axis="z")
-  _5pointFace.rotate_ClassMethod(math.radians(5),axis="x")
-  _5pointFace.rotate_ClassMethod(math.radians(5),axis="y")
+  #_5pointFace.rotate_ClassMethod(math.radians(5),axis="x")
+  #_5pointFace.rotate_ClassMethod(math.radians(5),axis="y")
   
-
-
   Filepath=OutputPath + "\\00" + str(Counter) + ".jpg"
-  _3D_Plotter(_5pointFace._3dPoints,Filepath,kwargs)
+  
   Counter=Counter+1
   if Counter>100:
     break
 
   eigvalues, eigvectors=_5pointFace.GetPCA_SetToMean()
+  _3D_Plotter(_5pointFace._3dPoints,Filepath,True,True)#,eigvalues=eigvalues,eigvectors=eigvectors)
+
 
 
 #projection matrix 

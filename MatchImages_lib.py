@@ -633,7 +633,7 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
 
     #ImageGrayscale=Resize_toPixel_keepRatio(ImageInfo.ImageGrayscale[0], 120, 120)
 
-    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,100,95,3,False)
+    Canvas,List_CroppingImg=CreateCropInMatrixOfImage(ImageColour,100,100,0,False)
     KernelSize=5
     kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing
 
@@ -651,6 +651,7 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
             #get histogram for HOG used for comparison during match matrix
             OPENCV_hog_descriptor=HOG_extrator.compute(For_HOG_FeatureMatch)
         ImageInfo.Metrics_functions["HM_data_HOG_Dist"].append(OPENCV_hog_descriptor)
+        
 
     
     #FEATURE MATCHER
@@ -665,26 +666,28 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
     for Img_colour in List_CroppingImg:
         #get grayscale
         Img_grayscale=cv2.cvtColor(Img_colour, cv2.COLOR_BGR2GRAY)
+        #get HSV (may work better than RGB)
+        Img_colour_HSV=cv2.cvtColor(Img_colour,cv2.COLOR_BGR2HSV)
         #_3DVisLabLib.ImageViewer_Quick_no_resize(Img_colour,0,True,True)
         if "HM_data_HistogramCentralis" in Metrics_dict:
             #create a masked histogram with just central position
             global HistogramCentralis_mask
             if HistogramCentralis_mask is None:#check global object is populated with mask or not
-                HistogramCentralis_mask = np.zeros((Img_colour.shape[0],Img_colour.shape[1],3), np.uint8)
+                HistogramCentralis_mask = np.zeros((Img_colour_HSV.shape[0],Img_colour_HSV.shape[1],3), np.uint8)
                 #get radius
                 Diameter=min((HistogramCentralis_mask.shape[0]),(HistogramCentralis_mask.shape[1]))
                 Radius=int((Diameter/2)*1.0)#percentage of smallest dimension (1=100%)
                 cv2.circle(HistogramCentralis_mask,(int(HistogramCentralis_mask.shape[1]/2),int(HistogramCentralis_mask.shape[0]/2)), Radius, (255,255,255), -1)
                 HistogramCentralis_mask = cv2.cvtColor(HistogramCentralis_mask, cv2.COLOR_BGR2GRAY)
                 #_3DVisLabLib.ImageViewer_Quick_no_resize(HistogramCentralis_mask,0,True,True)
-            hist = cv2.calcHist([Img_colour], [0, 1, 2], HistogramCentralis_mask, [8, 8, 8],[0, 256, 0, 256, 0, 256])
+            hist = cv2.calcHist([Img_colour_HSV], [0, 1, 2], HistogramCentralis_mask, [8, 8, 8],[0, 256, 0, 256, 0, 256])
             hist = cv2.normalize(hist, hist).flatten()
             ImageInfo.Metrics_functions["HM_data_HistogramCentralis"].append(hist)
             
     
         #HISTOGRAM
         if "HM_data_histo" in Metrics_dict:
-            hist = cv2.calcHist([Img_colour], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
+            hist = cv2.calcHist([Img_colour_HSV], [0, 1, 2], None, [8, 8, 8],[0, 256, 0, 256, 0, 256])
             #hsv conversion very slow
             #hsv = cv2.cvtColor(Img_colour,cv2.COLOR_BGR2HSV)#colour 2d histogram needs conveted to hsv
             # channels = [0,1] because we need to process both H and S plane.
@@ -698,7 +701,7 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
         if "HM_data_MacroStructure" in Metrics_dict:
         #get small image to experiment with macro structure matching
             
-            MacroStructure_img = cv2.resize(Img_colour, (19, 19))
+            MacroStructure_img = cv2.resize(Img_colour_HSV, (19, 19))
             KernelSize=3
             kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing
             MacroStructure_img = cv2.filter2D(MacroStructure_img,-1,kernel)
@@ -706,20 +709,22 @@ def StackedImg_Generator(ImageInfo_ref,IsTestImage,Metrics_dict):
             ImageInfo.Metrics_functions["HM_data_MacroStructure"].append(MacroStructure_img)
             #_3DVisLabLib.ImageViewer_Quick_no_resize(MacroStructure_img,0,True,True)
 
+        #getting a stripe of 
+        #if "HM_data_1D_fft_Striping" in Metrics_dict:
 
         #HISTOGRAM STRIPING - vertical and horizontal histogram 
         if "HM_data_HistogramStriping" in Metrics_dict:
             global HistogramStripulus_Centralis
             if HistogramStripulus_Centralis is None:#check global object is populated with mask or not
-               HistogramStripulus_Centralis = np.zeros((Img_colour.shape[0],Img_colour.shape[1],3), np.uint8)
+               HistogramStripulus_Centralis = np.zeros((Img_colour_HSV.shape[0],Img_colour_HSV.shape[1],3), np.uint8)
                #get radius
                Diameter=min((HistogramStripulus_Centralis.shape[0]),(HistogramStripulus_Centralis.shape[1]))
                Radius=int((Diameter/2)*1)#percentage of smallest dimension (1=100%)
                cv2.circle(HistogramStripulus_Centralis,(int(HistogramStripulus_Centralis.shape[1]/2),int(HistogramStripulus_Centralis.shape[0]/2)), Radius, (255,255,255), -1)
                HistogramStripulus_Centralis = cv2.cvtColor(HistogramStripulus_Centralis, cv2.COLOR_BGR2GRAY)
-            #MacroStructure_img = cv2.resize(Img_colour, (25, 25))
+            #MacroStructure_img = cv2.resize(Img_colour_HSV, (25, 25))
             #_3DVisLabLib.ImageViewer_Quick_no_resize(HistogramStripulus_Centralis,0,True,True)
-            HistoStripes = cv2.filter2D(Img_colour,-1,kernel)
+            HistoStripes = cv2.filter2D(Img_colour_HSV,-1,kernel)
             HistoStripes=Histogram_Stripes(HistoStripes,9,8,HistogramStripulus_Centralis)
             ImageInfo.Metrics_functions["HM_data_HistogramStriping"].append(HistoStripes)
 
@@ -1253,7 +1258,11 @@ def GetPwrSpcDensity(image):
                                         statistic = "mean",
                                         bins = kbins)
     Abins *= np.pi * (kbins[1:]**2 - kbins[:-1]**2)
-
+    #pl.loglog(kvals, Abins)
+    #pl.xlabel("$k$")
+    #pl.ylabel("$P(k)$")
+    #pl.tight_layout()
+    #pl.savefig(r"C:\Working\testOutput\cloud_power_spectrum3.png", dpi = 300, bbox_inches = "tight")
     return Abins
 
 

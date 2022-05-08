@@ -5,7 +5,10 @@ import scipy.stats as stats
 import matplotlib.pyplot as pl
 import cv2
 
-image=cv2.imread(r"E:\NCR\TestImages\2.jpg")
+
+
+
+
 
 def GetPwrSpcDensity(image):
     #https://bertvandenbroucke.netlify.app/2019/05/24/computing-a-power-spectrum-in-python/
@@ -29,17 +32,18 @@ def GetPwrSpcDensity(image):
                                         bins = kbins)
     Abins *= np.pi * (kbins[1:]**2 - kbins[:-1]**2)
 
-    return Abins
+    #return Abins
     pl.loglog(kvals, Abins)
     pl.xlabel("$k$")
     pl.ylabel("$P(k)$")
     pl.tight_layout()
-    pl.savefig(r"E:\NCR\TestImages\cloud_power_spectrum2.png", dpi = 300, bbox_inches = "tight")
+    pl.savefig(r"C:\Working\testOutput\cloud_power_spectrum9.png", dpi = 300, bbox_inches = "tight")
 
-#GetPwrSpcDensity(image)
+image=cv2.imread(r"C:\Working\testOutput\plop9.jpg")
+GetPwrSpcDensity(image)
 
 
-
+ddd
 
 if True is False:
         #notes for normalising vectors/make as unit vectors - to get dot product without magnitude

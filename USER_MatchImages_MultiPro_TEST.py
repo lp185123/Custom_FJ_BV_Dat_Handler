@@ -51,10 +51,10 @@ class MatchImagesObject():
         #self.InputFolder=r"C:\Working\TempImages\Flowers"
         #self.InputFolder = r"E:\NCR\TestImages\Furniture"
         #self.InputFolder=r"C:\Working\TempImages\TestMatches"
-        self.InputFolder=r"E:\NCR\TestImages\Artwork\complete\artwork"
+        #self.InputFolder=r"E:\NCR\TestImages\Artwork\complete\artwork"
         #self.InputFolder=r"E:\NCR\TestImages\UK_1000"
         #self.InputFolder=r"C:\Working\TempImages"
-        #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
+        self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_15sets10"
         #self.InputFolder=r"E:\NCR\TestImages\UK_Side_SMALL_side_findmatchtest"
         #self.InputFolder=r"C:\Working\TempImages\Artwork"
         #self.InputFolder=r"C:\Working\TempImages\butterflys"
@@ -94,12 +94,13 @@ class MatchImagesObject():
         self.Use__TemplateMatching = False # match templates by sliding one over the other - can be different sizes so bear that in mind
         self.Use__HistogramStriping = True#to handle images with aspect ratio changes or scaling, can use a spherical mask
         self.Use__HistogramCentralis = False#create a histogram mask so just look at centre of image - not good for images with translation problem but may be effective for general image matching
+        self.Use__1Dfft_Striping = True #create stripes of vertical and horizontal 1D fft which are essentially histograms
         #self.Use__QuiltScan==True
         ######################################################
         ##set multi process behaviour - can force no threading if memory issues are encountered (imgs > 3000)
         #######################################################
         # set this to "1" to force inline processing, otherwise to limit cores set to the cores you wish to use then add one (as system will remove one for safety regardless)
-        self.MemoryError_ReduceLoad = (False,1)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
+        self.MemoryError_ReduceLoad = (True,1)  # fix memory errors (multiprocess makes copies of everything) (Activation,N+1 cores to use -EG use 4 cores = (True,5))
         #sometimes establishing a new worker fork can spike memory usage 200+% which can cause unexpected memory errors
 
         self.BeastMode = False  # Beast mode will optimise processing and give speed boost - but won't be able to update user with estimated time left
@@ -108,7 +109,7 @@ class MatchImagesObject():
         #but its not possible to predict how windows will distribute processes to which cores
 
         #***This option very slow still under development***#currently 150 images vs 12 input match takes 4min with on-fly but 12 seconds pre processed
-        self.ProcessImagesOnFly=True#currently only works with MULTIPLE IMAGE function - if using a large amount of images
+        self.ProcessImagesOnFly=False#currently only works with MULTIPLE IMAGE function - if using a large amount of images
         #setting this to true will not load image processing details into memory but process on the fly, this
         #is much slower and much less efficient but is currently only solution to large datasets. Parallel processing may
         #mitigate some slowness- TIPS - move data onto internal harddrive if faster, or even ramdrive even if that sounds circular
@@ -212,7 +213,10 @@ class MatchImagesObject():
             self.Metrics_dict["HM_data_HistogramCentralis"] = None
             self.Metrics_functions["HM_data_HistogramCentralis"] = None
         #if self.Use__QuiltScan: self.Metrics_dict["HM_data_QuiltScan"] = None
-
+        if self.Use__1Dfft_Striping:
+            self.Metrics_dict["HM_data_1D_fft_Striping"] = None
+            self.Metrics_functions["HM_data_1D_fft_Striping"] = None
+        
         for metrix in self.Metrics_dict:
             print("Using metrics",metrix)
 
