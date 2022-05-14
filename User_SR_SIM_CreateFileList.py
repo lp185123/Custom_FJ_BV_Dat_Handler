@@ -38,3 +38,5 @@ f = open(FileListFilePathAndName, "w")
 for Datfile in ListAllDat_files:
     f.write(Datfile+"\n")
 f.close()
+
+a,b,*c,d=(1,2,3,4,5,6)
