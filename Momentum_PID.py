@@ -64,7 +64,7 @@ def main():
     
     #create objects
     force_Gravity=_2d_Force("Gravity",[0,9.81])
-    FollowCam=_2d_Body("FollowCam",1,[250,250],[-20,-200])
+    FollowCam=_2d_Body("FollowCam",1,[250,250],[-20,-100])
     dTime=TimeDiffObject()
     SimImage=SimViewBox(500,500)
 
@@ -72,8 +72,8 @@ def main():
         OutputSimImage= SimImage.UpdateImage(FollowCam.position_2d)
         _3DVisLabLib.ImageViewer_Quickv2_UserControl(OutputSimImage,0,False,False)
     
+        #get time difference to keep it consistent
         dt=dTime.Get_dT()
-        print(dt)
         #compute force on object
         FollowCam.Force+=force_Gravity.ForceVector_2d
         #apply newtons second law, compute accelerate
@@ -82,7 +82,6 @@ def main():
         FollowCam.velocity_2d+=Acceleration*dt
         #integrate twice to get position
         FollowCam.position_2d+=FollowCam.velocity_2d* dt
-        print(FollowCam.position_2d)
 
 
 if __name__ == "__main__":
