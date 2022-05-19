@@ -10,12 +10,6 @@ from dataclasses import dataclass,field
 from numpy.linalg import eig
 import random
 import enum
-OutputPath=r"C:\Working\testOutput"
-
-Result = input("Press enter to clear folder:" + str(OutputPath))
-if Result=="":
-  _3DVisLabLib.DeleteFiles_RecreateFolder(OutputPath)
-
 
 class UserOperationStrings(enum.Enum):
     Xplus="w"
@@ -76,7 +70,7 @@ class _3D_data:
 
     for Index,Point in enumerate(self._3dPoints):
       self._3dPoints[Index]=self._3dPoints[Index]+round(random.random())
-      
+
 
   def Translate3D_classmethod(self,**kwargs):
     #need to add concatenate input matrix
@@ -289,6 +283,24 @@ class CameraClass:
     CartesianCoords=scaledPixelCoords/scaledPixelCoords[-1]
     return CartesianCoords
 
+  def Get2DProjectedPoints(self,InputPoints:np.array):
+    '''return 2D coordinates'''
+    SuccessPnt=0
+    _2dPoint_list=[]
+    for _3dPoint in InputPoints:
+      _2dPoint=self.GetProjectedPoints(_3dPoint)
+      try:
+        _2dPoint_list.append((int(_2dPoint[0:2][0]),int(_2dPoint[0:2][1])))
+        SuccessPnt=SuccessPnt+1
+      except IndexError as error:
+        #for pixels out of range we can ignore
+        pass
+      except Exception as e:
+        print("error plotting 2d projected points in Get2DProjectedImage")
+        print(e)
+    return np.array(_2dPoint_list)
+    
+
   def Get2DProjectedImage(self,InputPoints:np.array):
     '''return opencv object of 2d plane'''
     Image=np.zeros([self.Image_Width,self.Image_Height])
@@ -316,9 +328,6 @@ class CameraClass:
         break
       cv2.line(Image, (_2dPoint_list[Index][1],_2dPoint_list[Index][0]), (_2dPoint_list[Index+1][1],_2dPoint_list[Index+1][0]), (255), thickness=line_thickness)
     return Image
-    
-
-
 # Focallength_mm= 26 
 # Pixel_size_sensor_mm= 0.00551 
 # Image_Height=1000
@@ -409,147 +418,158 @@ def _3D_Plotter(Input_np_array,Filepath,Drawpaths,CrossProducts,**kwargs):#3d ma
     if Filepath is not None:
       plt.savefig(Filepath)
 
-_3D_points=[]
-_3D_points.append((-150.0, -150.0, -125.0))
-_3D_points.append((150.0, -150.0, -125.0))
-_3D_points.append(( 0.0, 0.0, 0.0))
-_3D_points.append((0.0, -330.0, -65.0))
-_3D_points.append((-225.0, 170.0, -135.0))
-_3D_points.append(( 225.0, 170.0, -135.0))
+def main():
+  OutputPath=r"C:\Working\testOutput"
 
-#create random field of 3d points with a rough shape
-_3D_points=[]
-for Index in range(0,10):
-  _3D_points.append((Index*random.random(),Index*random.random(),4*Index*random.random()))
+  Result = input("Press enter to clear folder:" + str(OutputPath))
+  if Result=="":
+    _3DVisLabLib.DeleteFiles_RecreateFolder(OutputPath)
 
 
+  _3D_points=[]
+  _3D_points.append((-150.0, -150.0, -125.0))
+  _3D_points.append((150.0, -150.0, -125.0))
+  _3D_points.append(( 0.0, 0.0, 0.0))
+  _3D_points.append((0.0, -330.0, -65.0))
+  _3D_points.append((-225.0, 170.0, -135.0))
+  _3D_points.append(( 225.0, 170.0, -135.0))
 
-def GenerateSquare():
-  _side= np.arange(-10, 11, 1)
-  _StaticAxis= np.full((len(_side)),10 )
-  out_arr_top = np.column_stack((_side, _StaticAxis))
-  _StaticAxis= np.full((len(_side)),-10 )
-  out_arr_lower = np.column_stack((_side, _StaticAxis))
-  _StaticAxis= np.full((len(_side)),10 )
-  out_arr_left = np.column_stack((_StaticAxis, _side))
-  _StaticAxis= np.full((len(_side)),-10 )
-  out_arr_right = np.column_stack((_StaticAxis, _side))
-
-  #must be better way of doing this
-  OutputArray=[]
-  for a,b,c,d in zip (out_arr_top,out_arr_lower,out_arr_left,out_arr_right):
-    OutputArray.append(tuple(a))
-    OutputArray.append(tuple(b))
-    OutputArray.append(tuple(c))
-    OutputArray.append(tuple(d))
-
-  return OutputArray
-
-
-#draw cube
-_3D_points=[]
-#z axis
-#for Z_Index in range(-10,10,1):
-#create square
-_Square=GenerateSquare()
-for elem in _Square:
-  _3D_points.append((elem[0],elem[1],-10))
-for elem in _Square:
-  _3D_points.append((elem[0],elem[1],10))
-#generate vertical sides
-#have a go making this smarter
-for Elem in range (-10,10):
-  _3D_points.append((-10,-10,Elem))
-  _3D_points.append((10,-10,Elem))
-  _3D_points.append((-10,10,Elem))
-  _3D_points.append((10,10,Elem))
+  #create random field of 3d points with a rough shape
+  _3D_points=[]
+  for Index in range(0,10):
+    _3D_points.append((Index*random.random(),Index*random.random(),4*Index*random.random()))
 
 
 
+  def GenerateSquare():
+    _side= np.arange(-10, 11, 1)
+    _StaticAxis= np.full((len(_side)),10 )
+    out_arr_top = np.column_stack((_side, _StaticAxis))
+    _StaticAxis= np.full((len(_side)),-10 )
+    out_arr_lower = np.column_stack((_side, _StaticAxis))
+    _StaticAxis= np.full((len(_side)),10 )
+    out_arr_left = np.column_stack((_StaticAxis, _side))
+    _StaticAxis= np.full((len(_side)),-10 )
+    out_arr_right = np.column_stack((_StaticAxis, _side))
+
+    #must be better way of doing this
+    OutputArray=[]
+    for a,b,c,d in zip (out_arr_top,out_arr_lower,out_arr_left,out_arr_right):
+      OutputArray.append(tuple(a))
+      OutputArray.append(tuple(b))
+      OutputArray.append(tuple(c))
+      OutputArray.append(tuple(d))
+
+    return OutputArray
 
 
-#convert to numpy array for matrix operations
-_3D_points_np=np.array(_3D_points)
-
-#NEXT - remember matrix multiplication rules
-#need to convert to homogenous vecotrs (x,y,z,1), do translation, then convert back from homogenous (divinde by last element)
-
-#try dataclass object
-_5pointFace=_3D_data_Experiment("5pointface",_3D_points_np)
-_5pointFace._MyPurpose()
-
-MyCamera=CameraClass("ForProjectionMatrix",3,0.00551,1000,1000)
+  #draw cube
+  _3D_points=[]
+  #z axis
+  #for Z_Index in range(-10,10,1):
+  #create square
+  _Square=GenerateSquare()
+  for elem in _Square:
+    _3D_points.append((elem[0],elem[1],-10))
+  for elem in _Square:
+    _3D_points.append((elem[0],elem[1],10))
+  #generate vertical sides
+  #have a go making this smarter
+  for Elem in range (-10,10):
+    _3D_points.append((-10,-10,Elem))
+    _3D_points.append((10,-10,Elem))
+    _3D_points.append((-10,10,Elem))
+    _3D_points.append((10,10,Elem))
 
 
 
 
-#Translate3D(_3D_points_np,x=1,y=1,z=1)
+
+  #convert to numpy array for matrix operations
+  _3D_points_np=np.array(_3D_points)
+
+  #NEXT - remember matrix multiplication rules
+  #need to convert to homogenous vecotrs (x,y,z,1), do translation, then convert back from homogenous (divinde by last element)
+
+  #try dataclass object
+  _5pointFace=_3D_data_Experiment("5pointface",_3D_points_np)
+  _5pointFace._MyPurpose()
+
+  MyCamera=CameraClass("ForProjectionMatrix",3,0.00551,1000,1000)
 
 
-while True:
-  Image=MyCamera.Get2DProjectedImage(_5pointFace._3dPoints)
-  UserRequest=_3DVisLabLib.ImageViewer_Quickv2_UserControl(Image,0,True,False)
-  #move camera controls
-  if UserRequest==UserOperationStrings.Xplus.value:
-    MyCamera.Translation_Cam_XYZ(1,0,0)
-  if UserRequest==UserOperationStrings.Xminus.value:
-    MyCamera.Translation_Cam_XYZ(-1,0,0) 
-  if UserRequest==UserOperationStrings.Yplus.value:
-    MyCamera.Translation_Cam_XYZ(0,1,0)
-  if UserRequest==UserOperationStrings.Yminus.value:
-    MyCamera.Translation_Cam_XYZ(0,-1,0) 
-  if UserRequest==UserOperationStrings.Zplus.value:
-    MyCamera.Translation_Cam_XYZ(0,0,1)
-  if UserRequest==UserOperationStrings.Zminus.value:
-    MyCamera.Translation_Cam_XYZ(0,0,-1) 
-  
-  #rotate object
-  if UserRequest==UserOperationStrings.RotateX.value:
-    _5pointFace.rotate_ClassMethod(math.radians(5),axis="x")
-  if UserRequest==UserOperationStrings.RotateY.value:
-    _5pointFace.rotate_ClassMethod(math.radians(5),axis="y")
-  if UserRequest==UserOperationStrings.RotateZ.value:
+
+
+  #Translate3D(_3D_points_np,x=1,y=1,z=1)
+
+
+  while True:
+    Image=MyCamera.Get2DProjectedImage(_5pointFace._3dPoints)
+    UserRequest=_3DVisLabLib.ImageViewer_Quickv2_UserControl(Image,0,True,False)
+    #move camera controls
+    if UserRequest==UserOperationStrings.Xplus.value:
+      MyCamera.Translation_Cam_XYZ(1,0,0)
+    if UserRequest==UserOperationStrings.Xminus.value:
+      MyCamera.Translation_Cam_XYZ(-1,0,0) 
+    if UserRequest==UserOperationStrings.Yplus.value:
+      MyCamera.Translation_Cam_XYZ(0,1,0)
+    if UserRequest==UserOperationStrings.Yminus.value:
+      MyCamera.Translation_Cam_XYZ(0,-1,0) 
+    if UserRequest==UserOperationStrings.Zplus.value:
+      MyCamera.Translation_Cam_XYZ(0,0,1)
+    if UserRequest==UserOperationStrings.Zminus.value:
+      MyCamera.Translation_Cam_XYZ(0,0,-1) 
+    
+    #rotate object
+    if UserRequest==UserOperationStrings.RotateX.value:
+      _5pointFace.rotate_ClassMethod(math.radians(5),axis="x")
+    if UserRequest==UserOperationStrings.RotateY.value:
+      _5pointFace.rotate_ClassMethod(math.radians(5),axis="y")
+    if UserRequest==UserOperationStrings.RotateZ.value:
+      _5pointFace.rotate_ClassMethod(math.radians(5),axis="z")
+    
+    #change camera focal length
+    if UserRequest==UserOperationStrings.FocalLengthPlus.value:
+      MyCamera.Focallength_mm=MyCamera.Focallength_mm+1
+    if UserRequest==UserOperationStrings.FocalLengthMinus.value:
+      MyCamera.Focallength_mm=MyCamera.Focallength_mm-1
+
+
+  Counter=0
+  while True:
+    Filepath=OutputPath + "\\00" + str(Counter) + ".jpg"
+    Filepath_2d=OutputPath + "\\00" + str(Counter) + "_2d.jpg"
+    Filepath_2dProject=OutputPath + "\\_2DProject00" + str(Counter) + "_2d.jpg"
+
+
+    #Projected_2dPoints=[]
+    ##for _3dPoint in _5pointFace._3dPoints:
+    #  Projected_2dPoints.append(MyCamera.GetProjectedPoints(_3dPoint))
+    #Projected_2dPoints=np.array(Projected_2dPoints)
+
+
+    Image=MyCamera.Get2DProjectedImage(_5pointFace._3dPoints)
+    cv2.imwrite(Filepath_2dProject, Image)
+
+    _5pointFace.Translate3D_classmethod(x=0,y=0,z=0)
     _5pointFace.rotate_ClassMethod(math.radians(5),axis="z")
-  
-  #change camera focal length
-  if UserRequest==UserOperationStrings.FocalLengthPlus.value:
-    MyCamera.Focallength_mm=MyCamera.Focallength_mm+1
-  if UserRequest==UserOperationStrings.FocalLengthMinus.value:
-    MyCamera.Focallength_mm=MyCamera.Focallength_mm-1
+    _5pointFace.rotate_ClassMethod(math.radians(5),axis="x")
+    _5pointFace.rotate_ClassMethod(math.radians(5),axis="y")
+    MyCamera.Translation_Cam_XYZ(0,0,int(-Counter/10))
+    #MyCamera.Focallength_mm=MyCamera.Focallength_mm+Counter
+    #_5pointFace.AddRandomMovement(19)
+    
+    Counter=Counter+1
+    if Counter>100:
+      break
+
+    #eigvalues, eigvectors=_5pointFace.GetPCA_SetToMean()
+    #_3D_Plotter(_5pointFace._3dPoints,Filepath,False,False)#,eigvalues=eigvalues,eigvectors=eigvectors)
+    #_3D_Plotter(Projected_2dPoints,Filepath_2d,False,False)
 
 
-Counter=0
-while True:
-  Filepath=OutputPath + "\\00" + str(Counter) + ".jpg"
-  Filepath_2d=OutputPath + "\\00" + str(Counter) + "_2d.jpg"
-  Filepath_2dProject=OutputPath + "\\_2DProject00" + str(Counter) + "_2d.jpg"
+  #projection matrix 
+  #https://homepages.inf.ed.ac.uk/rbf/CVonline/LOCAL_COPIES/EPSRC_SSAZ/node3.html
 
-
-  #Projected_2dPoints=[]
-  ##for _3dPoint in _5pointFace._3dPoints:
-  #  Projected_2dPoints.append(MyCamera.GetProjectedPoints(_3dPoint))
-  #Projected_2dPoints=np.array(Projected_2dPoints)
-
-
-  Image=MyCamera.Get2DProjectedImage(_5pointFace._3dPoints)
-  cv2.imwrite(Filepath_2dProject, Image)
-
-  _5pointFace.Translate3D_classmethod(x=0,y=0,z=0)
-  _5pointFace.rotate_ClassMethod(math.radians(5),axis="z")
-  _5pointFace.rotate_ClassMethod(math.radians(5),axis="x")
-  _5pointFace.rotate_ClassMethod(math.radians(5),axis="y")
-  MyCamera.Translation_Cam_XYZ(0,0,int(-Counter/10))
-  #MyCamera.Focallength_mm=MyCamera.Focallength_mm+Counter
-  #_5pointFace.AddRandomMovement(19)
-  
-  Counter=Counter+1
-  if Counter>100:
-    break
-
-  #eigvalues, eigvectors=_5pointFace.GetPCA_SetToMean()
-  #_3D_Plotter(_5pointFace._3dPoints,Filepath,False,False)#,eigvalues=eigvalues,eigvectors=eigvectors)
-  #_3D_Plotter(Projected_2dPoints,Filepath_2d,False,False)
-
-
-#projection matrix 
-#https://homepages.inf.ed.ac.uk/rbf/CVonline/LOCAL_COPIES/EPSRC_SSAZ/node3.html
+if __name__ == "__main__":
+    main()

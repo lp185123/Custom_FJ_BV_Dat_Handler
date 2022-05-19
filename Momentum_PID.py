@@ -6,26 +6,26 @@ import time
 from scipy import rand
 import _3DVisLabLib
 import random
-
+import Practise_3dView
 
 @dataclass(order=True,repr=False)
-class _2d_Body:
-    '''2D physics object'''
+class _ND_Body:
+    '''ND physics object, ND = n dimension, so can change to 2d physics if required'''
     sort_index: float =field(init=False)#use this for sorting
     Name:str
     Mass:float
-    position_2d:np.array([],dtype=float)
-    velocity_2d:np.array([],dtype=float)
-    ForceVector_2d:np.array([],dtype=float)
+    position_ND:np.array([],dtype=float)
+    velocity_ND:np.array([],dtype=float)
+    ForceVector_ND:np.array([],dtype=float)
     Radius:float
 
     def __post_init__(self):#need this for sorting
-        object.__setattr__(self,'sort_index',self.Mass)
+        object.__setattr__(self,'sort_index',self.position_ND[2])
         self.Force=np.array([0,0,0],dtype=float)
-        self.position_2d=np.array(self.position_2d,dtype=float)
-        self.ForceVector_2d=np.array(self.ForceVector_2d,dtype=float)
-        self.velocity_2d=np.array(self.velocity_2d,dtype=float)
-        self.Radius=int(np.linalg.norm(self.ForceVector_2d)+self.Mass)
+        self.position_ND=np.array(self.position_ND,dtype=float)
+        self.ForceVector_ND=np.array(self.ForceVector_ND,dtype=float)
+        self.velocity_ND=np.array(self.velocity_ND,dtype=float)
+        self.Radius=int(np.linalg.norm(self.ForceVector_ND)+self.Mass)
         if self.Radius>30:
             self.Radius=30
         if self.Radius<2:
@@ -37,7 +37,7 @@ class _2d_Body:
         so will orbit the object'''
         #get directional vector from Camera to Ball
         #subtract end point from start point
-        RelativePos_2me=InputObject.position_2d-self.position_2d
+        RelativePos_2me=InputObject.position_ND-self.position_ND
         #get distance from ball to camera
         DistanceObject2me=np.linalg.norm(RelativePos_2me)
         #set to unit vector
@@ -46,14 +46,14 @@ class _2d_Body:
         ApplicationForceVector=DirectionToObject_unit * (1/(DistanceObject2me+100))**2#sort of equasion for gravity
         #compute force on self
         #self.Force=np.array([0,0],dtype=float)
-        self.Force=ApplicationForceVector * InputObject.ForceVector_2d
+        self.Force=ApplicationForceVector * InputObject.ForceVector_ND
         #apply newtons second law, compute accelerate
         Acceleration=self.Force/self.Mass
         #integrate once to get velocity
-        self.velocity_2d+=Acceleration*dT
-        #FollowCam.velocity_2d=Acceleration*dt #use this for no inertia
+        self.velocity_ND+=Acceleration*dT
         #integrate twice to get position
-        self.position_2d+=self.velocity_2d* dT
+        self.position_ND+=self.velocity_ND* dT
+
         return
 
 
@@ -63,14 +63,22 @@ class _2d_Body:
         or at least make it less aggressive/sharp '''
         pass
 
-@dataclass(order=True,repr=False)
-class _2d_Force:
-    '''2D force object'''
-    sort_index: str =field(init=False)#use this for sorting
-    Name:str
-    ForceVector_2d:np.array([],dtype=float)
-    def __post_init__(self):#need this for sorting
-        object.__setattr__(self,'sort_index',self.Name)
+# @dataclass(order=True,repr=False)
+# class _ND_Force:
+#     '''ND force object'''
+#     sort_index: str =field(init=False)#use this for sorting
+#     Name:str
+#     ForceVector_ND:np.array([],dtype=float)
+#     def __post_init__(self):#need this for sorting
+#         object.__setattr__(self,'sort_index',self.Name)
+
+def mapFromTo(x,a,b,c,d):
+    # x:input value; 
+    # a,b:input range
+    # c,d:output range
+    # y:return value
+        y=(x-a)/(b-a)*(d-c)+c
+        return y
 
 class TimeDiffObject:
     '''Class to create Dt for physics simulations'''
@@ -86,25 +94,128 @@ class TimeDiffObject:
 
 class SimViewBox():
     '''Display particles'''
-    def __init__(self,Height,Width) -> None:
+    def __init__(self,Height,Width,ZDepth) -> None:
         self.BaseImage=np.zeros([Height,Width,3],dtype="uint8")
-
+        self.ZDepth=ZDepth
+        self.GridImg=cv2.imread(r"C:\Working\GridPerspective.jpg",cv2.IMREAD_GRAYSCALE)
+        self.GridImg = cv2.cvtColor(self.GridImg,cv2.COLOR_GRAY2RGB)
+        self.GridImg = cv2.resize(self.GridImg,(self.BaseImage.shape[0],self.BaseImage.shape[1]))
     def ResetImage(self):
+        #self.BaseImage=cv2.imread(r"C:\Working\GridPerspective.jpg",cv2.IMREAD_GRAYSCALE)
+        #self.BaseImage = cv2.cvtColor(self.BaseImage,cv2.COLOR_GRAY2RGB)
+        #self.BaseImage = cv2.resize(self.BaseImage,(800,800))
         self.BaseImage=np.zeros([self.BaseImage.shape[0],self.BaseImage.shape[1],3],dtype="uint8")
 
-    def UpdateImage(self,Object):
-        # Center coordinates
-        center_coordinates = tuple([int(x) for x in Object.position_2d[0:2]] )
+    def UpdateImage(self,Object,_2Dpoint_if_exists):
+        if _2Dpoint_if_exists is not None:
+            center_coordinates=tuple(_2Dpoint_if_exists)
+        else:
+            # Center coordinates
+            center_coordinates = tuple([int(x) for x in Object.position_ND[0:2]] )
+        Rules=[center_coordinates[0]>0, center_coordinates[1]>0, center_coordinates[0]<self.BaseImage.shape[0],center_coordinates[0]<self.BaseImage.shape[1]]
+        if not all(Rules):
+            return self.BaseImage
         # Radius of circle
-        radius = Object.Radius
+        radius = 15#Object.Radius standard radius for all 
+        #difference from z0
+        Zdepth=int(Object.position_ND[2]/5)
+        radius=radius+Zdepth
+
+        if Object.Mass==1:
+            radius=radius/3
+        if radius<2:
+            radius=2
+        if radius>100:
+            radius=100
+
+        NewColour=(np.array(Object.Colour)/2)
+        NewColour=tuple(NewColour.astype(int))
+
+
         # Blue color in BGR
         color = Object.Colour
+        Zdepth=Zdepth*3
+        NewerColor=(Object.Colour[0]+Zdepth,Object.Colour[1]+Zdepth,Object.Colour[2]+Zdepth)
+        
         # Line thickness of 2 px
         thickness = -1
-        #draw circle on image
-        image = cv2.circle(self.BaseImage, center_coordinates, radius, color, thickness)
+        
+        #try:
+        #create small portion of image to create physics body and blur it
+        #SmallFrame_body=np.array()
 
-        return image
+
+        #get copy of image
+        #CopyImage=self.BaseImage.copy()
+
+        #create mask - slightly bigger than current radius?
+        Mask=np.zeros([self.BaseImage.shape[0],self.BaseImage.shape[1],3],dtype="uint8")
+        image_Zlayer = cv2.circle(Mask, center_coordinates, int(radius), NewerColor, thickness)
+
+
+
+        #blur z layer
+        KernelSize=int(mapFromTo(Zdepth,-50,30,9,1))
+        KernelSize=max(1,KernelSize)
+        KernelSize=min(21,KernelSize)
+        if KernelSize%2==0:#kernels can only handle odd numbers
+            KernelSize+=1
+
+        kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing - maybe make smoother as such small images
+        IncreaseRadius=5
+        CentreAreaToSMoothX=center_coordinates[1]
+        CentreAreaToSMoothY=center_coordinates[0]
+        LeftAreaToSMoothX=CentreAreaToSMoothX-int(radius+IncreaseRadius)
+        RightAreaToSMoothX=CentreAreaToSMoothX+int(radius+IncreaseRadius)
+        TopAreaToSMoothX=CentreAreaToSMoothY-int(radius+IncreaseRadius)
+        LowerAreaToSMoothX=CentreAreaToSMoothY+int(radius+IncreaseRadius)
+
+        #check crop area is in range
+        Rules=[LeftAreaToSMoothX>0, TopAreaToSMoothX>0, RightAreaToSMoothX<self.BaseImage.shape[0],LowerAreaToSMoothX<self.BaseImage.shape[1]]
+        if not all(Rules):
+            return self.BaseImage
+
+
+        AreaCheck=image_Zlayer[LeftAreaToSMoothX:RightAreaToSMoothX,TopAreaToSMoothX:LowerAreaToSMoothX,:]
+        BlurredFramedBody=cv2.filter2D(AreaCheck,-1,kernel)
+        BlurredFramedBody_gray = cv2.cvtColor(BlurredFramedBody, cv2.COLOR_BGR2GRAY)
+        (thresh, BinarisedImage) = cv2.threshold(BlurredFramedBody_gray, 50, 255, cv2.THRESH_BINARY)
+        BinarisedImage_inverted = cv2.bitwise_not(BinarisedImage)
+        BinarisedImage_3Channel = cv2.cvtColor (BinarisedImage, cv2.COLOR_GRAY2BGR)
+        BinarisedImage_3Channel_inv = cv2.cvtColor (BinarisedImage_inverted, cv2.COLOR_GRAY2BGR)
+
+        
+
+        #cut out hole in original image
+        OriginalArea=self.BaseImage[LeftAreaToSMoothX:RightAreaToSMoothX,TopAreaToSMoothX:LowerAreaToSMoothX,:].copy()
+
+       
+
+        self.BaseImage[LeftAreaToSMoothX:RightAreaToSMoothX,TopAreaToSMoothX:LowerAreaToSMoothX,:]=0#(BinarisedImage_3Channel_inv*255)
+
+        plop=np.subtract(OriginalArea.astype(np.int16),BinarisedImage_3Channel.astype(np.int16))
+        plop=np.clip(plop, 0, 255)
+        plop=plop.astype(np.uint8)
+        plop=np.add(plop,BlurredFramedBody)
+
+        #_3DVisLabLib.ImageViewer_Quickv2(BinarisedImage_3Channel,0,True,False)
+        #_3DVisLabLib.ImageViewer_Quickv2(BinarisedImage_3Channel_inv,0,True,False)
+        #_3DVisLabLib.ImageViewer_Quickv2(OriginalArea,0,True,False)
+        #_3DVisLabLib.ImageViewer_Quickv2(plop,0,True,False)
+
+
+        self.BaseImage[LeftAreaToSMoothX:RightAreaToSMoothX,TopAreaToSMoothX:LowerAreaToSMoothX,:] = plop
+        #now add to canvas with alpha blend
+        #TestImage = cv2.addWeighted(TestImage, ParameterObject.AlphaBlend, ProcessedImage, 1.0, 0.0)
+
+        return self.BaseImage#self.BaseImage
+
+        #add back onto canvas
+
+        # except Exception as e:
+        #     print(e)
+        #     self.BaseImage = cv2.circle(self.BaseImage , center_coordinates, int(radius), NewerColor, thickness)
+        #     return self.BaseImage
 
 refPt = []#global object to handle recording mouse position
 GlobalMousePos=(250,250)#need to be global to handle capturing mouse on opencv UI
@@ -124,34 +235,66 @@ def FollowMouse(event, x, y, flags, param):
 
 
 def main():
+
+    #create camera object
+    MyCamera=Practise_3dView.CameraClass("ForProjectionMatrix",5,0.00551,500,500)
+    MyCamera.Translation_Cam_XYZ(-250,-250,609)
+
+
     ListBodies=[]
     cv2.namedWindow("img")
     cv2.setMouseCallback("img", FollowMouse)
     #create objects
-    force_Gravity=_2d_Body("User",10.0,[250,250,0],[0,0,0],[20,20,20],0)
+    force_Gravity=_ND_Body("User",10.0,[250,250,0],[0,0,0],[90,90,90],0)
     ListBodies.append(force_Gravity)
-    for Indexer, CreateBody in enumerate(range (0,15)):
-        RandMass=random.randint(1,20)
-        RandForce=random.randint(1,20)
-        ListBodies.append(_2d_Body(str(Indexer),RandMass,[random.randint(100,400),random.randint(100,400),random.randint(100,400)],[0,0,0],[RandForce,RandForce,RandForce],0))
+   
+    #add little ones
+    for Indexer, CreateBody in enumerate(range (0,20)):
+        RandMass=1
+        RandForce=RandMass
+        ListBodies.append(_ND_Body(str(Indexer),
+        RandMass,
+        [random.randint(250,300),random.randint(250,300),random.randint(-20,20)],
+        [-0.03,-0.01,0],
+        [RandForce,RandForce,RandForce],0))
+
+    for Indexer, CreateBody in enumerate(range (0,0)):
+        RandMass=random.randint(15,15)
+        RandForce=RandMass#random.randint(1,1)
+        ListBodies.append(_ND_Body(str(Indexer),
+        RandMass,
+        [random.randint(220,220),random.randint(200,200),random.randint(-10,10)],
+        [0.1,0.1,0],
+        [RandForce,RandForce,RandForce],0))
     
 
 
     dTime=TimeDiffObject()
-    SimImage=SimViewBox(500,500)
+    SimImage=SimViewBox(500,500,500)
 
     #global variable to store positon of users cursor in the opencv window
     global GlobalMousePos
     while True:
         #get time difference to keep it consistent
-        force_Gravity.position_2d=np.array(list(GlobalMousePos) + [0])#only want X and Y but need a Z to satisfy logic
+        #force_Gravity.position_ND=np.array(list(GlobalMousePos) + [0])#only want X and Y but need a Z to satisfy logic
         #time.sleep(0.01)
-        dt=dTime.Get_dT()+10
+        dt=10#dTime.Get_dT()
         SimImage.ResetImage()
-        for PhysBody in ListBodies:
-            OutputSimImage= SimImage.UpdateImage(PhysBody)
+        #NOTE this should be handled in the dataclass - check out why not and get this workign properly
+        ListBodies.sort(key=lambda x:x.position_ND[2])
 
-        _3DVisLabLib.ImageViewer_Quickv2_UserControl(OutputSimImage,0,False,False)
+        for PhysBody in ListBodies:
+            #for doing 1 coordinate at a time, need to expand a dim 
+            ProjectedPoint=MyCamera.Get2DProjectedPoints(np.expand_dims(PhysBody.position_ND, axis=0))
+            OutputSimImage= SimImage.UpdateImage(PhysBody,ProjectedPoint[0])
+            
+
+        OutputSimImage = cv2.resize(OutputSimImage,(OutputSimImage.shape[1]*2,OutputSimImage.shape[0]*2))
+        cv2.imshow("img", OutputSimImage)
+        if cv2.waitKey(20) & 0xFF == 27:#need [waitkey] for GUI to update
+            #for some reason
+            pass 
+        #_3DVisLabLib.ImageViewer_Quickv2_UserControl(OutputSimImage,0,False,False)
 
         for PhysBody in ListBodies:
             if all([PhysBody.Name=="User"]):
