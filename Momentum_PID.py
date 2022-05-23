@@ -1,3 +1,4 @@
+from enum import auto
 import numpy as np
 from dataclasses import dataclass,field
 import cv2
@@ -7,6 +8,27 @@ from scipy import rand
 import _3DVisLabLib
 import random
 import Practise_3dView
+import copy
+
+@dataclass(order=True,repr=False)
+class TrailUnit:
+    '''trail object - this is best done with a matrix - this will probably be very slow'''
+    sort_index: float =field(init=False)#use this for sorting
+    CountDown: int
+    position_ND:np.array([],dtype=float)
+    Colour: tuple
+
+    def __post_init__(self):#need this for sorting
+        object.__setattr__(self,'sort_index',self.position_ND[2])
+    def _Tick(self):
+        '''each draw, reduce lifetime of item'''
+        self.CountDown=self.CountDown-1
+    def IsLifeTimeFinished(self):
+        if self.CountDown<=0:
+            return True
+        else:
+            return False
+
 
 @dataclass(order=True,repr=False)
 class _ND_Body:
@@ -18,6 +40,10 @@ class _ND_Body:
     velocity_ND:np.array([],dtype=float)
     ForceVector_ND:np.array([],dtype=float)
     Radius:float
+
+    def GetTrailObject(self):
+        '''Return an object to handle drawing trails complying with Z buffer'''
+        return TrailUnit(100,self.position_ND,self.Colour)
 
     def __post_init__(self):#need this for sorting
         object.__setattr__(self,'sort_index',self.position_ND[2])
@@ -106,6 +132,31 @@ class SimViewBox():
         #self.BaseImage = cv2.resize(self.BaseImage,(800,800))
         self.BaseImage=np.zeros([self.BaseImage.shape[0],self.BaseImage.shape[1],3],dtype="uint8")
 
+    def UpdateImage_trails(self,TrailObject,_2Dpoint_if_exists):
+        if _2Dpoint_if_exists is not None:
+            center_coordinates=tuple(_2Dpoint_if_exists)
+        else:
+            # Center coordinates
+             center_coordinates = tuple([int(x) for x in TrailObject.position_ND[0:2]] )
+
+        try:
+           
+            LifeTimeColour=1#TrailObject.CountDown/100
+            Zdepth=int(TrailObject.position_ND[2]/5)
+            NewerColor=(int(TrailObject.Colour[0]*LifeTimeColour),
+            int(TrailObject.Colour[1]*LifeTimeColour),
+            int(TrailObject.Colour[2]*LifeTimeColour))
+
+            #self.BaseImage = cv2.circle(self.BaseImage, center_coordinates, int(1), NewerColor, -1)
+            self.BaseImage[center_coordinates[1],center_coordinates[0],0]=NewerColor[0]
+            self.BaseImage[center_coordinates[1],center_coordinates[0],1]=NewerColor[1]
+            self.BaseImage[center_coordinates[1],center_coordinates[0],2]=NewerColor[2]
+        #can ignore out of bound error
+        #warning - trys can be expensive if catching too much 
+        except IndexError as error:
+            pass
+        return self.BaseImage
+
     def UpdateImage(self,Object,_2Dpoint_if_exists):
         if _2Dpoint_if_exists is not None:
             center_coordinates=tuple(_2Dpoint_if_exists)
@@ -114,6 +165,7 @@ class SimViewBox():
             center_coordinates = tuple([int(x) for x in Object.position_ND[0:2]] )
         Rules=[center_coordinates[0]>0, center_coordinates[1]>0, center_coordinates[0]<self.BaseImage.shape[0],center_coordinates[0]<self.BaseImage.shape[1]]
         if not all(Rules):
+            print(f"Out of range to plot body {center_coordinates}")
             return self.BaseImage
         # Radius of circle
         radius = 15#Object.Radius standard radius for all 
@@ -151,8 +203,8 @@ class SimViewBox():
         #create mask - slightly bigger than current radius?
         Mask=np.zeros([self.BaseImage.shape[0],self.BaseImage.shape[1],3],dtype="uint8")
         image_Zlayer = cv2.circle(Mask, center_coordinates, int(radius), NewerColor, thickness)
-
-
+        #self.BaseImage=cv2.circle(self.BaseImage, center_coordinates, int(2), NewerColor, thickness)
+        #return self.BaseImage
 
         #blur z layer
         KernelSize=int(mapFromTo(Zdepth,-50,30,9,1))
@@ -162,7 +214,7 @@ class SimViewBox():
             KernelSize+=1
 
         kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing - maybe make smoother as such small images
-        IncreaseRadius=5
+        IncreaseRadius=10
         CentreAreaToSMoothX=center_coordinates[1]
         CentreAreaToSMoothY=center_coordinates[0]
         LeftAreaToSMoothX=CentreAreaToSMoothX-int(radius+IncreaseRadius)
@@ -173,16 +225,17 @@ class SimViewBox():
         #check crop area is in range
         Rules=[LeftAreaToSMoothX>0, TopAreaToSMoothX>0, RightAreaToSMoothX<self.BaseImage.shape[0],LowerAreaToSMoothX<self.BaseImage.shape[1]]
         if not all(Rules):
+            print(f"Crop area out of range{LeftAreaToSMoothX,RightAreaToSMoothX,TopAreaToSMoothX,LowerAreaToSMoothX}")
             return self.BaseImage
 
 
         AreaCheck=image_Zlayer[LeftAreaToSMoothX:RightAreaToSMoothX,TopAreaToSMoothX:LowerAreaToSMoothX,:]
         BlurredFramedBody=cv2.filter2D(AreaCheck,-1,kernel)
         BlurredFramedBody_gray = cv2.cvtColor(BlurredFramedBody, cv2.COLOR_BGR2GRAY)
-        (thresh, BinarisedImage) = cv2.threshold(BlurredFramedBody_gray, 50, 255, cv2.THRESH_BINARY)
-        BinarisedImage_inverted = cv2.bitwise_not(BinarisedImage)
+        (_, BinarisedImage) = cv2.threshold(BlurredFramedBody_gray, 50, 255, cv2.THRESH_BINARY)
+        #BinarisedImage_inverted = cv2.bitwise_not(BinarisedImage)
         BinarisedImage_3Channel = cv2.cvtColor (BinarisedImage, cv2.COLOR_GRAY2BGR)
-        BinarisedImage_3Channel_inv = cv2.cvtColor (BinarisedImage_inverted, cv2.COLOR_GRAY2BGR)
+        #BinarisedImage_3Channel_inv = cv2.cvtColor (BinarisedImage_inverted, cv2.COLOR_GRAY2BGR)
 
         
 
@@ -242,29 +295,30 @@ def main():
 
 
     ListBodies=[]
+    ListTrails=[]
     cv2.namedWindow("img")
     cv2.setMouseCallback("img", FollowMouse)
     #create objects
-    force_Gravity=_ND_Body("User",10.0,[250,250,0],[0,0,0],[90,90,90],0)
+    force_Gravity=_ND_Body("User",10.0,[250,250,0],[0,0,0],[70,70,70],0)
     ListBodies.append(force_Gravity)
    
     #add little ones
-    for Indexer, CreateBody in enumerate(range (0,20)):
+    for Indexer, CreateBody in enumerate(range (0,2)):
         RandMass=1
         RandForce=RandMass
         ListBodies.append(_ND_Body(str(Indexer),
         RandMass,
         [random.randint(250,300),random.randint(250,300),random.randint(-20,20)],
-        [-0.03,-0.01,0],
+        [-0.08,0,random.randint(-1,1)*random.random()*random.random()],
         [RandForce,RandForce,RandForce],0))
 
-    for Indexer, CreateBody in enumerate(range (0,0)):
-        RandMass=random.randint(15,15)
+    for Indexer, CreateBody in enumerate(range (0,1)):
+        RandMass=random.randint(200,200)
         RandForce=RandMass#random.randint(1,1)
         ListBodies.append(_ND_Body(str(Indexer),
         RandMass,
         [random.randint(220,220),random.randint(200,200),random.randint(-10,10)],
-        [0.1,0.1,0],
+        [-0.01,0,0],
         [RandForce,RandForce,RandForce],0))
     
 
@@ -281,12 +335,26 @@ def main():
         dt=10#dTime.Get_dT()
         SimImage.ResetImage()
         #NOTE this should be handled in the dataclass - check out why not and get this workign properly
+        
+        ListBodies=ListBodies+ListTrails
         ListBodies.sort(key=lambda x:x.position_ND[2])
+        ListTrails=[]
+        for Index, PhysBody in enumerate(ListBodies):
+            if type(PhysBody) is TrailUnit:
+                #update trails according to z buffer
+                ProjectedPoint=MyCamera.Get2DProjectedPoints(np.expand_dims(PhysBody.position_ND, axis=0))
+                OutputSimImage= SimImage.UpdateImage_trails(PhysBody,ProjectedPoint[0])
+                PhysBody._Tick()
+                if PhysBody.IsLifeTimeFinished()==True:
+                    ListBodies.remove(PhysBody)
 
-        for PhysBody in ListBodies:
-            #for doing 1 coordinate at a time, need to expand a dim 
-            ProjectedPoint=MyCamera.Get2DProjectedPoints(np.expand_dims(PhysBody.position_ND, axis=0))
-            OutputSimImage= SimImage.UpdateImage(PhysBody,ProjectedPoint[0])
+
+            #if is a physics body - update image and get a trails object
+            if type(PhysBody) is _ND_Body:
+                #for doing 1 coordinate at a time, need to expand a dim 
+                ProjectedPoint=MyCamera.Get2DProjectedPoints(np.expand_dims(PhysBody.position_ND, axis=0))
+                OutputSimImage= SimImage.UpdateImage(PhysBody,ProjectedPoint[0])
+                ListTrails.append(copy.deepcopy(PhysBody.GetTrailObject()))
             
 
         OutputSimImage = cv2.resize(OutputSimImage,(OutputSimImage.shape[1]*2,OutputSimImage.shape[0]*2))
@@ -297,12 +365,14 @@ def main():
         #_3DVisLabLib.ImageViewer_Quickv2_UserControl(OutputSimImage,0,False,False)
 
         for PhysBody in ListBodies:
-            if all([PhysBody.Name=="User"]):
-                continue#don't process the user object
-            for PhysBodyExt in ListBodies:
-                rules=[PhysBodyExt.Name!=PhysBody.Name]
-                if all(rules):
-                    PhysBody.SimulateAsPhysicsBody(PhysBodyExt,dt)
+            if type(PhysBody) is _ND_Body: 
+                if all([PhysBody.Name=="User"]):
+                    continue#don't process the user object
+                for PhysBodyExt in ListBodies:
+                    if type(PhysBodyExt) is _ND_Body: 
+                        rules=[PhysBodyExt.Name!=PhysBody.Name]
+                        if all(rules):
+                            PhysBody.SimulateAsPhysicsBody(PhysBodyExt,dt)
 
 
 if __name__ == "__main__":

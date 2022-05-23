@@ -11,6 +11,27 @@ from numpy.linalg import eig
 import random
 import enum
 
+
+def rotateAroundAxis(X, theta, axis='x'):
+  '''Rotate multidimensional array `X` `theta` degrees around axis `axis`'''
+  c, s = np.cos(theta), np.sin(theta)
+  if axis == 'x': return np.dot(X, np.array([
+    [1.,  0,  0],
+    [0 ,  c, -s],
+    [0 ,  s,  c]
+  ]))
+  elif axis == 'y': return np.dot(X, np.array([
+    [c,  0,  -s],
+    [0,  1,   0],
+    [s,  0,   c]
+  ]))
+  elif axis == 'z': return np.dot(X, np.array([
+    [c, -s,  0 ],
+    [s,  c,  0 ],
+    [0,  0,  1.],
+  ]))
+
+
 class UserOperationStrings(enum.Enum):
     Xplus="w"
     Xminus="s"
@@ -145,44 +166,28 @@ class _3D_data:
     return values, vectors
   
 
-  @staticmethod
-  def rotate(X, theta, axis='x'):
-    '''Rotate multidimensional array `X` `theta` degrees around axis `axis`'''
-    c, s = np.cos(theta), np.sin(theta)
-    if axis == 'x': return np.dot(X, np.array([
-      [1.,  0,  0],
-      [0 ,  c, -s],
-      [0 ,  s,  c]
-    ]))
-    elif axis == 'y': return np.dot(X, np.array([
-      [c,  0,  -s],
-      [0,  1,   0],
-      [s,  0,   c]
-    ]))
-    elif axis == 'z': return np.dot(X, np.array([
-      [c, -s,  0 ],
-      [s,  c,  0 ],
-      [0,  0,  1.],
-    ]))
+
 
   def rotate_ClassMethod(self, theta, axis='x'):
-    '''Rotate multidimensional array `X` `theta` degrees around axis `axis`'''
-    c, s = np.cos(theta), np.sin(theta)
-    if axis == 'x': self._3dPoints= np.dot(self._3dPoints, np.array([
-      [1.,  0,  0],
-      [0 ,  c, -s],
-      [0 ,  s,  c]
-    ]))
-    elif axis == 'y': self._3dPoints= np.dot(self._3dPoints, np.array([
-      [c,  0,  -s],
-      [0,  1,   0],
-      [s,  0,   c]
-    ]))
-    elif axis == 'z': self._3dPoints= np.dot(self._3dPoints, np.array([
-      [c, -s,  0 ],
-      [s,  c,  0 ],
-      [0,  0,  1.],
-    ]))
+    self._3dPoints=rotateAroundAxis(self._3dPoints, theta, axis)
+
+    # '''Rotate multidimensional array `X` `theta` degrees around axis `axis`'''
+    # c, s = np.cos(theta), np.sin(theta)
+    # if axis == 'x': self._3dPoints= np.dot(self._3dPoints, np.array([
+    #   [1.,  0,  0],
+    #   [0 ,  c, -s],
+    #   [0 ,  s,  c]
+    # ]))
+    # elif axis == 'y': self._3dPoints= np.dot(self._3dPoints, np.array([
+    #   [c,  0,  -s],
+    #   [0,  1,   0],
+    #   [s,  0,   c]
+    # ]))
+    # elif axis == 'z': self._3dPoints= np.dot(self._3dPoints, np.array([
+    #   [c, -s,  0 ],
+    #   [s,  c,  0 ],
+    #   [0,  0,  1.],
+    # ]))
 
 
 #test inherited class
@@ -230,12 +235,18 @@ class CameraClass:
   #these are variables (usually in __init__ as "self")
   TranslationMatrix_t=np.array([0, 0, 90])#a 3D translation vector describing the position of the camera center
   RotationMatrix_R=np.eye(3, k=0)#orientation of the cmaera
+  #experiment with rotation matrix input
+  RotationMatrix_R[0,:]=np.array([1,0,0])
+  RotationMatrix_R[1,:]=np.array([0,1, 0])
+  RotationMatrix_R[2,:]=np.array([0,0, 1])
+  
   IntrinsicMatrix_K=None# calibration matrix
   ExtrinsicMatrix=None
   _3D_worldCoordinates=None
 
   def __post_init__(self):#need this for sorting
     object.__setattr__(self,'sort_index',self.Focallength_mm)#if we want to freeze object
+    
 
   def Translation_Cam_XYZ(self,x,y,z):
     self.TranslationMatrix_t[0]=self.TranslationMatrix_t[0]+x
@@ -256,10 +267,26 @@ class CameraClass:
     CameraMatrix_Intrinsic[1,1]=focalY
     CameraMatrix_Intrinsic[0,2]=cx
     CameraMatrix_Intrinsic[1,2]=cy
+
     self.IntrinsicMatrix_K=CameraMatrix_Intrinsic
 
+  def CalculateExtrinsicMatrix_MovingCam(self):
+    '''we want the camera to move around the world rather than vice-versa, so formula  [R|t] can be modified to
+    [Rc C]^-1.
+    replace [R|t] with [R|-RC]??.  Inverse of a valid rotation matrix is just the transpose'''
+    #add column to  Rotation matrix - note the tranpose which is an inverse if a rotation matrix
+    #t=-RC
+    Rinv=self.RotationMatrix_R.T
+    C=self.TranslationMatrix_t
+    Rinv_mul_C=np.matmul(Rinv,C)
+    #calculate [R|-RC]
+    b = np.append(self.RotationMatrix_R, [[Rinv_mul_C[0]],[Rinv_mul_C[1]],[Rinv_mul_C[2]]], axis = 1)
+
+    self.ExtrinsicMatrix=b
+
   def CalculateExtrinsicMatrix(self):
-    '''create extrinsic properties, translation & rotation [R|T]'''
+    '''create extrinsic properties, translation & rotation [R|t]'''
+    
     #add column to  Rotation matrix -
     b = np.append(self.RotationMatrix_R, [[self.TranslationMatrix_t[0]],[self.TranslationMatrix_t[1]],[self.TranslationMatrix_t[2]]], axis = 1)
     #b = np.pad(self.RotationMatrix, ((0, 0), (0, 1)), mode='constant', constant_values=0)
@@ -269,18 +296,101 @@ class CameraClass:
     #b[2,3]=self.TranslationVector[2]
     self.ExtrinsicMatrix=b
 
+  def RotateView_AroundLocation(self,XYZRotation_degrees:np.array,XYZRotateOrigin:np.array):
+    '''camera will spin around area of keeping area in frame'''
+    #translate rotate origin to zero
+
+    #apply rotation(s)
+    #TODO this is not nice
+    self.TranslationMatrix_t=rotateAroundAxis(self.TranslationMatrix_t, math.radians(XYZRotation_degrees[0]), axis="x")
+    self.TranslationMatrix_t=rotateAroundAxis(self.TranslationMatrix_t, math.radians(XYZRotation_degrees[1]), axis="y")
+    self.TranslationMatrix_t=rotateAroundAxis(self.TranslationMatrix_t, math.radians(XYZRotation_degrees[2]), axis="z")
+    
+    #untranslate position back
+
+    #camera direction will now be a unit vector of inverted position
+   # self.RotationMatrix_R=self.TranslationMatrix_t*-1
+    lookat=np.array([0,0,0])
+    vz = lookat - self.TranslationMatrix_t
+    vz = vz / (np.linalg.norm(vz) + 1e-16)#normalise - works for vectors with mag=0
+    vx = np.cross([ 0, 1, 0 ], vz)#cross with up vector (?)
+    vx = vx / (np.linalg.norm(vx) + 1e-16)#normalise - works for vectors with mag=0
+    vy = np.cross(vz,vx)
+
+    #4x4 matrix will support all affine transforms, including rotation and translation
+    RotMat=np.zeros([4,4])
+    RotMat[0:3,0]=vx
+    RotMat[0:3,1]=vy
+    RotMat[0:3,2]=vz
+    RotMat[3,3]=1
+    #test if a rotation matrix (only need 3x3 section for rotation only)
+    
+
+    self.RotationMatrix_R=RotMat[0:3,0:3]
+    
+    print(self.RotationMatrix_R)
+    if _3DVisLabLib.isRotationMatrix(RotMat[0:3,0:3])==False:
+      print(f"bad rotation matrix{self.RotationMatrix_R}")
+      #raise Exception("RotateView_AroundLocation isRotationMatrix, rotation matrix not valid",self.RotationMatrix_R)
+    
+    else:
+      TestEuler=_3DVisLabLib.rotationMatrixToEulerAngles(RotMat[0:3,0:3])
+    
+#     const Matrix4 Matrix4::createRotation(const Vertex& pos, const Vertex& lookat)
+# {
+#     Vector3 vz = lookat - pos;
+#     vz.normalize();
+#     Vector3 vx = Vector3::cross(Vector3( 0, 1, 0 ), vz);
+#     vx.normalize();
+#     Vector3 vy = Vector3::cross(vz, vx);
+
+#     Matrix4 rotation (  vx.x,   vy.x,   vz.x,   0,
+#                         vx.y,   vy.y,   vz.y,   0,
+#                         vx.z,   vy.z,   vz.z,   0,
+#                         0,      0,      0,      1);
+#     return rotation;
+#}
+# struct Mat3x3
+# {
+#     Vec3 column1;
+#     Vec3 column2;
+#     Vec3 column3;
+
+#     void makeRotationDir(const Vec3& direction, const Vec3& up = Vec3(0,1,0))
+#     {
+#         Vec3 xaxis = Vec3::Cross(up, direction);
+#         xaxis.normalizeFast();
+
+#         Vec3 yaxis = Vec3::Cross(direction, xaxis);
+#         yaxis.normalizeFast();
+
+#         column1.x = xaxis.x;
+#         column1.y = yaxis.x;
+#         column1.z = direction.x;
+
+#         column2.x = xaxis.y;
+#         column2.y = yaxis.y;
+#         column2.z = direction.y;
+
+#         column3.x = xaxis.z;
+#         column3.y = yaxis.z;
+#         column3.z = direction.z;
+#     }
+# }
+
+
   def GetProjectedPoints(self,InputPoint:np.array)->np.array:
     '''Calculate projection matrix P=K [r|T]
     this should be done in another function after proof of principle
     Expecting input of 3D homogenous coordinates'''
     self.CalculateIntrinsicMatrix()
-    self.CalculateExtrinsicMatrix()
+    self.CalculateExtrinsicMatrix_MovingCam()
 
     #convert 3d point to homogenous coordinates (just add a 1)
     Homogenous3DPt=np.append(InputPoint,([1]))
     
     scaledPixelCoords = np.matmul(np.matmul(self.IntrinsicMatrix_K,self.ExtrinsicMatrix),Homogenous3DPt)
-    CartesianCoords=scaledPixelCoords/scaledPixelCoords[-1]
+    CartesianCoords=scaledPixelCoords/scaledPixelCoords[-1]#divide by last element to convert from homogenous to cartesian
     return CartesianCoords
 
   def Get2DProjectedPoints(self,InputPoints:np.array):
@@ -421,9 +531,9 @@ def _3D_Plotter(Input_np_array,Filepath,Drawpaths,CrossProducts,**kwargs):#3d ma
 def main():
   OutputPath=r"C:\Working\testOutput"
 
-  Result = input("Press enter to clear folder:" + str(OutputPath))
-  if Result=="":
-    _3DVisLabLib.DeleteFiles_RecreateFolder(OutputPath)
+  #Result = input("Press enter to clear folder:" + str(OutputPath))
+  #if Result=="":
+  #  _3DVisLabLib.DeleteFiles_RecreateFolder(OutputPath)
 
 
   _3D_points=[]
@@ -480,7 +590,7 @@ def main():
     _3D_points.append((10,-10,Elem))
     _3D_points.append((-10,10,Elem))
     _3D_points.append((10,10,Elem))
-
+  _3D_points.append(( 0.0, 0.0, 0.0))
 
 
 
@@ -522,11 +632,14 @@ def main():
     
     #rotate object
     if UserRequest==UserOperationStrings.RotateX.value:
-      _5pointFace.rotate_ClassMethod(math.radians(5),axis="x")
+      #_5pointFace.rotate_ClassMethod(math.radians(5),axis="x")
+      MyCamera.RotateView_AroundLocation([5,0,0],[0,0,0])
     if UserRequest==UserOperationStrings.RotateY.value:
-      _5pointFace.rotate_ClassMethod(math.radians(5),axis="y")
+      #_5pointFace.rotate_ClassMethod(math.radians(5),axis="y")
+      MyCamera.RotateView_AroundLocation([0,5,0],[0,0,0])
     if UserRequest==UserOperationStrings.RotateZ.value:
-      _5pointFace.rotate_ClassMethod(math.radians(5),axis="z")
+      #_5pointFace.rotate_ClassMethod(math.radians(5),axis="z")
+      MyCamera.RotateView_AroundLocation([0,0,5],[0,0,0])
     
     #change camera focal length
     if UserRequest==UserOperationStrings.FocalLengthPlus.value:
