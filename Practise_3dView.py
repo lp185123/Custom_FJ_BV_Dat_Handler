@@ -43,9 +43,15 @@ class UserOperationStrings(enum.Enum):
     FocalLengthPlus="["
     FocalLengthMinus="]"
 
-    RotateX="x"
-    RotateY="y"
-    RotateZ="z"
+    Cam_LockRotateX="x"
+    Cam_LockRotateY="y"
+    Cam_LockRotateZ="z"
+
+    Obj_RotateX="b"
+    Obj_RotateY="n"
+    Obj_RotateZ="m"
+
+
 
     def MapKeyPressToString(self,keypress):
         if keypress in self.MapKeyPress_to_String:
@@ -234,7 +240,7 @@ class CameraClass:
 
   #these are variables (usually in __init__ as "self")
   TranslationMatrix_t=np.array([0, 0, 90])#a 3D translation vector describing the position of the camera center
-  RotationMatrix_R=np.eye(3, k=0)#orientation of the cmaera
+  RotationMatrix_R=np.eye(3, k=0)#orientation of the camera
   #experiment with rotation matrix input
   RotationMatrix_R[0,:]=np.array([1,0,0])
   RotationMatrix_R[1,:]=np.array([0,1, 0])
@@ -247,6 +253,12 @@ class CameraClass:
   def __post_init__(self):#need this for sorting
     object.__setattr__(self,'sort_index',self.Focallength_mm)#if we want to freeze object
     
+  @property
+  def TranslationMatrix(self):
+      return self.TranslationMatrix_t
+  @TranslationMatrix.setter
+  def TranslationMatrix(self, value):
+        self.TranslationMatrix_t = value
 
   def Translation_Cam_XYZ(self,x,y,z):
     self.TranslationMatrix_t[0]=self.TranslationMatrix_t[0]+x
@@ -298,6 +310,38 @@ class CameraClass:
 
   def RotateView_AroundLocation(self,XYZRotation_degrees:np.array,XYZRotateOrigin:np.array):
     '''camera will spin around area of keeping area in frame'''
+
+    TestList=[Index for Index, x in enumerate(XYZRotation_degrees) if x>0]
+    if len(TestList)>1:
+      raise Exception("RotateView_AroundLocation multiple axis input not implemented yet")
+    #maybe changing the up vector depending on input axis to rotate will
+    #help with gimbal lock problem - this is a fudge TODO
+    UpVectorDict={}
+    UpVectorDict[0]=([ 0, 1, 0 ])
+    UpVectorDict[1]=([ 0, 1, 0 ])
+    UpVectorDict[2]=([ 0, 1,0 ])
+    #multiply arbitrary up vector by current rotation advice
+    #this might help problem we have
+    #UpVector_inputAxis=self.RotationMatrix_R@UpVectorDict[TestList[0]]
+    UpVector_inputAxis=UpVectorDict[TestList[0]]
+
+    #https://computergraphics.stackexchange.com/questions/4668/correcting-my-look-at-matrix-so-that-it-works-on-non-camera-objects
+
+    #  "Using a constant vector such as (0,1,0), which is the only recommendation I've ran 
+    #  across is no good. You end up rotating the bank axis for no reason, and near singularity
+    #   points (attitude +-90) the camera spins wildly.  My solution was using [currentRotationMatrix * (0,1,0)] 
+    #   as the up vector. It makes sure only the heading and attitude are changed for the lookAt so the bank 
+    #   is not altered, and it has stood up very well through testing. I highly suggest you mention it on the
+    #    lookAt page."https://www.euclideanspace.com/maths/algebra/vectors/lookat/index.htm
+
+    #try using [currentRotationMatrix * (0,1,0)] as up vector instead of just a static up vector
+    #static up vector was causing issues with singularities (maybe - or something at 90 degrees)
+
+    #TODO maybe try rodrigues
+    #rot vec
+    #rmat,jac=cv2.rodrigues(rot_vec)
+    #angles=cv2.RDecompose3x3
+
     #translate rotate origin to zero
 
     #apply rotation(s)
@@ -305,15 +349,17 @@ class CameraClass:
     self.TranslationMatrix_t=rotateAroundAxis(self.TranslationMatrix_t, math.radians(XYZRotation_degrees[0]), axis="x")
     self.TranslationMatrix_t=rotateAroundAxis(self.TranslationMatrix_t, math.radians(XYZRotation_degrees[1]), axis="y")
     self.TranslationMatrix_t=rotateAroundAxis(self.TranslationMatrix_t, math.radians(XYZRotation_degrees[2]), axis="z")
-    
+    self.TranslationMatrix_t=np.round(self.TranslationMatrix_t,1)
     #untranslate position back
-
     #camera direction will now be a unit vector of inverted position
    # self.RotationMatrix_R=self.TranslationMatrix_t*-1
-    lookat=np.array([0,0,0])
+
+    
+
+    lookat=XYZRotateOrigin#np.array([0,0,0])
     vz = lookat - self.TranslationMatrix_t
     vz = vz / (np.linalg.norm(vz) + 1e-16)#normalise - works for vectors with mag=0
-    vx = np.cross([ 0, 1, 0 ], vz)#cross with up vector (?)
+    vx = np.cross(UpVector_inputAxis, vz)#cross with up vector (?)
     vx = vx / (np.linalg.norm(vx) + 1e-16)#normalise - works for vectors with mag=0
     vy = np.cross(vz,vx)
 
@@ -322,81 +368,64 @@ class CameraClass:
     RotMat[0:3,0]=vx
     RotMat[0:3,1]=vy
     RotMat[0:3,2]=vz
+    #RotMat[0,0:3]=vx
+    #RotMat[1,0:3]=vy
+    #RotMat[2,0:3]=vz
     RotMat[3,3]=1
     #test if a rotation matrix (only need 3x3 section for rotation only)
     
-
+    
     self.RotationMatrix_R=RotMat[0:3,0:3]
     
-    print(self.RotationMatrix_R)
+    #try using rotation vector- magnitude is the z rotation (?)
+    #rrmat,jac=cv2.Rodrigues(vx)
+    #self.RotationMatrix_R=rrmat
+
+    # print(self.RotationMatrix_R)
     if _3DVisLabLib.isRotationMatrix(RotMat[0:3,0:3])==False:
       print(f"bad rotation matrix{self.RotationMatrix_R}")
       #raise Exception("RotateView_AroundLocation isRotationMatrix, rotation matrix not valid",self.RotationMatrix_R)
     
     else:
-      TestEuler=_3DVisLabLib.rotationMatrixToEulerAngles(RotMat[0:3,0:3])
-    
-#     const Matrix4 Matrix4::createRotation(const Vertex& pos, const Vertex& lookat)
-# {
-#     Vector3 vz = lookat - pos;
-#     vz.normalize();
-#     Vector3 vx = Vector3::cross(Vector3( 0, 1, 0 ), vz);
-#     vx.normalize();
-#     Vector3 vy = Vector3::cross(vz, vx);
+      print(np.round(self.RotationMatrix_R,2))
+      print(np.degrees(_3DVisLabLib.rotationMatrixToEulerAngles(RotMat[0:3,0:3])))
+  
 
-#     Matrix4 rotation (  vx.x,   vy.x,   vz.x,   0,
-#                         vx.y,   vy.y,   vz.y,   0,
-#                         vx.z,   vy.z,   vz.z,   0,
-#                         0,      0,      0,      1);
-#     return rotation;
-#}
-# struct Mat3x3
-# {
-#     Vec3 column1;
-#     Vec3 column2;
-#     Vec3 column3;
+  def GetDistanceFromCamera(self,_3DInputPoint:np.array)->float:
+    '''get distance of current point from camera'''
+    return np.linalg.norm(self.TranslationMatrix_t-_3DInputPoint)
 
-#     void makeRotationDir(const Vec3& direction, const Vec3& up = Vec3(0,1,0))
-#     {
-#         Vec3 xaxis = Vec3::Cross(up, direction);
-#         xaxis.normalizeFast();
-
-#         Vec3 yaxis = Vec3::Cross(direction, xaxis);
-#         yaxis.normalizeFast();
-
-#         column1.x = xaxis.x;
-#         column1.y = yaxis.x;
-#         column1.z = direction.x;
-
-#         column2.x = xaxis.y;
-#         column2.y = yaxis.y;
-#         column2.z = direction.y;
-
-#         column3.x = xaxis.z;
-#         column3.y = yaxis.z;
-#         column3.z = direction.z;
-#     }
-# }
-
-
-  def GetProjectedPoints(self,InputPoint:np.array)->np.array:
-    '''Calculate projection matrix P=K [r|T]
-    this should be done in another function after proof of principle
-    Expecting input of 3D homogenous coordinates'''
+  def BuildProjectionMatrix(self):
+    '''Refresh projection matrix if any intrinsic or extrinsic camera details have changed'''
     self.CalculateIntrinsicMatrix()
     self.CalculateExtrinsicMatrix_MovingCam()
+
+  def GetProjectedPoints(self,InputPoint:np.array)->np.array:
+    '''Calculate projection matrix P=K [r|T] and return 2d points
+    this should be done in another function after proof of principle
+    Expecting input of 3D homogenous coordinates'''
+    
 
     #convert 3d point to homogenous coordinates (just add a 1)
     Homogenous3DPt=np.append(InputPoint,([1]))
     
     scaledPixelCoords = np.matmul(np.matmul(self.IntrinsicMatrix_K,self.ExtrinsicMatrix),Homogenous3DPt)
-    CartesianCoords=scaledPixelCoords/scaledPixelCoords[-1]#divide by last element to convert from homogenous to cartesian
+    #print(scaledPixelCoords)#,end="\r")
+    #do we test for clipping here?
+
+    if scaledPixelCoords[-1]!=0:
+      CartesianCoords=scaledPixelCoords/scaledPixelCoords[-1]#divide by last element to convert from homogenous to cartesian
+    else:
+      CartesianCoords=scaledPixelCoords
+      
+    
     return CartesianCoords
 
   def Get2DProjectedPoints(self,InputPoints:np.array):
     '''return 2D coordinates'''
     SuccessPnt=0
     _2dPoint_list=[]
+
     for _3dPoint in InputPoints:
       _2dPoint=self.GetProjectedPoints(_3dPoint)
       try:
@@ -410,18 +439,40 @@ class CameraClass:
         print(e)
     return np.array(_2dPoint_list)
     
+  @staticmethod
+  def mapFromTo(x,a,b,c,d):
+    # x:input value; 
+    # a,b:input range
+    # c,d:output range
+    # y:return value
+        y=(x-a)/(b-a)*(d-c)+c
+        return y
 
   def Get2DProjectedImage(self,InputPoints:np.array):
-    '''return opencv object of 2d plane'''
-    Image=np.zeros([self.Image_Width,self.Image_Height])
+
+
+    '''return opencv object of 3d input points on 2d plane, add dimming using distance from camera - fudge'''
+    #TODO fudge code for distance from camera - is there a formal way to decide this
+    Image=np.zeros([self.Image_Width,self.Image_Height,3],dtype="uint8")
     SuccessPnt=0
     _2dPoint_list=[]
+    _2dPoint_Distance=[]
     for _3dPoint in InputPoints:
+      #use *_ in case we want to add more output
       _2dPoint=self.GetProjectedPoints(_3dPoint)
       try:
-
-        Image[int(_2dPoint[0:2][0]),int(_2dPoint[0:2][1])]=255
+        #get distance of point from camera object
+        Dist_from_cam=np.linalg.norm(self.TranslationMatrix_t-_3dPoint)
+        #print(f"{Dist_from_cam}")#,end="\r")
+        #map arbitrary dimness distance
+        ColElement=int(self.mapFromTo(Dist_from_cam,150,10,0,255))
+        #set limits for maximum colour value
+        ColElement=max(0,ColElement)
+        ColElement=min(255,ColElement)
+        ColElement=255
+        Image[int(_2dPoint[0:2][0]),int(_2dPoint[0:2][1]),:]=ColElement
         _2dPoint_list.append((int(_2dPoint[0:2][0]),int(_2dPoint[0:2][1])))
+        _2dPoint_Distance.append(ColElement)
         SuccessPnt=SuccessPnt+1
       except IndexError as error:
         #for pixels out of range we can ignore
@@ -429,14 +480,16 @@ class CameraClass:
       except Exception as e:
         print("error plotting 2d projected points in Get2DProjectedImage")
         print(e)
-    print(f"{int((SuccessPnt/len(InputPoints))*100)}% points projected to 2D")
+    #if len(InputPoints)>0:
+    #  print(f"{int((SuccessPnt/len(InputPoints))*100)}% points projected to 2D")
 
     #draw lines in opencv
     line_thickness = 1
-    for Index,_2dPoint in enumerate(_2dPoint_list):
+    for Index,(_2dPoint,_2dPointDistance) in enumerate(zip(_2dPoint_list,_2dPoint_Distance)):
       if Index>=len(_2dPoint_list)-1:
         break
-      cv2.line(Image, (_2dPoint_list[Index][1],_2dPoint_list[Index][0]), (_2dPoint_list[Index+1][1],_2dPoint_list[Index+1][0]), (255), thickness=line_thickness)
+      cv2.line(Image, (_2dPoint_list[Index][1],_2dPoint_list[Index][0]), (_2dPoint_list[Index+1][1],_2dPoint_list[Index+1][0]), (_2dPointDistance,_2dPointDistance,_2dPointDistance), thickness=line_thickness)
+      pass
     return Image
 # Focallength_mm= 26 
 # Pixel_size_sensor_mm= 0.00551 
@@ -549,8 +602,6 @@ def main():
   for Index in range(0,10):
     _3D_points.append((Index*random.random(),Index*random.random(),4*Index*random.random()))
 
-
-
   def GenerateSquare():
     _side= np.arange(-10, 11, 1)
     _StaticAxis= np.full((len(_side)),10 )
@@ -586,11 +637,13 @@ def main():
   #generate vertical sides
   #have a go making this smarter
   for Elem in range (-10,10):
-    _3D_points.append((-10,-10,Elem))
-    _3D_points.append((10,-10,Elem))
+    randomint=random.randint(-2,2)
+    _3D_points.append((-10+randomint,-10+randomint,Elem))
+    _3D_points.append((10+randomint,-10+randomint,Elem))
     _3D_points.append((-10,10,Elem))
     _3D_points.append((10,10,Elem))
-  _3D_points.append(( 0.0, 0.0, 0.0))
+  
+
 
 
 
@@ -609,11 +662,14 @@ def main():
 
 
 
-
   #Translate3D(_3D_points_np,x=1,y=1,z=1)
 
-
+  DebugDraw=False
   while True:
+    DebugDraw=False
+    #refresh projection matrix
+    MyCamera.BuildProjectionMatrix()
+
     Image=MyCamera.Get2DProjectedImage(_5pointFace._3dPoints)
     UserRequest=_3DVisLabLib.ImageViewer_Quickv2_UserControl(Image,0,True,False)
     #move camera controls
@@ -630,17 +686,37 @@ def main():
     if UserRequest==UserOperationStrings.Zminus.value:
       MyCamera.Translation_Cam_XYZ(0,0,-1) 
     
-    #rotate object
-    if UserRequest==UserOperationStrings.RotateX.value:
+    #rotate camera around position
+    if UserRequest==UserOperationStrings.Cam_LockRotateX.value:
       #_5pointFace.rotate_ClassMethod(math.radians(5),axis="x")
       MyCamera.RotateView_AroundLocation([5,0,0],[0,0,0])
-    if UserRequest==UserOperationStrings.RotateY.value:
+      DebugDraw=True
+    if UserRequest==UserOperationStrings.Cam_LockRotateY.value:
       #_5pointFace.rotate_ClassMethod(math.radians(5),axis="y")
       MyCamera.RotateView_AroundLocation([0,5,0],[0,0,0])
-    if UserRequest==UserOperationStrings.RotateZ.value:
+      DebugDraw=True
+    if UserRequest==UserOperationStrings.Cam_LockRotateZ.value:
       #_5pointFace.rotate_ClassMethod(math.radians(5),axis="z")
       MyCamera.RotateView_AroundLocation([0,0,5],[0,0,0])
+      DebugDraw=True
     
+    if UserRequest==UserOperationStrings.Obj_RotateX.value:
+      _5pointFace.rotate_ClassMethod(math.radians(5),axis="x")
+      
+    if UserRequest==UserOperationStrings.Obj_RotateY.value:
+      _5pointFace.rotate_ClassMethod(math.radians(5),axis="y")
+      
+    if UserRequest==UserOperationStrings.Obj_RotateZ.value:
+      _5pointFace.rotate_ClassMethod(math.radians(5),axis="z")
+      
+
+    if DebugDraw==True:
+      #as we revolve around the object we will draw into the 3d view to quickly check motion of camera
+      #flip the transformation array otherwise if we see it straight on its hard to decipher
+      OldShape=_5pointFace._3dPoints.shape
+      TempOb=np.append(_5pointFace._3dPoints,np.round(MyCamera.TranslationMatrix/2)[::-1])
+      TempOb=TempOb.reshape(OldShape[0]+1,OldShape[1])
+      _5pointFace._3dPoints=TempOb
     #change camera focal length
     if UserRequest==UserOperationStrings.FocalLengthPlus.value:
       MyCamera.Focallength_mm=MyCamera.Focallength_mm+1
@@ -648,6 +724,7 @@ def main():
       MyCamera.Focallength_mm=MyCamera.Focallength_mm-1
 
 
+    
   Counter=0
   while True:
     Filepath=OutputPath + "\\00" + str(Counter) + ".jpg"
