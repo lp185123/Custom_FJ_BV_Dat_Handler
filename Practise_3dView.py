@@ -245,7 +245,6 @@ class CameraClass:
   RotationMatrix_R[0,:]=np.array([1,0,0])
   RotationMatrix_R[1,:]=np.array([0,1, 0])
   RotationMatrix_R[2,:]=np.array([0,0, 1])
-  
   IntrinsicMatrix_K=None# calibration matrix
   ExtrinsicMatrix=None
   _3D_worldCoordinates=None
@@ -387,12 +386,17 @@ class CameraClass:
       #raise Exception("RotateView_AroundLocation isRotationMatrix, rotation matrix not valid",self.RotationMatrix_R)
     
     else:
-      print(np.round(self.RotationMatrix_R,2))
-      print(np.degrees(_3DVisLabLib.rotationMatrixToEulerAngles(RotMat[0:3,0:3])))
-  
+      pass
+      #print(np.round(self.RotationMatrix_R,2))
+      #print(np.degrees(_3DVisLabLib.rotationMatrixToEulerAngles(RotMat[0:3,0:3])))
 
+
+  @staticmethod
+  def euclid_dist(t1, t2):
+    return np.sqrt(np.sum(np.square(t1-t2)))
   def GetDistanceFromCamera(self,_3DInputPoint:np.array)->float:
     '''get distance of current point from camera'''
+    return self.euclid_dist(self.TranslationMatrix_t,_3DInputPoint)
     return np.linalg.norm(self.TranslationMatrix_t-_3DInputPoint)
 
   def BuildProjectionMatrix(self):
@@ -447,6 +451,20 @@ class CameraClass:
     # y:return value
         y=(x-a)/(b-a)*(d-c)+c
         return y
+
+  def Is_3DPointBehindCamera(self,_3DInputPoint:np.array)->bool:
+    '''return a boolean if the 3D point is clipped from view (behind camera)'''
+    #need 3d camera location, normal describing camera plane, 3d input point
+
+    #take product of camera normal CN and (plot point-camera location)
+    #TODO define this axis in initialisation
+    CameraForwardVector=self.RotationMatrix_R[0:3,2]
+    DotProd=np.dot(CameraForwardVector, (self.TranslationMatrix_t-_3DInputPoint))
+    #print(f"DotProd {DotProd} _3DInputPoint{_3DInputPoint} self.TranslationMatrix_t{self.TranslationMatrix_t}")#,end="\r")
+    if DotProd <0:
+      return False
+    else:
+      return True
 
   def Get2DProjectedImage(self,InputPoints:np.array):
 
@@ -553,6 +571,13 @@ def _3D_Plotter(Input_np_array,Filepath,Drawpaths,CrossProducts,**kwargs):#3d ma
     sequence_containing_z_vals = list(Input_np_array[:,2])
     ax.scatter(sequence_containing_x_vals, sequence_containing_y_vals, sequence_containing_z_vals)
   
+    #plt.xlim([-500,500])
+    #plt.ylim([-500,500])
+    OrbitRange=300
+    ax.set_xlim(-OrbitRange,OrbitRange)
+    ax.set_ylim(-OrbitRange,OrbitRange)
+    ax.set_zlim(-OrbitRange,OrbitRange)
+
     if Drawpaths is True:
       x_start,y_start,z_start=0,0,0
       for Index,(x,y,z) in enumerate(zip(sequence_containing_x_vals,sequence_containing_y_vals,sequence_containing_z_vals)):
@@ -576,11 +601,12 @@ def _3D_Plotter(Input_np_array,Filepath,Drawpaths,CrossProducts,**kwargs):#3d ma
         #get cross product of last and current vectors - remember right hand rule!
         crossProd=np.cross([x_start,y_start,z_start],[x,y,z])
         plt.plot([0,crossProd[0]],[0,crossProd[1]],[0,crossProd[2]],label='v')
-
     #plt.show()
     if Filepath is not None:
       plt.savefig(Filepath)
-
+    else:
+      plt.show()
+      plt.close()
 def main():
   OutputPath=r"C:\Working\testOutput"
 

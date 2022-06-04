@@ -77,7 +77,7 @@ class CloudOCR():
         #Authenticate user - see notes 
         #https://www.youtube.com/watch?v=_24h-FQODqo good guidance - have to PIP install the google thing very specifically
         #os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = r"C:\Working\FindIMage_In_Dat\VisionAPIDemo\ocrtrial-338212-a4732d2e2a9c.json"
-        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = r"C:\Working\titanium-cacao-345715-a5031caf2100.json"
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = r"C:\Working\SN_KEY\titanium-cacao-345715-43b9e36018da.json"
         self.client = vision.ImageAnnotatorClient()
         #set GOOGLE_APPLICATION_CREDENTIALS="C:\Working\GIT\BV_DatHandler\titanium-cacao-345715-a5031caf2100.json"
         #pip install --upgrade google-analytics-data

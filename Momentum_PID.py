@@ -51,11 +51,11 @@ class _ND_Body:
         self.position_ND=np.array(self.position_ND,dtype=float)
         self.ForceVector_ND=np.array(self.ForceVector_ND,dtype=float)
         self.velocity_ND=np.array(self.velocity_ND,dtype=float)
-        self.Radius=int(np.linalg.norm(self.ForceVector_ND)+self.Mass)
-        if self.Radius>30:
-            self.Radius=30
-        if self.Radius<2:
-            self.Radius=2
+        #self.Radius=int(np.linalg.norm(self.ForceVector_ND)+self.Mass)
+        #if self.Radius>30:
+        #    self.Radius=30
+        #if self.Radius<2:
+        #    self.Radius=2
         self.Colour=(random.randint(0,255),random.randint(0,255),random.randint(0,255))
 
     def SimulateAsPhysicsBody(self,InputObject,dT):
@@ -167,13 +167,16 @@ class SimViewBox():
             pass
         return self.BaseImage
 
-    def UpdateImage(self,Object,_2Dpoint_if_exists,CameraObject):
+    def UpdateImage_ForSpheres(self,Object,_2Dpoint_if_exists,CameraObject,_2DProjectedRadius):
+        '''update the 2D camera image with sphere subjects
+        need 2D camera projection points of sphere centre and sphere radius'''
+
         if _2Dpoint_if_exists is not None:
             center_coordinates=tuple(_2Dpoint_if_exists)
         else:
             # Center coordinates
             center_coordinates = tuple([int(x) for x in Object.position_ND[0:2]] )
-        Rules=[center_coordinates[0]>0, center_coordinates[1]>0, center_coordinates[0]<self.BaseImage.shape[0],center_coordinates[0]<self.BaseImage.shape[1]]
+        Rules=[(CameraObject.Is_3DPointBehindCamera(Object.position_ND)) is False,center_coordinates[0]>0, center_coordinates[1]>0, center_coordinates[0]<self.BaseImage.shape[0],center_coordinates[0]<self.BaseImage.shape[1]]
         if not all(Rules):
             #print(f"Out of range to plot body {center_coordinates}")
             return self.BaseImage
@@ -181,26 +184,30 @@ class SimViewBox():
         #get distance from input object to camera object centre
         Dist2Camera=CameraObject.GetDistanceFromCamera(Object.position_ND)
         # Radius of circle
-        radius = 15#Object.Radius standard radius for all 
-        #difference from z0
-        Zdepth=int(Dist2Camera/30)
-        radius=radius+Zdepth
-
-        if Object.Mass==1:
-            radius=radius/3
+        radius =int((300-Dist2Camera)/10)#_2DProjectedRadius#Object.Radius standard radius for all 
+        #print(f"Dist2Camera{Dist2Camera}")
         if radius<2:
             radius=2
         if radius>100:
             radius=100
 
+        #difference from z0
+        Zdepth=int(Dist2Camera)
+        #radius=radius+Zdepth
+        
+
         NewColour=(np.array(Object.Colour)/2)
         NewColour=tuple(NewColour.astype(int))
 
-
         # Blue color in BGR
         color = Object.Colour
-        Zdepth=Zdepth*3
-        NewerColor=(Object.Colour[0]+Zdepth,Object.Colour[1]+Zdepth,Object.Colour[2]+Zdepth)
+        DistanceFade=(mapFromTo(Zdepth,600,400,1,0.1))
+        DistanceFade=max(0.1,DistanceFade)
+        DistanceFade=min(1,DistanceFade)
+        DistanceFade=1#debug
+        NewerColor=(int(Object.Colour[0]*DistanceFade),
+        int(Object.Colour[1]*DistanceFade),
+        int(Object.Colour[2]*DistanceFade))
         
         # Line thickness of 2 px
         thickness = -1
@@ -223,11 +230,12 @@ class SimViewBox():
         KernelSize=int(mapFromTo(Zdepth,-50,30,9,1))
         KernelSize=max(1,KernelSize)
         KernelSize=min(21,KernelSize)
+        KernelSize=3
         if KernelSize%2==0:#kernels can only handle odd numbers
             KernelSize+=1
 
         kernel = np.ones((KernelSize,KernelSize),np.float32)/(KernelSize*KernelSize)#kernel size for smoothing - maybe make smoother as such small images
-        IncreaseRadius=10
+        IncreaseRadius=5
         CentreAreaToSMoothX=center_coordinates[1]
         CentreAreaToSMoothY=center_coordinates[0]
         LeftAreaToSMoothX=CentreAreaToSMoothX-int(radius+IncreaseRadius)
@@ -255,8 +263,7 @@ class SimViewBox():
         #cut out hole in original image
         OriginalArea=self.BaseImage[LeftAreaToSMoothX:RightAreaToSMoothX,TopAreaToSMoothX:LowerAreaToSMoothX,:].copy()
 
-       
-
+    
         self.BaseImage[LeftAreaToSMoothX:RightAreaToSMoothX,TopAreaToSMoothX:LowerAreaToSMoothX,:]=0#(BinarisedImage_3Channel_inv*255)
 
         plop=np.subtract(OriginalArea.astype(np.int16),BinarisedImage_3Channel.astype(np.int16))
@@ -302,42 +309,98 @@ def FollowMouse(event, x, y, flags, param):
         MouseClick_LeftDown=True
     if event == cv2.EVENT_LBUTTONUP:
         MouseClick_LeftDown=False
+def euclid_dist(t1, t2):
+    return np.sqrt(np.sum(np.square(t1-t2)))
+def GetProjectedRadius(SphericalPhysBody,CameraObject: Practise_3dView.CameraClass ,_2D_CentrePoint):
+    '''Get circle raidus to represent 3D spherical object in 2D projected view'''
+    
+    # #align circle with normal of camera
+                #from centre of object, use rotation matrix of camera to offset radius in plane parallel to camera
+                #get any vector except forward vector
+    #             CameraPlane=CameraObject.RotationMatrix_R[0:3,1]
+    #             RadiusOffset_3D=SphericalPhysBody.position_ND+(CameraPlane*SphericalPhysBody.Radius)
+    #             #print(f"RadiusOffset_3D{RadiusOffset_3D}")
+                
+
+    #             #make sure vectors are aligned, should be "flat" to each other - but can flip polarity
+    #             CheckV1=RadiusOffset_3D-SphericalPhysBody.position_ND
+    #             CheckV1=CheckV1/np.linalg.norm(CheckV1)
+    #             CheckV2=CameraObject.RotationMatrix_R[0:3,1]
+    #             CheckV2=CheckV2/np.linalg.norm(CheckV2)
+    #             DotProduct=np.dot(CheckV1,CheckV2)
+    #             #print(f"DotProduct_ProjectCheck {DotProduct}")
+    #             if not all([abs(DotProduct)>0.98,abs(DotProduct)<1.02]):
+    #                 print(f"GetProjectedRadius Error, dotproduct {DotProduct}")
+    #                 #raise Exception("Error with GetProjectedRadius check DotProduct")
 
 
+    #circle will "look at" centre of camera
+    #create a vector orthogonal to look-at vector
+    Look_atVector=CameraObject.TranslationMatrix- SphericalPhysBody.position_ND
+    #need arbitray vector as long as makes valid cross product, make sure can't align or will break
+    ArbitraryVec=np.array([-Look_atVector[1],1,-Look_atVector[2]])
+    CrossProd=np.cross(Look_atVector,ArbitraryVec)
+    #check orthogonal (dot product=0)
+    DotProduct_check=np.dot(Look_atVector,CrossProd)
+    if round(DotProduct_check,2)!=0:
+        print(f"Look_atVector {Look_atVector} ArbitraryVec {ArbitraryVec} DotProduct_check {DotProduct_check} ")
+        raise Exception("Error with GetProjectedRadius, dotproduct not zero for orthogonal vector")
 
+    CrossProd_norm=CrossProd / np.linalg.norm(CrossProd)
+    RadiusOffset_3D=SphericalPhysBody.position_ND+(CrossProd_norm*SphericalPhysBody.Radius)
+
+    #check the 3d distance - this should always be the radius unless we are using the wrong camera axis
+    #or the camera is aligned with an axis 
+    Check3D_Distance=euclid_dist(SphericalPhysBody.position_ND, RadiusOffset_3D)
+    if abs(Check3D_Distance-SphericalPhysBody.Radius)>0.1:
+        #pass
+        raise Exception("Error with GetProjectedRadius Check3D_Distance- possibly incorrect camera axis ")
+
+
+    #Calculate 2D projecti on of radius offset
+    ProjectedPoint=CameraObject.Get2DProjectedPoints(np.expand_dims(RadiusOffset_3D, axis=0))
+    if (ProjectedPoint.shape)!=(1,2):
+        raise Exception("Error with GetProjectedRadius ProjectedPoint- probably bad cross product ")
+    #calculate difference of position between 2D centre point projection and 2D radius offset
+    #this figure can be used to create a circle in the draw loop
+    dist = euclid_dist(_2D_CentrePoint,ProjectedPoint)
+    return dist,RadiusOffset_3D
+
+def CalculateCollisionSphere(Obj1,Obj2,Elastic=True):
+    #https://physics.stackexchange.com/questions/598480/calculating-new-velocities-of-n-dimensional-particles-after-collision/598524#598524
+    pass
 def main():
 
     #create camera object
-    MyCamera=Practise_3dView.CameraClass("ForProjectionMatrix",5,0.00551,500,500)
-    MyCamera.TranslationMatrix=np.array([0,0,500])
-
-
+    MyCamera=Practise_3dView.CameraClass("ForProjectionMatrix",2,0.00551,500,500)
+    MyCamera.TranslationMatrix=np.array([0,0,-150])
     ListBodies=[]
     ListTrails=[]
     cv2.namedWindow("img")
     cv2.setMouseCallback("img", FollowMouse)
     #create objects
-    force_Gravity=_ND_Body("User",10.0,[0,0,0],[0,0,0],[70,70,70],0)
+    force_Gravity=_ND_Body("User",10.0,[0,0,0],[0,0,0],[370,370,370],5)
     ListBodies.append(force_Gravity)
    
     #add little ones
-    for Indexer, CreateBody in enumerate(range (0,6)):
+    for Indexer, CreateBody in enumerate(range (0,10)):
         RandMass=1
-        RandForce=RandMass
+        RandForce=2
         ListBodies.append(_ND_Body(str(Indexer),
         RandMass,
-        [random.randint(0,50),random.randint(0,50),random.randint(-20,20)],
-        [-0.08,0,random.randint(-1,1)*random.random()*random.random()],
-        [RandForce,RandForce,RandForce],0))
-
-    for Indexer, CreateBody in enumerate(range (0,1)):
-        RandMass=random.randint(200,200)
+        [random.randint(-100,100),random.randint(-100,100),random.randint(-100,100)],
+        [random.randint(-3,3)*0.1,random.randint(-3,3)*0.1,random.randint(1,3)*0.1],
+        [RandForce,RandForce,RandForce],5))
+        #[random.randint(-3,3)*0.01,random.randint(-3,3)*0.01,random.randint(-3,3)*0.01],
+    #[-0.08*0,0,random.randint(-3,3)*random.random()*random.random()*0],
+    for Indexer, CreateBody in enumerate(range (0,0)):
+        RandMass=65
         RandForce=RandMass#random.randint(1,1)
         ListBodies.append(_ND_Body(str(Indexer),
         RandMass,
-        [random.randint(30,30),random.randint(20,20),random.randint(-10,10)],
-        [-0.01,0,0],
-        [RandForce,RandForce,RandForce],0))
+        [random.randint(-10,10),random.randint(-10,10),random.randint(-10,10)],
+        [random.randint(-5,5)*0.01,random.randint(-3,3)*0.01,random.randint(-3,3)*0.01],
+        [RandForce,RandForce,RandForce],5))
     
 
 
@@ -348,16 +411,28 @@ def main():
     global GlobalMousePos,MouseClick_LeftDown
     
     Counter=0
+    ImgCounter=0
     dt=5
     while Counter<9999999:
+        OutputSimImage=None
         Counter+=1
-
+        #force_Gravity.position_ND=np.array([0,0,100-Counter-Counter])
+        #MyCamera.RotateView_AroundLocation([10,0,0],[0,0,0])
+        #MyCamera.RotateView_AroundLocation([0,3,0],[0,0,0])
+        #MyCamera.RotateView_AroundLocation([0,0,2],[0,0,0])
+        #MyCamera.Translation_Cam_XYZ(0,0,-2)
         #print(f"{Counter}", end="\r")
+        
         if MouseClick_LeftDown==True:
+            #force_Gravity.position_ND=np.array([0,0,10-Counter])
             MyCamera.RotateView_AroundLocation([0,5,0],[0,0,0])
-            dt=0#dTime.Get_dT()
+            if Counter%3==0 : dt-=1
         else:
-            dt=5#dTime.Get_dT()
+            if Counter%3==0 : dt+=1#dTime.Get_dT()
+        dt=max(0,dt)
+        dt=min(5,dt)
+
+
         #get time difference to keep it consistent
         #force_Gravity.position_ND=np.array(list(GlobalMousePos) + [0])#only want X and Y but need a Z to satisfy logic
         #time.sleep(0.01)
@@ -374,6 +449,7 @@ def main():
         ListBodies.reverse()#we want to draw from farthest away object to closest 
 
         ListTrails=[]
+        DebugArray=[]
         for Index, PhysBody in enumerate(ListBodies):
             if type(PhysBody) is TrailUnit:
                 #update trails according to z buffer
@@ -385,19 +461,39 @@ def main():
 
             #if is a physics body - update image and get a trails object
             if type(PhysBody) is _ND_Body:
+                #if object is behind the camera, don't draw
+                
+                    
+                #we are operating with spheres, so need to get the projected circle radius
+                #need to extend radius from centre point out in same plane as camera
+                
+                #map 3D cartesian point to 2D with view frustrum
                 #for doing 1 coordinate at a time, need to expand a dim 
                 ProjectedPoint=MyCamera.Get2DProjectedPoints(np.expand_dims(PhysBody.position_ND, axis=0))
-                OutputSimImage= SimImage.UpdateImage(PhysBody,ProjectedPoint[0],MyCamera)
-
+                #specifically for drawing spheres - need to get radius projection from point
+                #using a vector from the camera rotation matrix - so the radius is plotted flat to camera
+                
+                _2DProjectedRadius,_3DCheckRadius=GetProjectedRadius(SphericalPhysBody=PhysBody,CameraObject=MyCamera,_2D_CentrePoint=ProjectedPoint)
+                #print(f"_2DProjectedRadius{_2DProjectedRadius}")
+                #generate image specifcally for spherical graphics
+                OutputSimImage= SimImage.UpdateImage_ForSpheres(PhysBody,ProjectedPoint[0],MyCamera,_2DProjectedRadius)
+                
+                #print(f"Check3D_Distance {MyCamera.GetDistanceFromCamera(PhysBody.position_ND)}")
+                #print(f"_2DProjectedRadius {_2DProjectedRadius}")
                 #if no time don't get trail object - even if trail granted per distance unit
                 if dt!=0: ListTrails.append(copy.deepcopy(PhysBody.GetTrailObject()))
+
+                #debug 
+                #DebugArray.append(_3DCheckRadius)
+                DebugArray.append(PhysBody.position_ND)
             
         if Counter%1==0:
-            OutputSimImage = cv2.resize(OutputSimImage,(OutputSimImage.shape[1]*2,OutputSimImage.shape[0]*2))
-            cv2.imshow("img", OutputSimImage)
-            if cv2.waitKey(20) & 0xFF == 27:#need [waitkey] for GUI to update
-                #for some reason
-                pass 
+            if OutputSimImage is not None:
+                OutputSimImage = cv2.resize(OutputSimImage,(OutputSimImage.shape[1]*2,OutputSimImage.shape[0]*2))
+                cv2.imshow("img", OutputSimImage)
+                if cv2.waitKey(20) & 0xFF == 27:#need [waitkey] for GUI to update
+                    #for some reason
+                    pass 
 
         for PhysBody in ListBodies:
             if type(PhysBody) is _ND_Body: 
@@ -409,6 +505,19 @@ def main():
                         if all(rules):
                             PhysBody.SimulateAsPhysicsBody(PhysBodyExt,dt)
 
-
+        #debug output 
+        #draw camera rotation
+        DebugArray.append(MyCamera.TranslationMatrix + (MyCamera.RotationMatrix_R[0:3,0]*5))
+        DebugArray.append(MyCamera.TranslationMatrix + (MyCamera.RotationMatrix_R[0:3,1]*5))
+        DebugArray.append(MyCamera.TranslationMatrix + (MyCamera.RotationMatrix_R[0:3,2]*15))
+        DebugArray.append(MyCamera.TranslationMatrix)
+        #DebugArray.append([0,0,0])
+        XYZplotFilePath=r"C:\Working\TempImages\OrbitTempImgs\IMG00" + str(ImgCounter) + ".jpg"
+        ImgCounter+=1
+        ImgplotFilePath=r"C:\Working\TempImages\OrbitTempImgs\IMG00" + str(ImgCounter) + ".jpg"
+        ImgCounter+=1
+        
+        #Practise_3dView._3D_Plotter(np.array(DebugArray),XYZplotFilePath,None,None)
+        #cv2.imwrite(ImgplotFilePath, OutputSimImage)
 if __name__ == "__main__":
     main()
